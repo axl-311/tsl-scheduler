@@ -1637,6 +1637,10 @@
         document.getElementById('startHour').value = this.config.startHour;
         document.getElementById('endHour').value = this.config.endHour;
         document.getElementById('googleClientId').value = this.config.googleClientId || '';
+        document.getElementById('calendarT1').value = this.config.calendarT1 || '';
+        document.getElementById('calendarT2').value = this.config.calendarT2 || '';
+        document.getElementById('calendarPublic').value = this.config.calendarPublic || '';
+        document.getElementById('calendarNonPublic').value = this.config.calendarNonPublic || '';
         
         this.openDialog('settingsDialog');
       }
@@ -1645,6 +1649,10 @@
         this.config.startHour = parseInt(document.getElementById('startHour').value);
         this.config.endHour = parseInt(document.getElementById('endHour').value);
         this.config.googleClientId = document.getElementById('googleClientId').value.trim() || null;
+        this.config.calendarT1 = document.getElementById('calendarT1').value.trim() || null;
+        this.config.calendarT2 = document.getElementById('calendarT2').value.trim() || null;
+        this.config.calendarPublic = document.getElementById('calendarPublic').value.trim() || null;
+        this.config.calendarNonPublic = document.getElementById('calendarNonPublic').value.trim() || null;
         
         this.saveConfig();
         this.render();
