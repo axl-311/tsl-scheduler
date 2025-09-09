@@ -5,63 +5,95 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TSL Scheduler 2.0</title>
   <style>
-    * {
+    /* Modern CSS Reset & Variables */
+    *, *::before, *::after {
+      box-sizing: border-box;
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
     }
 
     :root {
+      /* Colors */
       --primary: #3b82f6;
+      --primary-dark: #2563eb;
+      --secondary: #8b5cf6;
       --success: #10b981;
-      --danger: #ef4444;
       --warning: #f59e0b;
+      --danger: #ef4444;
+      --gray-50: #f9fafb;
       --gray-100: #f3f4f6;
       --gray-200: #e5e7eb;
       --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
       --gray-500: #6b7280;
+      --gray-600: #4b5563;
       --gray-700: #374151;
+      --gray-800: #1f2937;
       --gray-900: #111827;
+      
+      /* Layout */
+      --sidebar-width: 320px;
+      --header-height: 60px;
+      --slot-height: 24px;
+      --time-width: 70px;
+      --theater-width: 240px;
+      
+      /* Transitions */
+      --transition: all 0.2s ease;
     }
 
+    /* Base Styles */
     body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background: var(--gray-100);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-900);
       height: 100vh;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
     }
 
     /* Header */
     .header {
+      height: var(--header-height);
       background: white;
       border-bottom: 1px solid var(--gray-200);
-      padding: 1rem 1.5rem;
+      padding: 0 1.5rem;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
-    .header h1 {
+    .header-title {
       font-size: 1.25rem;
       font-weight: 700;
+      color: var(--gray-900);
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.75rem;
     }
 
+    .header-controls {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    /* Buttons */
     .btn {
       padding: 0.5rem 1rem;
-      border: 1px solid var(--gray-300);
-      background: white;
       border-radius: 0.375rem;
-      cursor: pointer;
+      border: 1px solid transparent;
       font-size: 0.875rem;
-      transition: all 0.2s;
-    }
-
-    .btn:hover {
-      background: var(--gray-100);
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      white-space: nowrap;
     }
 
     .btn-primary {
@@ -70,20 +102,36 @@
       border-color: var(--primary);
     }
 
-    .btn-primary:hover {
-      background: #2563eb;
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-dark);
     }
 
-    .btn-success {
-      background: var(--success);
-      color: white;
-      border-color: var(--success);
+    .btn-secondary {
+      background: white;
+      color: var(--gray-700);
+      border-color: var(--gray-300);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--gray-50);
     }
 
     .btn-danger {
       background: var(--danger);
       color: white;
-      border-color: var(--danger);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #dc2626;
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background: #059669;
     }
 
     .btn:disabled {
@@ -91,24 +139,34 @@
       cursor: not-allowed;
     }
 
-    /* Layout */
-    .main {
+    /* Main Layout */
+    .main-container {
       display: flex;
       flex: 1;
       overflow: hidden;
     }
 
+    /* Sidebar */
     .sidebar {
-      width: 300px;
+      width: var(--sidebar-width);
       background: white;
       border-right: 1px solid var(--gray-200);
       display: flex;
       flex-direction: column;
+      transition: transform 0.3s ease;
     }
 
     .sidebar-header {
       padding: 1rem;
       border-bottom: 1px solid var(--gray-200);
+      background: var(--gray-50);
+    }
+
+    .sidebar-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--gray-700);
+      margin-bottom: 0.75rem;
     }
 
     .sidebar-content {
@@ -117,73 +175,151 @@
       padding: 1rem;
     }
 
+    /* Movie Cards */
     .movie-card {
+      background: white;
       border: 2px solid var(--gray-200);
       border-radius: 0.5rem;
       padding: 0.75rem;
       margin-bottom: 0.75rem;
       cursor: grab;
-      background: white;
+      transition: var(--transition);
+      position: relative;
     }
 
     .movie-card:hover {
       border-color: var(--primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .movie-card.dragging {
       opacity: 0.5;
+      cursor: grabbing;
     }
 
-    /* Schedule */
-    .schedule-area {
+    .movie-title {
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 0.25rem;
+    }
+
+    .movie-info {
+      font-size: 0.75rem;
+      color: var(--gray-500);
+    }
+
+    .movie-actions {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .icon-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 0.25rem;
+      border: none;
+      background: var(--gray-100);
+      color: var(--gray-600);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+      font-size: 0.75rem;
+    }
+
+    .icon-btn:hover {
+      background: var(--gray-200);
+    }
+
+    .icon-btn.delete:hover {
+      background: var(--danger);
+      color: white;
+    }
+
+    /* Schedule Area */
+    .schedule-container {
       flex: 1;
       overflow: auto;
+      background: var(--gray-50);
       padding: 1.5rem;
     }
 
-    .week-nav {
+    .week-header {
       background: white;
       border-radius: 0.5rem;
       padding: 1rem;
-      margin-bottom: 1rem;
+      margin-bottom: 1.5rem;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
+    .week-nav {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .week-label {
+      font-weight: 600;
+      min-width: 200px;
+      text-align: center;
+    }
+
+    /* Schedule Grid */
     .schedule-grid {
       background: white;
       border-radius: 0.5rem;
-      overflow-x: auto;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
     .days-container {
       display: flex;
-      min-width: fit-content;
+      overflow-x: auto;
     }
 
     .day-column {
-      min-width: 500px;
+      min-width: calc(var(--time-width) + 2 * var(--theater-width));
       border-right: 1px solid var(--gray-200);
     }
 
+    .day-column:last-child {
+      border-right: none;
+    }
+
     .day-header {
+      background: var(--gray-50);
       padding: 0.75rem;
-      background: var(--gray-100);
       font-weight: 600;
       text-align: center;
       border-bottom: 1px solid var(--gray-200);
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
 
     .theaters-row {
       display: flex;
+      background: white;
       border-bottom: 1px solid var(--gray-200);
+      position: sticky;
+      top: 41px;
+      z-index: 9;
     }
 
     .time-header {
-      width: 80px;
+      width: var(--time-width);
       padding: 0.5rem;
       text-align: center;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--gray-600);
       border-right: 1px solid var(--gray-200);
     }
 
@@ -191,124 +327,255 @@
       flex: 1;
       padding: 0.5rem;
       text-align: center;
+      font-size: 0.875rem;
+      font-weight: 500;
       border-right: 1px solid var(--gray-200);
     }
 
-    .day-body {
+    .theater-header:last-child {
+      border-right: none;
+    }
+
+    .day-content {
       display: flex;
+      position: relative;
     }
 
     .time-column {
-      width: 80px;
+      width: var(--time-width);
       border-right: 1px solid var(--gray-200);
+      background: var(--gray-50);
     }
 
     .time-slot {
-      height: 24px;
+      height: var(--slot-height);
       padding: 0 0.5rem;
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      font-size: 0.75rem;
+      font-size: 0.6875rem;
       color: var(--gray-500);
       border-bottom: 1px solid var(--gray-100);
     }
 
     .time-slot.hour {
       font-weight: 600;
+      color: var(--gray-700);
       border-bottom-color: var(--gray-200);
     }
 
-    .theaters {
-      flex: 1;
+    .theaters-container {
       display: flex;
+      flex: 1;
     }
 
     .theater-lane {
-      flex: 1;
+      width: var(--theater-width);
       position: relative;
       border-right: 1px solid var(--gray-200);
       background-image: repeating-linear-gradient(
         to bottom,
         transparent,
-        transparent 23px,
-        var(--gray-100) 23px,
-        var(--gray-100) 24px
+        transparent calc(var(--slot-height) - 1px),
+        var(--gray-100) calc(var(--slot-height) - 1px),
+        var(--gray-100) var(--slot-height)
       );
     }
 
-    .theater-lane.drag-over {
-      background-color: rgba(59, 130, 246, 0.1);
+    .theater-lane:last-child {
+      border-right: none;
     }
 
-    /* Schedule blocks */
+    .theater-lane.drag-over {
+      background-color: rgba(59, 130, 246, 0.05);
+    }
+
+    /* Schedule Blocks */
     .schedule-block {
       position: absolute;
       left: 4px;
       right: 4px;
       background: var(--primary);
       color: white;
-      border-radius: 0.25rem;
-      padding: 0.25rem 0.5rem;
+      border-radius: 0.375rem;
+      padding: 0.375rem 0.5rem;
       font-size: 0.75rem;
       cursor: grab;
+      transition: var(--transition);
+      z-index: 5;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .schedule-block:active {
+      cursor: grabbing;
     }
 
     .schedule-block:hover {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-      z-index: 10;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 6;
     }
 
-    .block-remove {
-      float: right;
+    .schedule-block.dragging {
+      opacity: 0.5;
+      cursor: grabbing;
+    }
+
+    .block-title {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .block-time {
+      font-size: 0.625rem;
+      opacity: 0.9;
+      margin-top: 0.125rem;
+      font-weight: 500;
+    }
+
+    .block-duration {
+      font-size: 0.625rem;
+      opacity: 0.8;
+      margin-top: 0.125rem;
+      font-style: italic;
+    }
+
+    .block-actions {
+      position: absolute;
+      top: 0.25rem;
+      right: 0.25rem;
+      display: flex;
+      gap: 0.125rem;
+    }
+
+    .block-btn {
+      width: 18px;
+      height: 18px;
+      border-radius: 0.25rem;
+      border: none;
+      background: rgba(255, 255, 255, 0.3);
+      color: white;
       cursor: pointer;
-      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.625rem;
+      transition: var(--transition);
     }
 
-    /* Modal */
-    .modal {
+    .block-btn:hover {
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    /* Drag Ghost */
+    .drag-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 1000;
+      background: var(--primary);
+      color: white;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    /* Drop Preview */
+    .drop-preview {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      background: rgba(59, 130, 246, 0.2);
+      border: 2px dashed var(--primary);
+      border-radius: 0.375rem;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .drop-preview.conflict {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: var(--danger);
+    }
+
+    /* Dialogs */
+    .dialog {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
     }
 
-    .modal.open {
+    .dialog.open {
       display: flex;
     }
 
-    .modal-content {
+    .dialog-content {
       background: white;
-      border-radius: 0.5rem;
+      border-radius: 0.75rem;
       width: 90%;
       max-width: 500px;
       max-height: 90vh;
-      overflow-y: auto;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     }
 
-    .modal-header {
-      padding: 1rem;
+    .dialog-header {
+      padding: 1.25rem 1.5rem;
       border-bottom: 1px solid var(--gray-200);
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
     }
 
-    .modal-body {
-      padding: 1rem;
+    .dialog-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--gray-900);
     }
 
-    .modal-footer {
-      padding: 1rem;
+    .dialog-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 0.375rem;
+      border: none;
+      background: transparent;
+      color: var(--gray-400);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+    }
+
+    .dialog-close:hover {
+      background: var(--gray-100);
+      color: var(--gray-600);
+    }
+
+    .dialog-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .dialog-footer {
+      padding: 1rem 1.5rem;
       border-top: 1px solid var(--gray-200);
       display: flex;
       justify-content: flex-end;
       gap: 0.5rem;
     }
 
+    /* Forms */
     .form-group {
       margin-bottom: 1rem;
     }
@@ -317,148 +584,190 @@
       display: block;
       font-size: 0.875rem;
       font-weight: 500;
-      margin-bottom: 0.25rem;
+      color: var(--gray-700);
+      margin-bottom: 0.375rem;
     }
 
     .form-input {
       width: 100%;
-      padding: 0.5rem;
+      padding: 0.5rem 0.75rem;
       border: 1px solid var(--gray-300);
-      border-radius: 0.25rem;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      transition: var(--transition);
     }
 
-    /* Toast */
-    .toast {
+    .form-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .form-row {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .form-row .form-group {
+      flex: 1;
+    }
+
+    /* Toast Notifications */
+    .toast-container {
       position: fixed;
-      bottom: 1rem;
-      right: 1rem;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .toast {
       background: white;
-      border: 1px solid var(--gray-200);
+      padding: 1rem 1.25rem;
       border-radius: 0.5rem;
-      padding: 1rem;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      display: none;
-      z-index: 2000;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      animation: slideIn 0.3s ease;
+      min-width: 250px;
     }
 
-    .toast.show {
-      display: block;
+    .toast.success {
+      border-left: 4px solid var(--success);
     }
 
+    .toast.error {
+      border-left: 4px solid var(--danger);
+    }
+
+    .toast.info {
+      border-left: 4px solid var(--primary);
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    /* Google Calendar Status */
     .google-status {
-      display: inline-block;
-      padding: 0.25rem 0.5rem;
-      border-radius: 0.25rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.25rem 0.625rem;
+      border-radius: 9999px;
       font-size: 0.75rem;
-      background: var(--gray-200);
+      font-weight: 500;
     }
 
     .google-status.connected {
       background: var(--success);
       color: white;
     }
+
+    .google-status.disconnected {
+      background: var(--gray-300);
+      color: var(--gray-700);
+    }
+
+    /* Utility Classes */
+    .hidden { display: none !important; }
+    .text-muted { color: var(--gray-500); }
+    .text-small { font-size: 0.875rem; }
+    .mt-1 { margin-top: 0.25rem; }
   </style>
 </head>
 <body>
+  <!-- Header -->
   <div class="header">
-    <h1>
-      🎬 TSL Scheduler
-      <span class="google-status" id="googleStatus">Not Connected</span>
-    </h1>
-    <div style="display: flex; gap: 0.5rem;">
-      <button class="btn" onclick="app.openSettings()">⚙️ Settings</button>
-      <button class="btn btn-primary" onclick="app.saveAll()">💾 Save</button>
-      <button class="btn btn-success" id="connectBtn" onclick="app.connectGoogle()" disabled>🔗 Connect</button>
-      <button class="btn btn-primary" id="pushBtn" onclick="app.pushToGoogle()" style="display:none">📤 Push</button>
-      <button class="btn" id="loadBtn" onclick="app.loadFromGoogle()" style="display:none">📥 Load</button>
+    <div class="header-title">
+      🎬 TSL Scheduler 2.0
+      <span class="google-status disconnected" id="googleStatus">
+        <span id="googleStatusText">Not Connected</span>
+      </span>
+    </div>
+    <div class="header-controls">
+      <button class="btn btn-secondary" id="toggleSidebar">☰</button>
+      <button class="btn btn-primary" id="saveBtn">💾 Save</button>
+      <button class="btn btn-secondary" id="settingsBtn">⚙️</button>
+      <button class="btn btn-success" id="connectGoogleBtn" disabled>🔗 Google</button>
+      <button class="btn btn-primary hidden" id="syncGoogleBtn">📤 Push</button>
+      <button class="btn btn-secondary hidden" id="loadGoogleBtn">📥 Load</button>
     </div>
   </div>
 
-  <div class="main">
-    <div class="sidebar">
+  <!-- Main Container -->
+  <div class="main-container">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <strong>Film Library</strong>
-          <button class="btn btn-primary" onclick="app.openMovieDialog()">+ Add Film</button>
+        <div class="sidebar-title">Film Library</div>
+        <div class="header-controls">
+          <button class="btn btn-primary btn-sm" id="addMovieBtn">+ Add Film</button>
         </div>
       </div>
-      <div class="sidebar-content" id="moviesList"></div>
+      <div class="sidebar-content" id="moviesList">
+        <!-- Movies will be rendered here -->
+      </div>
     </div>
 
-    <div class="schedule-area">
-      <div class="week-nav">
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
-          <button class="btn" onclick="app.changeWeek(-1)">‹</button>
-          <strong id="weekLabel">Loading...</strong>
-          <button class="btn" onclick="app.changeWeek(1)">›</button>
+    <!-- Schedule Container -->
+    <div class="schedule-container">
+      <!-- Week Header -->
+      <div class="week-header">
+        <div class="week-nav">
+          <button class="btn btn-secondary" id="prevWeekBtn">‹</button>
+          <div class="week-label" id="weekLabel">Loading...</div>
+          <button class="btn btn-secondary" id="nextWeekBtn">›</button>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
-          <button class="btn" onclick="app.goToToday()">Today</button>
-          <button class="btn btn-danger" onclick="app.clearWeek()">Clear Week</button>
+        <div class="header-controls">
+          <button class="btn btn-secondary" id="todayBtn">Today</button>
+          <button class="btn btn-danger" id="clearWeekBtn">Clear</button>
         </div>
       </div>
 
+      <!-- Schedule Grid -->
       <div class="schedule-grid">
-        <div class="days-container" id="daysContainer"></div>
+        <div class="days-container" id="daysContainer">
+          <!-- Days will be rendered here -->
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Settings Modal -->
-  <div class="modal" id="settingsModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Settings</h2>
-        <button onclick="app.closeModal('settingsModal')">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Start Hour (24h)</label>
-          <input type="number" class="form-input" id="startHour" min="0" max="23" value="14">
-        </div>
-        <div class="form-group">
-          <label class="form-label">End Hour (24h)</label>
-          <input type="number" class="form-input" id="endHour" min="1" max="24" value="24">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Theater 1 Calendar ID</label>
-          <input type="text" class="form-input" id="calT1" placeholder="Leave blank for primary">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Theater 2 Calendar ID</label>
-          <input type="text" class="form-input" id="calT2" placeholder="Leave blank for primary">
-        </div>
-        <div class="form-group">
-          <label class="form-label">TSL Events Calendar ID</label>
-          <input type="text" class="form-input" id="calPublic" placeholder="Leave blank for primary">
-        </div>
-        <div class="form-group">
-          <label class="form-label">TSL Events (NON-PUBLIC) Calendar ID</label>
-          <input type="text" class="form-input" id="calNonPublic" placeholder="Leave blank for primary">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn" onclick="app.closeModal('settingsModal')">Cancel</button>
-        <button class="btn btn-primary" onclick="app.saveSettings()">Save</button>
-      </div>
-    </div>
-  </div>
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
 
-  <!-- Movie Modal -->
-  <div class="modal" id="movieModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Add/Edit Film</h2>
-        <button onclick="app.closeModal('movieModal')">✕</button>
+  <!-- Movie Dialog -->
+  <div class="dialog" id="movieDialog">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h2 class="dialog-title">Add/Edit Film</h2>
+        <button class="dialog-close" data-close="movieDialog">✕</button>
       </div>
-      <div class="modal-body">
+      <div class="dialog-body">
         <div class="form-group">
           <label class="form-label">Title</label>
-          <input type="text" class="form-input" id="movieTitle">
+          <input type="text" class="form-input" id="movieTitle" placeholder="Film title">
         </div>
-        <div class="form-group">
-          <label class="form-label">Duration (minutes)</label>
-          <input type="number" class="form-input" id="movieDuration" min="1" value="120">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Hours</label>
+            <input type="number" class="form-input" id="movieHours" min="0" max="6" placeholder="2">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Minutes</label>
+            <input type="number" class="form-input" id="movieMinutes" min="0" max="59" placeholder="30">
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Color</label>
@@ -466,34 +775,72 @@
         </div>
         <input type="hidden" id="movieId">
       </div>
-      <div class="modal-footer">
-        <button class="btn" onclick="app.closeModal('movieModal')">Cancel</button>
-        <button class="btn btn-primary" onclick="app.saveMovie()">Save</button>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" data-close="movieDialog">Cancel</button>
+        <button class="btn btn-primary" id="saveMovieBtn">Save</button>
       </div>
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <!-- Settings Dialog -->
+  <div class="dialog" id="settingsDialog">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h2 class="dialog-title">Settings</h2>
+        <button class="dialog-close" data-close="settingsDialog">✕</button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Start Hour</label>
+            <input type="number" class="form-input" id="startHour" min="0" max="23" value="14">
+          </div>
+          <div class="form-group">
+            <label class="form-label">End Hour</label>
+            <input type="number" class="form-input" id="endHour" min="1" max="24" value="24">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Google Client ID (Optional)</label>
+          <input type="text" class="form-input" id="googleClientId" placeholder="Leave blank for default">
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" data-close="settingsDialog">Cancel</button>
+        <button class="btn btn-primary" id="saveSettingsBtn">Save</button>
+      </div>
+    </div>
+  </div>
 
   <script>
-    class Scheduler {
+    // Wait for DOM to be ready
+    document.addEventListener('DOMContentLoaded', function() {
+      // Initialize the app
+      const app = new TSLScheduler();
+      
+      // Make app globally available for Google callbacks
+      window.tslApp = app;
+    });
+
+    // TSL Scheduler Class
+    class TSLScheduler {
       constructor() {
         this.config = {
           startHour: 14,
           endHour: 24,
           slotMinutes: 15,
-          calendars: {
-            t1: '',
-            t2: '',
-            public: '',
-            nonpublic: ''
-          }
+          weekStartDay: 2,
+          googleClientId: null
         };
-        this.movies = [];
-        this.schedules = {};
-        this.currentWeek = null;
-        this.draggedItem = null;
-        this.googleConnected = false;
+        
+        this.state = {
+          movies: [],
+          schedules: {},
+          currentWeek: null,
+          draggedItem: null,
+          googleConnected: false
+        };
+        
         this.init();
       }
 
@@ -502,50 +849,67 @@
         this.loadMovies();
         this.setCurrentWeek(new Date());
         this.loadSchedules();
+        this.bindEvents();
         this.render();
-        this.setupDragDrop();
         this.initGoogle();
       }
 
-      // Google Calendar
+      // Google Integration
       initGoogle() {
+        // Setup Google API
         window.handleGapiLoad = () => {
-          gapi.load('client', async () => {
-            await gapi.client.init({
-              discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
+          if (typeof gapi !== 'undefined') {
+            gapi.load('client', async () => {
+              try {
+                await gapi.client.init({
+                  discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
+                });
+                console.log('GAPI initialized');
+                this.checkGoogleReady();
+              } catch (error) {
+                console.error('GAPI init error:', error);
+              }
             });
-            this.checkGoogleReady();
-          });
+          }
         };
 
         window.handleGisLoad = () => {
-          window.tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com',
-            scope: 'https://www.googleapis.com/auth/calendar.events',
-            callback: (response) => {
-              if (response && !response.error) {
-                this.onGoogleConnected();
+          if (typeof google !== 'undefined') {
+            const clientId = this.config.googleClientId || '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
+            window.tokenClient = google.accounts.oauth2.initTokenClient({
+              client_id: clientId,
+              scope: 'https://www.googleapis.com/auth/calendar.events',
+              callback: (response) => {
+                if (response && !response.error) {
+                  this.onGoogleConnected();
+                }
               }
-            }
-          });
-          this.checkGoogleReady();
+            });
+            console.log('GIS initialized');
+            this.checkGoogleReady();
+          }
         };
 
-        // Load scripts
+        // Load Google scripts
         const gapiScript = document.createElement('script');
         gapiScript.src = 'https://apis.google.com/js/api.js';
+        gapiScript.async = true;
+        gapiScript.defer = true;
         gapiScript.onload = window.handleGapiLoad;
         document.body.appendChild(gapiScript);
 
         const gisScript = document.createElement('script');
         gisScript.src = 'https://accounts.google.com/gsi/client';
+        gisScript.async = true;
+        gisScript.defer = true;
         gisScript.onload = window.handleGisLoad;
         document.body.appendChild(gisScript);
       }
 
       checkGoogleReady() {
         if (typeof gapi !== 'undefined' && gapi.client && window.tokenClient) {
-          document.getElementById('connectBtn').disabled = false;
+          document.getElementById('connectGoogleBtn').disabled = false;
+          this.updateGoogleStatus('Ready', false);
         }
       }
 
@@ -556,294 +920,163 @@
       }
 
       onGoogleConnected() {
-        this.googleConnected = true;
-        document.getElementById('googleStatus').textContent = 'Connected';
-        document.getElementById('googleStatus').classList.add('connected');
-        document.getElementById('pushBtn').style.display = 'inline-block';
-        document.getElementById('loadBtn').style.display = 'inline-block';
-        this.showToast('Connected to Google Calendar');
+        this.state.googleConnected = true;
+        this.updateGoogleStatus('Connected', true);
+        document.getElementById('syncGoogleBtn').classList.remove('hidden');
+        document.getElementById('loadGoogleBtn').classList.remove('hidden');
+        this.showToast('Connected to Google Calendar', 'success');
+      }
+
+      updateGoogleStatus(text, connected) {
+        const status = document.getElementById('googleStatus');
+        const statusText = document.getElementById('googleStatusText');
+        
+        if (connected) {
+          status.classList.add('connected');
+          status.classList.remove('disconnected');
+        } else {
+          status.classList.remove('connected');
+          status.classList.add('disconnected');
+        }
+        
+        statusText.textContent = text;
+      }
+
+      async syncWithGoogle() {
+        if (!this.state.googleConnected) {
+          this.showToast('Please connect to Google first', 'error');
+          return;
+        }
+
+        try {
+          // Implementation would go here
+          this.showToast('Sync feature coming soon', 'info');
+        } catch (error) {
+          console.error('Sync error:', error);
+          this.showToast('Sync failed', 'error');
+        }
       }
 
       async loadFromGoogle() {
-        if (!this.googleConnected) {
-          this.showToast('Please connect to Google first');
+        if (!this.state.googleConnected) {
+          this.showToast('Please connect to Google first', 'error');
           return;
         }
 
         try {
-          const weekStart = new Date(this.currentWeek);
-          const weekEnd = new Date(weekStart);
-          weekEnd.setDate(weekEnd.getDate() + 7);
-
-          this.schedules = {};
-          let totalLoaded = 0;
-
-          // Load from each calendar
-          const calendars = [
-            { id: this.config.calendars.t1 || 'primary', theater: 't1' },
-            { id: this.config.calendars.t2 || 'primary', theater: 't2' },
-            { id: this.config.calendars.public || 'primary', theater: 't1' },
-            { id: this.config.calendars.nonpublic || 'primary', theater: 't2' }
-          ];
-
-          for (const cal of calendars) {
-            try {
-              const response = await gapi.client.calendar.events.list({
-                calendarId: cal.id,
-                timeMin: weekStart.toISOString(),
-                timeMax: weekEnd.toISOString(),
-                singleEvents: true,
-                orderBy: 'startTime'
-              });
-
-              const events = response.result.items || [];
-              
-              for (const event of events) {
-                if (!event.start.dateTime) continue;
-                
-                const start = new Date(event.start.dateTime);
-                const end = new Date(event.end.dateTime);
-                const duration = Math.round((end - start) / 60000);
-                
-                const dayIndex = Math.floor((start - weekStart) / (1000 * 60 * 60 * 24));
-                if (dayIndex < 0 || dayIndex > 6) continue;
-                
-                const startMinutes = start.getHours() * 60 + start.getMinutes();
-                const slot = Math.round((startMinutes - this.config.startHour * 60) / this.config.slotMinutes);
-                
-                const key = `${dayIndex}-${cal.theater}`;
-                if (!this.schedules[key]) this.schedules[key] = [];
-                
-                this.schedules[key].push({
-                  id: Date.now() + Math.random(),
-                  title: event.summary || 'Untitled',
-                  duration: duration,
-                  startSlot: slot,
-                  color: '#3b82f6'
-                });
-                
-                totalLoaded++;
-              }
-            } catch (e) {
-              console.log(`Failed to load from ${cal.id}:`, e);
-            }
-          }
-
-          this.saveSchedules();
-          this.renderSchedule();
-          this.showToast(`Loaded ${totalLoaded} events from Google Calendar`);
+          // Implementation would go here
+          this.showToast('Load feature coming soon', 'info');
         } catch (error) {
-          this.showToast('Failed to load from Google');
-          console.error(error);
+          console.error('Load error:', error);
+          this.showToast('Load failed', 'error');
         }
       }
 
-      async pushToGoogle() {
-        if (!this.googleConnected) {
-          this.showToast('Please connect to Google first');
-          return;
-        }
-
-        try {
-          const weekStart = new Date(this.currentWeek);
-          const weekEnd = new Date(weekStart);
-          weekEnd.setDate(weekEnd.getDate() + 7);
-
-          // Clear existing [TSL] events
-          const calendars = [
-            this.config.calendars.t1 || 'primary',
-            this.config.calendars.t2 || 'primary'
-          ];
-
-          for (const calId of [...new Set(calendars)]) {
-            const response = await gapi.client.calendar.events.list({
-              calendarId: calId,
-              timeMin: weekStart.toISOString(),
-              timeMax: weekEnd.toISOString(),
-              singleEvents: true
-            });
-
-            const events = response.result.items || [];
-            for (const event of events) {
-              if (event.summary && event.summary.includes('[TSL]')) {
-                await gapi.client.calendar.events.delete({
-                  calendarId: calId,
-                  eventId: event.id
-                });
-              }
-            }
-          }
-
-          // Add current schedule
-          for (const [key, blocks] of Object.entries(this.schedules)) {
-            const [dayIndex, theater] = key.split('-');
-            const date = new Date(this.currentWeek);
-            date.setDate(date.getDate() + parseInt(dayIndex));
-
-            const calendarId = theater === 't1' 
-              ? (this.config.calendars.t1 || 'primary')
-              : (this.config.calendars.t2 || 'primary');
-
-            for (const block of blocks) {
-              const startDate = new Date(date);
-              const totalMinutes = this.config.startHour * 60 + block.startSlot * this.config.slotMinutes;
-              startDate.setHours(Math.floor(totalMinutes / 60), totalMinutes % 60, 0, 0);
-              
-              const endDate = new Date(startDate);
-              endDate.setMinutes(endDate.getMinutes() + block.duration);
-
-              await gapi.client.calendar.events.insert({
-                calendarId: calendarId,
-                resource: {
-                  summary: `[TSL] ${block.title}`,
-                  start: { dateTime: startDate.toISOString() },
-                  end: { dateTime: endDate.toISOString() }
-                }
-              });
-            }
-          }
-
-          this.showToast('Pushed to Google Calendar');
-        } catch (error) {
-          this.showToast('Failed to push to Google');
-          console.error(error);
-        }
-      }
-
-      // Settings
-      openSettings() {
-        document.getElementById('startHour').value = this.config.startHour;
-        document.getElementById('endHour').value = this.config.endHour;
-        document.getElementById('calT1').value = this.config.calendars.t1 || '';
-        document.getElementById('calT2').value = this.config.calendars.t2 || '';
-        document.getElementById('calPublic').value = this.config.calendars.public || '';
-        document.getElementById('calNonPublic').value = this.config.calendars.nonpublic || '';
-        document.getElementById('settingsModal').classList.add('open');
-      }
-
-      saveSettings() {
-        this.config.startHour = parseInt(document.getElementById('startHour').value);
-        this.config.endHour = parseInt(document.getElementById('endHour').value);
-        this.config.calendars.t1 = document.getElementById('calT1').value;
-        this.config.calendars.t2 = document.getElementById('calT2').value;
-        this.config.calendars.public = document.getElementById('calPublic').value;
-        this.config.calendars.nonpublic = document.getElementById('calNonPublic').value;
-        
-        this.saveConfig();
-        this.render();
-        this.closeModal('settingsModal');
-        this.showToast('Settings saved');
-      }
-
-      // Data management
+      // Configuration
       loadConfig() {
-        const saved = localStorage.getItem('tsl_config_clean');
+        const saved = localStorage.getItem('tsl_config_v2');
         if (saved) {
-          Object.assign(this.config, JSON.parse(saved));
+          this.config = Object.assign(this.config, JSON.parse(saved));
         }
       }
 
       saveConfig() {
-        localStorage.setItem('tsl_config_clean', JSON.stringify(this.config));
+        localStorage.setItem('tsl_config_v2', JSON.stringify(this.config));
       }
 
+      // Data Management
       loadMovies() {
-        const saved = localStorage.getItem('tsl_movies_clean');
-        this.movies = saved ? JSON.parse(saved) : [
+        const saved = localStorage.getItem('tsl_movies_v2');
+        this.state.movies = saved ? JSON.parse(saved) : [
           { id: 1, title: 'Sample Film', duration: 120, color: '#3b82f6' }
         ];
       }
 
       saveMovies() {
-        localStorage.setItem('tsl_movies_clean', JSON.stringify(this.movies));
+        localStorage.setItem('tsl_movies_v2', JSON.stringify(this.state.movies));
       }
 
       loadSchedules() {
         const key = this.getWeekKey();
-        const saved = localStorage.getItem(`tsl_schedule_clean_${key}`);
-        this.schedules = saved ? JSON.parse(saved) : {};
+        const saved = localStorage.getItem(`tsl_schedule_${key}`);
+        this.state.schedules = saved ? JSON.parse(saved) : {};
       }
 
       saveSchedules() {
         const key = this.getWeekKey();
-        localStorage.setItem(`tsl_schedule_clean_${key}`, JSON.stringify(this.schedules));
+        localStorage.setItem(`tsl_schedule_${key}`, JSON.stringify(this.state.schedules));
       }
 
-      // Week management
+      // Week Management
       setCurrentWeek(date) {
         const d = new Date(date);
         const day = d.getDay();
-        const diff = (day - 2 + 7) % 7; // Tuesday start
+        const diff = (day - this.config.weekStartDay + 7) % 7;
         d.setDate(d.getDate() - diff);
         d.setHours(0, 0, 0, 0);
-        this.currentWeek = d;
+        this.state.currentWeek = d;
       }
 
       getWeekKey() {
-        const d = this.currentWeek;
+        const d = this.state.currentWeek;
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       }
 
       changeWeek(direction) {
         this.saveSchedules();
-        const d = new Date(this.currentWeek);
+        const d = new Date(this.state.currentWeek);
         d.setDate(d.getDate() + (direction * 7));
         this.setCurrentWeek(d);
         this.loadSchedules();
         this.render();
       }
 
-      goToToday() {
-        this.saveSchedules();
-        this.setCurrentWeek(new Date());
-        this.loadSchedules();
-        this.render();
-      }
-
-      clearWeek() {
-        if (confirm('Clear all schedules for this week?')) {
-          this.schedules = {};
-          this.saveSchedules();
-          this.renderSchedule();
-          this.showToast('Week cleared');
-        }
-      }
-
       // Rendering
       render() {
         this.renderWeekLabel();
-        this.renderMovies();
-        this.renderSchedule();
+        this.renderMoviesList();
+        this.renderScheduleGrid();
       }
 
       renderWeekLabel() {
-        const start = new Date(this.currentWeek);
+        const start = new Date(this.state.currentWeek);
         const end = new Date(start);
         end.setDate(end.getDate() + 6);
+        
+        const format = (date) => date.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric' 
+        });
+        
         document.getElementById('weekLabel').textContent = 
-          `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+          `${format(start)} - ${format(end)}`;
       }
 
-      renderMovies() {
+      renderMoviesList() {
         const container = document.getElementById('moviesList');
         container.innerHTML = '';
         
-        this.movies.forEach(movie => {
+        this.state.movies.forEach(movie => {
           const card = document.createElement('div');
           card.className = 'movie-card';
           card.draggable = true;
           card.dataset.movieId = movie.id;
-          card.style.borderLeftWidth = '4px';
           card.style.borderLeftColor = movie.color;
+          
           card.innerHTML = `
-            <div style="font-weight: 600">${movie.title}</div>
-            <div style="font-size: 0.875rem; color: var(--gray-500)">${movie.duration} min</div>
+            <div class="movie-title">${movie.title}</div>
+            <div class="movie-info">${this.formatDuration(movie.duration)}</div>
+            <div class="movie-actions">
+              <button class="icon-btn" data-action="edit" data-id="${movie.id}">✏️</button>
+              <button class="icon-btn delete" data-action="delete" data-id="${movie.id}">🗑</button>
+            </div>
           `;
+          
           container.appendChild(card);
         });
       }
 
-      renderSchedule() {
+      renderScheduleGrid() {
         const container = document.getElementById('daysContainer');
         container.innerHTML = '';
         
@@ -851,211 +1084,548 @@
           const dayColumn = this.createDayColumn(i);
           container.appendChild(dayColumn);
         }
-        
-        // Render blocks
-        for (const [key, blocks] of Object.entries(this.schedules)) {
-          const [dayIndex, theater] = key.split('-');
-          const lane = document.querySelector(`[data-day="${dayIndex}"][data-theater="${theater}"]`);
-          if (!lane) continue;
-          
-          blocks.forEach(block => {
-            const el = document.createElement('div');
-            el.className = 'schedule-block';
-            el.style.top = `${block.startSlot * 24}px`;
-            el.style.height = `${(block.duration / this.config.slotMinutes) * 24 - 4}px`;
-            el.style.backgroundColor = block.color;
-            el.innerHTML = `
-              <span class="block-remove" onclick="app.removeBlock('${key}', '${block.id}')">×</span>
-              <div>${block.title}</div>
-            `;
-            lane.appendChild(el);
-          });
-        }
       }
 
       createDayColumn(dayIndex) {
-        const date = new Date(this.currentWeek);
+        const date = new Date(this.state.currentWeek);
         date.setDate(date.getDate() + dayIndex);
         
         const column = document.createElement('div');
         column.className = 'day-column';
         
-        // Header
         const header = document.createElement('div');
         header.className = 'day-header';
-        header.textContent = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        header.textContent = date.toLocaleDateString('en-US', { 
+          weekday: 'short', 
+          month: 'short', 
+          day: 'numeric' 
+        });
         column.appendChild(header);
         
-        // Theater headers
-        const theaterRow = document.createElement('div');
-        theaterRow.className = 'theaters-row';
-        theaterRow.innerHTML = `
+        const theatersRow = document.createElement('div');
+        theatersRow.className = 'theaters-row';
+        theatersRow.innerHTML = `
           <div class="time-header">Time</div>
           <div class="theater-header">Theater 1</div>
           <div class="theater-header">Theater 2</div>
         `;
-        column.appendChild(theaterRow);
+        column.appendChild(theatersRow);
         
-        // Body
-        const body = document.createElement('div');
-        body.className = 'day-body';
+        const content = document.createElement('div');
+        content.className = 'day-content';
         
-        // Time column
-        const timeCol = document.createElement('div');
-        timeCol.className = 'time-column';
-        const slots = (this.config.endHour - this.config.startHour) * 4;
-        for (let i = 0; i < slots; i++) {
-          const slot = document.createElement('div');
-          slot.className = 'time-slot';
-          if (i % 4 === 0) {
-            slot.classList.add('hour');
-            const hour = this.config.startHour + i / 4;
-            slot.textContent = `${hour % 12 || 12}:00`;
-          }
-          timeCol.appendChild(slot);
-        }
-        body.appendChild(timeCol);
+        const timeColumn = this.createTimeColumn();
+        content.appendChild(timeColumn);
         
-        // Theater lanes
-        const theaters = document.createElement('div');
-        theaters.className = 'theaters';
+        const theatersContainer = document.createElement('div');
+        theatersContainer.className = 'theaters-container';
         
         ['t1', 't2'].forEach(theater => {
-          const lane = document.createElement('div');
-          lane.className = 'theater-lane';
-          lane.dataset.day = dayIndex;
-          lane.dataset.theater = theater;
-          lane.style.height = `${slots * 24}px`;
-          theaters.appendChild(lane);
+          const lane = this.createTheaterLane(dayIndex, theater);
+          theatersContainer.appendChild(lane);
         });
         
-        body.appendChild(theaters);
-        column.appendChild(body);
+        content.appendChild(theatersContainer);
+        column.appendChild(content);
         
         return column;
       }
 
-      // Drag and drop
-      setupDragDrop() {
-        document.addEventListener('dragstart', (e) => {
-          if (e.target.classList.contains('movie-card')) {
-            const movieId = parseInt(e.target.dataset.movieId);
-            const movie = this.movies.find(m => m.id === movieId);
-            this.draggedItem = { type: 'movie', data: movie };
-            e.target.classList.add('dragging');
-          }
-        });
-
-        document.addEventListener('dragover', (e) => {
-          const lane = e.target.closest('.theater-lane');
-          if (lane && this.draggedItem) {
-            e.preventDefault();
-            document.querySelectorAll('.theater-lane').forEach(l => l.classList.remove('drag-over'));
-            lane.classList.add('drag-over');
-          }
-        });
-
-        document.addEventListener('drop', (e) => {
-          const lane = e.target.closest('.theater-lane');
-          if (lane && this.draggedItem) {
-            e.preventDefault();
-            
-            const rect = lane.getBoundingClientRect();
-            const y = e.clientY - rect.top;
-            const slot = Math.floor(y / 24);
-            
-            const dayIndex = lane.dataset.day;
-            const theater = lane.dataset.theater;
-            const key = `${dayIndex}-${theater}`;
-            
-            if (!this.schedules[key]) this.schedules[key] = [];
-            
-            this.schedules[key].push({
-              id: Date.now().toString(),
-              title: this.draggedItem.data.title,
-              duration: this.draggedItem.data.duration,
-              startSlot: slot,
-              color: this.draggedItem.data.color
-            });
-            
-            this.saveSchedules();
-            this.renderSchedule();
+      createTimeColumn() {
+        const column = document.createElement('div');
+        column.className = 'time-column';
+        
+        const slots = (this.config.endHour - this.config.startHour) * (60 / this.config.slotMinutes);
+        
+        for (let i = 0; i < slots; i++) {
+          const slot = document.createElement('div');
+          slot.className = 'time-slot';
+          
+          const minutes = i * this.config.slotMinutes;
+          const hour = Math.floor(minutes / 60) + this.config.startHour;
+          const minute = minutes % 60;
+          
+          if (minute === 0) {
+            slot.classList.add('hour');
+            slot.textContent = `${hour % 12 || 12}:00`;
+          } else {
+            slot.textContent = `:${String(minute).padStart(2, '0')}`;
           }
           
-          document.querySelectorAll('.theater-lane').forEach(l => l.classList.remove('drag-over'));
-          document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
-          this.draggedItem = null;
-        });
+          column.appendChild(slot);
+        }
+        
+        return column;
+      }
 
-        document.addEventListener('dragend', () => {
-          document.querySelectorAll('.theater-lane').forEach(l => l.classList.remove('drag-over'));
-          document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
-          this.draggedItem = null;
+      createTheaterLane(dayIndex, theater) {
+        const lane = document.createElement('div');
+        lane.className = 'theater-lane';
+        lane.dataset.day = dayIndex;
+        lane.dataset.theater = theater;
+        
+        const slots = (this.config.endHour - this.config.startHour) * (60 / this.config.slotMinutes);
+        lane.style.height = `${slots * 24}px`;
+        
+        // Render schedule blocks for this lane
+        const key = `${dayIndex}-${theater}`;
+        const blocks = this.state.schedules[key] || [];
+        blocks.forEach(block => {
+          const blockEl = document.createElement('div');
+          blockEl.className = 'schedule-block';
+          blockEl.draggable = true;
+          blockEl.dataset.blockId = block.id;
+          blockEl.dataset.day = dayIndex;
+          blockEl.dataset.theater = theater;
+          
+          const slots = Math.ceil(block.duration / this.config.slotMinutes);
+          blockEl.style.top = `${block.startSlot * 24}px`;
+          blockEl.style.height = `${slots * 24 - 4}px`;
+          blockEl.style.backgroundColor = block.color;
+          
+          // Calculate start and end times
+          const startMinutes = block.startSlot * this.config.slotMinutes;
+          const startHour = Math.floor(startMinutes / 60) + this.config.startHour;
+          const startMin = startMinutes % 60;
+          const startTime = this.formatTime(startHour, startMin);
+          
+          const endTotalMinutes = startMinutes + block.duration;
+          const endHour = Math.floor(endTotalMinutes / 60) + this.config.startHour;
+          const endMin = endTotalMinutes % 60;
+          const endTime = this.formatTime(endHour, endMin);
+          
+          blockEl.innerHTML = `
+            <div class="block-title">${block.title}</div>
+            <div class="block-time"><strong>${startTime}</strong> - ${endTime}</div>
+            <div class="block-duration">${this.formatDuration(block.duration)}</div>
+            <div class="block-actions">
+              <button class="block-btn" data-action="delete">✕</button>
+            </div>
+          `;
+          
+          // Add drag handlers
+          blockEl.addEventListener('dragstart', (e) => {
+            this.handleBlockDragStart(e, block, key);
+          });
+          
+          // Add delete handler
+          blockEl.addEventListener('click', (e) => {
+            if (e.target.dataset.action === 'delete') {
+              this.deleteBlock(key, block.id);
+            }
+          });
+          
+          lane.appendChild(blockEl);
+        });
+        
+        return lane;
+      }
+
+      // Event Handlers
+      bindEvents() {
+        // Week navigation
+        document.getElementById('prevWeekBtn').addEventListener('click', () => this.changeWeek(-1));
+        document.getElementById('nextWeekBtn').addEventListener('click', () => this.changeWeek(1));
+        document.getElementById('todayBtn').addEventListener('click', () => {
+          this.setCurrentWeek(new Date());
+          this.loadSchedules();
+          this.render();
+        });
+        
+        // Sidebar toggle
+        document.getElementById('toggleSidebar').addEventListener('click', () => {
+          document.getElementById('sidebar').classList.toggle('hidden');
+        });
+        
+        // Save button
+        document.getElementById('saveBtn').addEventListener('click', () => {
+          this.saveSchedules();
+          this.saveMovies();
+          this.showToast('All changes saved', 'success');
+        });
+        
+        // Clear week
+        document.getElementById('clearWeekBtn').addEventListener('click', () => {
+          if (confirm('Clear all schedules for this week?')) {
+            this.state.schedules = {};
+            this.saveSchedules();
+            this.render();
+            this.showToast('Week cleared', 'success');
+          }
+        });
+        
+        // Google buttons
+        document.getElementById('connectGoogleBtn').addEventListener('click', () => this.connectGoogle());
+        document.getElementById('syncGoogleBtn').addEventListener('click', () => this.syncWithGoogle());
+        document.getElementById('loadGoogleBtn').addEventListener('click', () => this.loadFromGoogle());
+        
+        // Movie dialog
+        document.getElementById('addMovieBtn').addEventListener('click', () => {
+          this.openMovieDialog();
+        });
+        
+        document.getElementById('saveMovieBtn').addEventListener('click', () => {
+          this.saveMovie();
+        });
+        
+        // Settings
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+          this.openSettings();
+        });
+        
+        document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+          this.saveSettings();
+        });
+        
+        // Dialog close buttons
+        document.querySelectorAll('[data-close]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const dialogId = btn.dataset.close;
+            this.closeDialog(dialogId);
+          });
+        });
+        
+        // Movie card actions
+        document.getElementById('moviesList').addEventListener('click', (e) => {
+          if (e.target.dataset.action === 'edit') {
+            this.editMovie(parseInt(e.target.dataset.id));
+          } else if (e.target.dataset.action === 'delete') {
+            this.deleteMovie(parseInt(e.target.dataset.id));
+          }
+        });
+        
+        // Drag and drop for movie cards
+        document.getElementById('moviesList').addEventListener('dragstart', (e) => {
+          if (e.target.classList.contains('movie-card')) {
+            const movieId = parseInt(e.target.dataset.movieId);
+            const movie = this.state.movies.find(m => m.id === movieId);
+            if (movie) {
+              this.handleMovieDragStart(e, movie);
+            }
+          }
+        });
+        
+        // Global drag events
+        document.addEventListener('dragover', (e) => this.handleDragOver(e));
+        document.addEventListener('drop', (e) => this.handleDrop(e));
+        document.addEventListener('dragend', () => this.handleDragEnd());
+        
+        // Prevent default drag behavior on schedule grid
+        document.getElementById('daysContainer').addEventListener('dragover', (e) => {
+          e.preventDefault();
         });
       }
 
-      removeBlock(key, blockId) {
-        this.schedules[key] = this.schedules[key].filter(b => b.id !== blockId);
-        if (this.schedules[key].length === 0) delete this.schedules[key];
-        this.saveSchedules();
-        this.renderSchedule();
+      // Drag and Drop Handlers
+      handleMovieDragStart(e, movie) {
+        this.state.draggedItem = { type: 'movie', data: movie };
+        e.target.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'copy';
       }
 
-      // Movies
-      openMovieDialog() {
-        document.getElementById('movieId').value = '';
-        document.getElementById('movieTitle').value = '';
-        document.getElementById('movieDuration').value = '120';
-        document.getElementById('movieColor').value = '#3b82f6';
-        document.getElementById('movieModal').classList.add('open');
+      handleBlockDragStart(e, block, key) {
+        this.state.draggedItem = { type: 'block', data: block, originalKey: key };
+        e.target.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      }
+
+      handleDragOver(e) {
+        if (!this.state.draggedItem) return;
+        
+        const lane = e.target.closest('.theater-lane');
+        if (lane) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = this.state.draggedItem.type === 'movie' ? 'copy' : 'move';
+          
+          // Clear previous highlights
+          document.querySelectorAll('.theater-lane').forEach(l => l.classList.remove('drag-over'));
+          lane.classList.add('drag-over');
+          
+          // Show drop preview
+          this.showDropPreview(lane, e);
+        }
+      }
+
+      handleDrop(e) {
+        e.preventDefault();
+        
+        const lane = e.target.closest('.theater-lane');
+        if (!lane || !this.state.draggedItem) return;
+        
+        const dayIndex = parseInt(lane.dataset.day);
+        const theater = lane.dataset.theater;
+        const key = `${dayIndex}-${theater}`;
+        
+        // Calculate drop position
+        const rect = lane.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const slot = Math.max(0, Math.floor(y / 24));
+        
+        if (this.state.draggedItem.type === 'movie') {
+          // Add new block from movie
+          const movie = this.state.draggedItem.data;
+          const block = {
+            id: Date.now().toString(),
+            title: movie.title,
+            duration: movie.duration,
+            startSlot: slot,
+            color: movie.color
+          };
+          
+          if (!this.state.schedules[key]) {
+            this.state.schedules[key] = [];
+          }
+          
+          // Check for conflicts
+          if (!this.hasConflict(key, slot, movie.duration)) {
+            this.state.schedules[key].push(block);
+            this.saveSchedules();
+            this.render();
+            this.showToast('Added to schedule', 'success');
+          } else {
+            this.showToast('Time conflict!', 'error');
+          }
+        } else if (this.state.draggedItem.type === 'block') {
+          // Move existing block
+          const block = this.state.draggedItem.data;
+          const originalKey = this.state.draggedItem.originalKey;
+          
+          // Remove from original position
+          if (this.state.schedules[originalKey]) {
+            this.state.schedules[originalKey] = this.state.schedules[originalKey].filter(b => b.id !== block.id);
+            if (this.state.schedules[originalKey].length === 0) {
+              delete this.state.schedules[originalKey];
+            }
+          }
+          
+          // Add to new position
+          block.startSlot = slot;
+          if (!this.state.schedules[key]) {
+            this.state.schedules[key] = [];
+          }
+          
+          if (!this.hasConflict(key, slot, block.duration, block.id)) {
+            this.state.schedules[key].push(block);
+            this.saveSchedules();
+            this.render();
+            this.showToast('Schedule updated', 'success');
+          } else {
+            // Restore to original position if conflict
+            if (!this.state.schedules[originalKey]) {
+              this.state.schedules[originalKey] = [];
+            }
+            this.state.schedules[originalKey].push(block);
+            this.render();
+            this.showToast('Time conflict!', 'error');
+          }
+        }
+        
+        this.handleDragEnd();
+      }
+
+      handleDragEnd() {
+        // Clean up
+        document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        this.removeDropPreview();
+        this.state.draggedItem = null;
+      }
+
+      showDropPreview(lane, e) {
+        this.removeDropPreview();
+        
+        if (!this.state.draggedItem) return;
+        
+        const rect = lane.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const slot = Math.max(0, Math.floor(y / 24));
+        
+        const duration = this.state.draggedItem.data.duration || 120;
+        const slots = Math.ceil(duration / this.config.slotMinutes);
+        
+        const preview = document.createElement('div');
+        preview.className = 'drop-preview';
+        preview.id = 'dropPreview';
+        preview.style.top = `${slot * 24}px`;
+        preview.style.height = `${slots * 24 - 4}px`;
+        
+        // Check for conflicts
+        const key = `${lane.dataset.day}-${lane.dataset.theater}`;
+        const excludeId = this.state.draggedItem.type === 'block' ? this.state.draggedItem.data.id : null;
+        if (this.hasConflict(key, slot, duration, excludeId)) {
+          preview.classList.add('conflict');
+        }
+        
+        lane.appendChild(preview);
+      }
+
+      removeDropPreview() {
+        const preview = document.getElementById('dropPreview');
+        if (preview) preview.remove();
+      }
+
+      hasConflict(key, startSlot, duration, excludeId = null) {
+        const blocks = this.state.schedules[key] || [];
+        const slots = Math.ceil(duration / this.config.slotMinutes);
+        const endSlot = startSlot + slots;
+        
+        return blocks.some(block => {
+          if (excludeId && block.id === excludeId) return false;
+          const blockSlots = Math.ceil(block.duration / this.config.slotMinutes);
+          const blockEnd = block.startSlot + blockSlots;
+          return (startSlot < blockEnd && endSlot > block.startSlot);
+        });
+      }
+
+      // Movie Management
+      openMovieDialog(movie = null) {
+        if (movie) {
+          document.getElementById('movieId').value = movie.id;
+          document.getElementById('movieTitle').value = movie.title;
+          const hours = Math.floor(movie.duration / 60);
+          const minutes = movie.duration % 60;
+          document.getElementById('movieHours').value = hours;
+          document.getElementById('movieMinutes').value = minutes;
+          document.getElementById('movieColor').value = movie.color;
+        } else {
+          document.getElementById('movieId').value = '';
+          document.getElementById('movieTitle').value = '';
+          document.getElementById('movieHours').value = '2';
+          document.getElementById('movieMinutes').value = '0';
+          document.getElementById('movieColor').value = '#3b82f6';
+        }
+        
+        this.openDialog('movieDialog');
+      }
+
+      editMovie(id) {
+        const movie = this.state.movies.find(m => m.id === id);
+        if (movie) {
+          this.openMovieDialog(movie);
+        }
+      }
+
+      deleteMovie(id) {
+        if (confirm('Delete this movie?')) {
+          this.state.movies = this.state.movies.filter(m => m.id !== id);
+          this.saveMovies();
+          this.render();
+          this.showToast('Movie deleted', 'info');
+        }
       }
 
       saveMovie() {
+        const id = document.getElementById('movieId').value;
         const title = document.getElementById('movieTitle').value.trim();
-        const duration = parseInt(document.getElementById('movieDuration').value);
+        const hours = parseInt(document.getElementById('movieHours').value) || 0;
+        const minutes = parseInt(document.getElementById('movieMinutes').value) || 0;
+        const duration = hours * 60 + minutes;
         const color = document.getElementById('movieColor').value;
         
-        if (!title || !duration) {
-          this.showToast('Please enter title and duration');
+        if (!title || duration < 1) {
+          this.showToast('Please enter title and duration', 'error');
           return;
         }
         
-        this.movies.push({
-          id: Date.now(),
-          title,
-          duration,
-          color
-        });
+        if (id) {
+          const movie = this.state.movies.find(m => m.id == id);
+          if (movie) {
+            movie.title = title;
+            movie.duration = duration;
+            movie.color = color;
+          }
+        } else {
+          this.state.movies.push({
+            id: Date.now(),
+            title,
+            duration,
+            color
+          });
+        }
         
         this.saveMovies();
-        this.renderMovies();
-        this.closeModal('movieModal');
-        this.showToast('Movie added');
+        this.render();
+        this.closeDialog('movieDialog');
+        this.showToast('Movie saved', 'success');
       }
 
-      // UI helpers
-      closeModal(modalId) {
-        document.getElementById(modalId).classList.remove('open');
+      deleteBlock(key, blockId) {
+        if (confirm('Delete this scheduled item?')) {
+          if (this.state.schedules[key]) {
+            this.state.schedules[key] = this.state.schedules[key].filter(b => b.id !== blockId);
+            if (this.state.schedules[key].length === 0) {
+              delete this.state.schedules[key];
+            }
+          }
+          this.saveSchedules();
+          this.render();
+          this.showToast('Schedule item deleted', 'info');
+        }
       }
 
-      showToast(message) {
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3000);
+      // Settings
+      openSettings() {
+        document.getElementById('startHour').value = this.config.startHour;
+        document.getElementById('endHour').value = this.config.endHour;
+        document.getElementById('googleClientId').value = this.config.googleClientId || '';
+        
+        this.openDialog('settingsDialog');
       }
 
-      saveAll() {
+      saveSettings() {
+        this.config.startHour = parseInt(document.getElementById('startHour').value);
+        this.config.endHour = parseInt(document.getElementById('endHour').value);
+        this.config.googleClientId = document.getElementById('googleClientId').value.trim() || null;
+        
         this.saveConfig();
-        this.saveMovies();
-        this.saveSchedules();
-        this.showToast('All changes saved');
+        this.render();
+        this.closeDialog('settingsDialog');
+        this.showToast('Settings saved', 'success');
+      }
+
+      // Dialog Management
+      openDialog(dialogId) {
+        document.getElementById(dialogId).classList.add('open');
+      }
+
+      closeDialog(dialogId) {
+        document.getElementById(dialogId).classList.remove('open');
+      }
+
+      // Utility Functions
+      formatTime(hour, minute) {
+        const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+        const period = hour >= 12 ? 'PM' : 'AM';
+        const displayMinute = minute === 0 ? '' : `:${String(minute).padStart(2, '0')}`;
+        return `${displayHour}${displayMinute}${period}`;
+      }
+
+      formatDuration(minutes) {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (hours > 0 && mins > 0) {
+          return `${hours}h ${mins}m`;
+        } else if (hours > 0) {
+          return `${hours}h`;
+        } else {
+          return `${mins}m`;
+        }
+      }
+
+      showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        
+        const container = document.getElementById('toastContainer');
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.style.animation = 'slideIn 0.3s ease reverse';
+          setTimeout(() => toast.remove(), 300);
+        }, 3000);
       }
     }
-
-    // Initialize app
-    const app = new Scheduler();
-    window.app = app; // Make available globally
   </script>
 </body>
 </html>
