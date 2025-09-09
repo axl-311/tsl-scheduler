@@ -832,19 +832,25 @@
                     isAllDay: !event.start.dateTime
                 };
 
-                // If event has specific time and falls within current week, add to schedule grid
-                if (event.start.dateTime && isEventInCurrentWeek(event)) {
+                // If event has specific time, add to schedule grid for any week it appears in
+                if (event.start.dateTime) {
                     console.log('Processing timed event for grid:', event.summary, event.start.dateTime);
                     const scheduledEvent = convertToScheduledEvent(eventData);
                     if (scheduledEvent) {
                         console.log('Successfully converted to scheduled event:', scheduledEvent);
                         scheduledEvents.push(scheduledEvent);
-                        renderScheduledEvent(scheduledEvent);
+                        
+                        // Only render if it falls within current week view
+                        const dayOfWeek = calculateDayOfWeek(scheduledEvent.actualDate);
+                        if (dayOfWeek >= 0 && dayOfWeek <= 6) {
+                            const renderEvent = { ...scheduledEvent, day: dayOfWeek };
+                            renderScheduledEvent(renderEvent);
+                        }
                     } else {
                         console.log('Failed to convert event to scheduled format:', event.summary);
                     }
                 } else {
-                    console.log('Event skipped for grid - either no dateTime or outside week:', event.summary, event.start);
+                    console.log('Event skipped for grid - no dateTime:', event.summary, event.start);
                 }
 
                 // Always add to library for potential rescheduling
