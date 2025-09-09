@@ -537,7 +537,7 @@
 
         // Google Calendar API Configuration
         const CLIENT_ID = '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
-        const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
+        const API_KEY = 'AIzaSyCguPYDlrKVGPmMlQC5vF0T_c5RBk3kQ2M';
         const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
 
@@ -748,15 +748,114 @@
             }
         }
 
-        // Import from Google Calendar (Test with personal calendar first)
+        // Import from Google Calendar (Test all calendars)
         async function importFromGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
                 return;
             }
 
-            // Start with personal calendar test
-            await importSingleCalendar('primary');
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.classList.add('syncing');
+            syncStatus.innerHTML = '<span>↻</span><span>Testing all calendars...</span>';
+            
+            libraryEvents = [];
+            let totalEvents = 0;
+            let successfulCalendars = [];
+            let failedCalendars = [];
+
+            // Test all calendars
+            for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
+                updateDebugInfo(`Testing ${calendarKey}: ${calendarId}`);
+                
+                try {
+                    const events = await importSingleCalendarData(calendarKey, calendarId);
+                    if (events.length > 0) {
+                        successfulCalendars.push(`${calendarKey} (${events.length} events)`);
+                        totalEvents += events.length;
+                    } else {
+                        successfulCalendars.push(`${calendarKey} (0 events)`);
+                    }
+                } catch (error) {
+                    failedCalendars.push(`${calendarKey}: ${error.message}`);
+                    updateDebugInfo(`Failed ${calendarKey}: ${error.message}`);
+                }
+            }
+
+            // Update UI
+            renderLibrary();
+            syncStatus.classList.remove('syncing');
+            
+            if (totalEvents > 0) {
+                syncStatus.classList.add('connected');
+                syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
+                updateDebugInfo(`Success! Total: ${totalEvents} events. Successful: ${successfulCalendars.join(', ')}. Failed: ${failedCalendars.join(', ')}`);
+                showToast(`Found ${totalEvents} events across ${successfulCalendars.length} calendars`);
+            } else {
+                syncStatus.innerHTML = '<span>⚠</span><span>No events found</span>';
+                updateDebugInfo(`No events found. Failed calendars: ${failedCalendars.join(', ')}`);
+                showToast('No events found in any calendars');
+            }
+        }
+
+        // Helper function to import from a single calendar and return events
+        async function importSingleCalendarData(calendarKey, calendarId) {
+            const startOfWeek = new Date(currentWeekStart);
+            const endOfWeek = new Date(currentWeekStart);
+            endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+            const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
+                `timeMin=${startOfWeek.toISOString()}&` +
+                `timeMax=${endOfWeek.toISOString()}&` +
+                `showDeleted=false&` +
+                `singleEvents=true&` +
+                `orderBy=startTime&` +
+                `key=${API_KEY}`;
+
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const events = data.items || [];
+            
+            // Add events to library
+            events.forEach(event => {
+                // Calculate duration in minutes
+                let duration = 120; // Default 2 hours
+                if (event.start && event.end) {
+                    const start = new Date(event.start.dateTime || event.start.date);
+                    const end = new Date(event.end.dateTime || event.end.date);
+                    duration = Math.round((end - start) / 60000); // Convert to minutes
+                }
+
+                // Skip all-day events for the schedule grid
+                if (!event.start.dateTime) {
+                    duration = 1440; // Mark as 24 hours for all-day events
+                }
+
+                libraryEvents.push({
+                    id: event.id || Date.now() + Math.random(),
+                    title: event.summary || 'Untitled Event',
+                    duration: duration,
+                    calendar: calendarKey,
+                    description: event.description || '',
+                    location: event.location || '',
+                    googleEventId: event.id,
+                    startTime: event.start,
+                    endTime: event.end,
+                    isAllDay: !event.start.dateTime
+                });
+            });
+
+            return events;
         }
 
         // Initialize the app
