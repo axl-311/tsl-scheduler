@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Theater Scheduler - Test Version</title>
+    <title>TSL Theater Scheduler - Final Version</title>
     <style>
         * {
             margin: 0;
@@ -455,7 +455,7 @@
 <body>
     <div class="app-container">
         <div class="header">
-            <h1>TSL Theater Scheduler - Test Version</h1>
+            <h1>TSL Theater Scheduler - Final Version</h1>
             <button id="authButton" class="auth-button">
                 Connect Google Calendar
             </button>
@@ -521,6 +521,8 @@
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     <script>
+        console.log('TSL Theater Scheduler - Final Version Loading...');
+        
         // Application State
         let currentWeekStart = new Date();
         currentWeekStart.setHours(0, 0, 0, 0);
@@ -535,15 +537,17 @@
         let collapsedDays = new Set();
         let accessToken = null;
 
-        // Google Calendar API Configuration
+        // Google Calendar API Configuration - CORRECT API KEY
         const CLIENT_ID = '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
         const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
         const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
 
-        // Test with personal calendar first, then TSL calendars
+        console.log('Using API Key:', API_KEY);
+
+        // Your TSL Calendar IDs
         const CALENDAR_IDS = {
-            'primary': 'primary', // Your personal Google Calendar - this should work
+            'primary': 'primary',
             'events': '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
             'non-public': '6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700@group.calendar.google.com',
             'tbd': '7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306@group.calendar.google.com',
@@ -563,20 +567,20 @@
 
         function updateDebugInfo(message) {
             document.getElementById('debugInfo').textContent = `Debug: ${message}`;
+            console.log('DEBUG:', message);
         }
 
         // Initialize Google API with new Identity Services
         function initGoogleAPI() {
             updateDebugInfo('Loading Google API...');
             
-            // Initialize the Google API client
             gapi.load('client', async () => {
                 try {
                     await gapi.client.init({
                         apiKey: API_KEY,
                         discoveryDocs: DISCOVERY_DOCS
                     });
-                    console.log('Google API client initialized');
+                    console.log('Google API client initialized successfully');
                     updateDebugInfo('Google API loaded successfully');
                 } catch (error) {
                     console.error('Error initializing Google API client:', error);
@@ -586,7 +590,6 @@
                 }
             });
 
-            // Initialize Google Sign-In
             google.accounts.id.initialize({
                 client_id: CLIENT_ID,
                 callback: handleCredentialResponse,
@@ -595,13 +598,11 @@
             });
         }
 
-        // Handle the credential response from Google Sign-In
         function handleCredentialResponse(response) {
             console.log('Credential response received');
             updateDebugInfo('Received Google credential response');
         }
 
-        // Initialize OAuth2 flow for getting access token
         function initOAuth() {
             updateDebugInfo('Setting up OAuth...');
             
@@ -613,8 +614,7 @@
                         accessToken = response.access_token;
                         updateDebugInfo(`Access token received: ${response.access_token.substring(0, 20)}...`);
                         updateSigninStatus(true);
-                        // Start with just personal calendar for testing
-                        importSingleCalendar('primary');
+                        importFromGoogle();
                     } else {
                         updateDebugInfo(`OAuth error: ${response.error || 'Unknown error'}`);
                     }
@@ -648,14 +648,12 @@
 
         function handleAuthClick() {
             if (accessToken) {
-                // Sign out
                 google.accounts.oauth2.revoke(accessToken, () => {
                     console.log('Access token revoked');
                 });
                 updateSigninStatus(false);
                 showToast('Disconnected from Google Calendar');
             } else {
-                // Sign in
                 if (window.tokenClient) {
                     updateDebugInfo('Requesting access token...');
                     window.tokenClient.requestAccessToken();
@@ -666,86 +664,58 @@
             }
         }
 
-        // Test with just one calendar first
-        async function importSingleCalendar(calendarKey) {
-            const calendarId = CALENDAR_IDS[calendarKey];
-            updateDebugInfo(`Testing calendar: ${calendarKey} (${calendarId})`);
+        // Helper function to check if event falls within current week view
+        function isEventInCurrentWeek(event) {
+            if (!event.start.dateTime) return false;
             
-            const syncStatus = document.getElementById('syncStatus');
-            syncStatus.classList.add('syncing');
-            syncStatus.innerHTML = '<span>↻</span><span>Testing calendar access...</span>';
+            const eventStart = new Date(event.start.dateTime);
+            const weekStart = new Date(currentWeekStart);
+            const weekEnd = new Date(currentWeekStart);
+            weekEnd.setDate(weekEnd.getDate() + 7);
             
-            try {
-                const startOfWeek = new Date(currentWeekStart);
-                const endOfWeek = new Date(currentWeekStart);
-                endOfWeek.setDate(endOfWeek.getDate() + 7);
+            const inWeek = eventStart >= weekStart && eventStart < weekEnd;
+            console.log('Event in current week check:', event.summary, eventStart, 'Week:', weekStart, 'to', weekEnd, 'Result:', inWeek);
+            return inWeek;
+        }
 
-                const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
-                    `timeMin=${startOfWeek.toISOString()}&` +
-                    `timeMax=${endOfWeek.toISOString()}&` +
-                    `showDeleted=false&` +
-                    `singleEvents=true&` +
-                    `orderBy=startTime&` +
-                    `key=${API_KEY}`;
-
-                updateDebugInfo(`Making request to: ${url.substring(0, 100)}...`);
-
-                const response = await fetch(url, {
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`
-                    }
-                });
-
-                updateDebugInfo(`Response status: ${response.status} ${response.statusText}`);
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const events = data.items || [];
-                    
-                    updateDebugInfo(`Success! Found ${events.length} events in ${calendarKey}`);
-                    
-                    libraryEvents = [];
-                    events.forEach(event => {
-                        // Calculate duration in minutes
-                        let duration = 120; // Default 2 hours
-                        if (event.start && event.end) {
-                            const start = new Date(event.start.dateTime || event.start.date);
-                            const end = new Date(event.end.dateTime || event.end.date);
-                            duration = Math.round((end - start) / 60000); // Convert to minutes
-                        }
-
-                        libraryEvents.push({
-                            id: event.id || Date.now() + Math.random(),
-                            title: event.summary || 'Untitled Event',
-                            duration: duration,
-                            calendar: calendarKey,
-                            description: event.description || '',
-                            location: event.location || '',
-                            googleEventId: event.id,
-                            startTime: event.start,
-                            endTime: event.end
-                        });
-                    });
-
-                    renderLibrary();
-                    syncStatus.classList.remove('syncing');
-                    syncStatus.classList.add('connected');
-                    syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
-                    showToast(`Success! Found ${events.length} events in your ${calendarConfig[calendarKey].name}`);
-                    
-                } else {
-                    const errorText = await response.text();
-                    updateDebugInfo(`Error ${response.status}: ${errorText.substring(0, 200)}`);
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-            } catch (error) {
-                console.error('Error fetching calendar events:', error);
-                updateDebugInfo(`Error: ${error.message}`);
-                syncStatus.classList.remove('syncing');
-                syncStatus.innerHTML = '<span>⚠</span><span>Test failed</span>';
-                showToast(`Test failed: ${error.message}`);
+        // Helper function to convert Google Calendar event to scheduled event format
+        function convertToScheduledEvent(eventData) {
+            if (!eventData.startTime || !eventData.startTime.dateTime) {
+                console.log('No dateTime found for event:', eventData.title);
+                return null;
             }
+            
+            const startDate = new Date(eventData.startTime.dateTime);
+            const weekStart = new Date(currentWeekStart);
+            
+            // Calculate which day of the week (0 = Monday, 6 = Sunday)
+            const daysDiff = Math.floor((startDate - weekStart) / (24 * 60 * 60 * 1000));
+            console.log('Days difference calculation:', eventData.title, startDate, weekStart, daysDiff);
+            
+            if (daysDiff < 0 || daysDiff > 6) {
+                console.log('Event outside week range:', eventData.title, daysDiff);
+                return null;
+            }
+            
+            // Determine theater based on calendar
+            let theater = 0; // Default to Theater 1
+            if (eventData.calendar === 'theater-2') {
+                theater = 1;
+            } else if (eventData.calendar === 'theater-1') {
+                theater = 0;
+            }
+            
+            const result = {
+                ...eventData,
+                day: daysDiff,
+                theater: theater,
+                startHour: startDate.getHours(),
+                startMinute: startDate.getMinutes(),
+                id: `existing-${eventData.googleEventId || Date.now()}`
+            };
+            
+            console.log('Converted event:', result);
+            return result;
         }
 
         // Import from Google Calendar (Test all calendars)
@@ -819,6 +789,8 @@
                 `orderBy=startTime&` +
                 `key=${API_KEY}`;
 
+            console.log(`Fetching from ${calendarKey}:`, url);
+
             const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`
@@ -833,8 +805,12 @@
             const data = await response.json();
             const events = data.items || [];
             
-            // Add events to library
+            console.log(`Found ${events.length} events in ${calendarKey}`);
+
+            // Add events to library AND schedule grid if they have specific times
             events.forEach(event => {
+                console.log('Processing event:', event.summary, 'Start:', event.start);
+                
                 // Calculate duration in minutes
                 let duration = 120; // Default 2 hours
                 if (event.start && event.end) {
@@ -843,12 +819,7 @@
                     duration = Math.round((end - start) / 60000); // Convert to minutes
                 }
 
-                // Skip all-day events for the schedule grid
-                if (!event.start.dateTime) {
-                    duration = 1440; // Mark as 24 hours for all-day events
-                }
-
-                libraryEvents.push({
+                const eventData = {
                     id: event.id || Date.now() + Math.random(),
                     title: event.summary || 'Untitled Event',
                     duration: duration,
@@ -859,7 +830,28 @@
                     startTime: event.start,
                     endTime: event.end,
                     isAllDay: !event.start.dateTime
-                });
+                };
+
+                // If event has specific time and falls within current week, add to schedule grid
+                if (event.start.dateTime && isEventInCurrentWeek(event)) {
+                    console.log('Processing timed event for grid:', event.summary, event.start.dateTime);
+                    const scheduledEvent = convertToScheduledEvent(eventData);
+                    if (scheduledEvent) {
+                        console.log('Successfully converted to scheduled event:', scheduledEvent);
+                        scheduledEvents.push(scheduledEvent);
+                        renderScheduledEvent(scheduledEvent);
+                    } else {
+                        console.log('Failed to convert event to scheduled format:', event.summary);
+                    }
+                } else {
+                    console.log('Event skipped for grid - either no dateTime or outside week:', event.summary, event.start);
+                }
+
+                // Always add to library for potential rescheduling
+                if (!event.start.dateTime) {
+                    eventData.duration = 1440; // Mark as 24 hours for all-day events
+                }
+                libraryEvents.push(eventData);
             });
 
             return events;
@@ -867,6 +859,7 @@
 
         // Initialize the app
         function init() {
+            console.log('Initializing TSL Theater Scheduler...');
             generateTimeColumn();
             generateDaysColumns();
             updateWeekDisplay();
@@ -1006,7 +999,7 @@
             document.getElementById('libraryCount').textContent = `(${filteredEvents.length})`;
         }
 
-        // Simplified drag and drop for testing (rest of the functions remain the same)
+        // Drag and Drop handlers
         function handleDragStart(e) {
             draggedItem = this;
             this.classList.add('dragging');
@@ -1111,8 +1104,20 @@
         }
 
         function renderScheduledEvent(event) {
+            console.log('Rendering scheduled event:', event);
+            
             const dayColumn = document.getElementById(`day-${event.day}`);
-            const lane = dayColumn.querySelectorAll('.theater-lane')[event.theater];
+            if (!dayColumn) {
+                console.error('Day column not found for day:', event.day);
+                return;
+            }
+            
+            const lanes = dayColumn.querySelectorAll('.theater-lane');
+            const lane = lanes[event.theater];
+            if (!lane) {
+                console.error('Theater lane not found for theater:', event.theater);
+                return;
+            }
             
             const eventBlock = document.createElement('div');
             eventBlock.className = `event-block calendar-${event.calendar}`;
@@ -1137,6 +1142,1230 @@
             eventBlock.addEventListener('dragend', handleDragEnd);
             
             lane.appendChild(eventBlock);
+            
+            console.log('Event rendered successfully:', event.title, 'at', top, 'px');
+        }
+
+        function formatTimeRange(startH, startM, endH, endM) {
+            const formatSingleTime = (h, m) => {
+                const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                const min = m.toString().padStart(2, '0');
+                return `${hour}:${min}`;
+            };
+            
+            return `${formatSingleTime(startH, startM)} - ${formatSingleTime(endH, endM)}`;
+        }
+
+        // Week navigation
+        function changeWeek(direction) {
+            currentWeekStart.setDate(currentWeekStart.getDate() + (direction * 7));
+            document.getElementById('daysContainer').innerHTML = '';
+            generateDaysColumns();
+            updateWeekDisplay();
+            
+            // Re-render scheduled events for the new week
+            scheduledEvents = [];
+            updateWeekStats();
+        }
+
+        function updateWeekDisplay() {
+            const endDate = new Date(currentWeekStart);
+            endDate.setDate(endDate.getDate() + 6);
+            
+            const options = { month: 'short', day: 'numeric', year: 'numeric' };
+            const startStr = currentWeekStart.toLocaleDateString('en-US', options);
+            const endStr = endDate.toLocaleDateString('en-US', options);
+            
+            document.getElementById('weekDisplay').textContent = `Week of ${startStr} - ${endStr}`;
+        }
+
+        function updateWeekStats() {
+            const total = scheduledEvents.length;
+            document.getElementById('weekTotal').textContent = `${total} event${total !== 1 ? 's' : ''}`;
+        }
+
+        // Collapse Tuesday-Thursday
+        function toggleCollapse() {
+            const days = [1, 2, 3];
+            days.forEach(day => {
+                const dayColumn = document.getElementById(`day-${day}`);
+                dayColumn.classList.toggle('collapsed');
+            });
+            
+            const button = event.target;
+            button.textContent = button.textContent.includes('Collapse') ? 'Expand Tue-Thu' : 'Collapse Tue-Thu';
+        }
+
+        // Filter library
+        function filterLibrary() {
+            renderLibrary();
+        }
+
+        // Toast notification
+        function showToast(message) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Initialize app on load
+        init();
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSL Theater Scheduler - Final Version</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f7;
+            color: #1d1d1f;
+        }
+
+        .app-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .auth-button {
+            padding: 8px 16px;
+            background: #34c759;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+            margin-left: auto;
+            margin-right: 15px;
+        }
+
+        .auth-button:hover {
+            background: #30a852;
+        }
+
+        .auth-button.sign-out {
+            background: #ff3b30;
+        }
+
+        .auth-button.sign-out:hover {
+            background: #d70015;
+        }
+
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            background: #e8e8e8;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #86868b;
+        }
+
+        .sync-status.connected {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .sync-status.syncing {
+            background: #fff3e0;
+            color: #ef6c00;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .controls {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .week-navigation {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .week-navigation button {
+            padding: 8px 16px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .week-navigation button:hover {
+            background: #0051d5;
+        }
+
+        .week-display {
+            font-size: 16px;
+            font-weight: 500;
+            min-width: 200px;
+            text-align: center;
+        }
+
+        .week-stats {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: #007aff;
+        }
+
+        .collapse-toggle {
+            padding: 8px 16px;
+            background: #f0f0f2;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .collapse-toggle:hover {
+            background: #e0e0e2;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 20px;
+        }
+
+        .library-panel {
+            width: 280px;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+
+        .library-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .library-count {
+            font-size: 14px;
+            color: #86868b;
+            font-weight: normal;
+        }
+
+        .calendar-filter {
+            margin-bottom: 15px;
+        }
+
+        .calendar-filter select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .library-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            cursor: move;
+            position: relative;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .library-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .library-item.dragging {
+            opacity: 0.5;
+        }
+
+        .library-item-title {
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: white;
+        }
+
+        .library-item-duration {
+            font-size: 12px;
+            color: rgba(255,255,255,0.8);
+        }
+
+        /* Calendar colors */
+        .calendar-primary { background: #4285f4; }
+        .calendar-events { background: #ec407a; }
+        .calendar-non-public { background: #ff9800; }
+        .calendar-tbd { background: #42a5f5; }
+        .calendar-theater-1 { background: #757575; }
+        .calendar-theater-2 { background: #66bb6a; }
+
+        .schedule-container {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow-x: auto;
+        }
+
+        .schedule-grid {
+            display: flex;
+            min-width: 1000px;
+        }
+
+        .time-column {
+            width: 60px;
+            border-right: 1px solid #e0e0e0;
+            padding-top: 50px;
+        }
+
+        .time-slot {
+            height: 40px;
+            padding: 5px 10px;
+            font-size: 12px;
+            color: #86868b;
+            text-align: right;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .days-container {
+            flex: 1;
+            display: flex;
+        }
+
+        .day-column {
+            flex: 1;
+            min-width: 140px;
+            border-right: 1px solid #e0e0e0;
+            position: relative;
+        }
+
+        .day-column.collapsed {
+            min-width: 50px;
+            max-width: 50px;
+        }
+
+        .day-column.collapsed .day-header {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            padding: 10px 5px;
+        }
+
+        .day-column.collapsed .theater-lanes {
+            display: none;
+        }
+
+        .day-column:last-child {
+            border-right: none;
+        }
+
+        .day-header {
+            height: 50px;
+            padding: 10px;
+            font-weight: 600;
+            text-align: center;
+            border-bottom: 2px solid #e0e0e0;
+            background: #f8f8f8;
+        }
+
+        .theater-lanes {
+            display: flex;
+            height: calc(40px * 48);
+            position: relative;
+        }
+
+        .theater-lane {
+            flex: 1;
+            border-right: 1px solid #e8e8e8;
+            position: relative;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent,
+                transparent 39px,
+                #f0f0f0 39px,
+                #f0f0f0 40px
+            );
+        }
+
+        .theater-lane:last-child {
+            border-right: none;
+        }
+
+        .theater-lane-header {
+            position: absolute;
+            top: -25px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 11px;
+            color: #86868b;
+            font-weight: 500;
+        }
+
+        .theater-lane.drop-active {
+            background-color: rgba(0, 122, 255, 0.05);
+        }
+
+        .event-block {
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            border-radius: 6px;
+            padding: 4px 6px;
+            cursor: move;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            z-index: 10;
+        }
+
+        .event-block:hover {
+            transform: scale(1.02);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 20;
+        }
+
+        .event-block.dragging {
+            opacity: 0.5;
+            z-index: 100;
+        }
+
+        .event-title {
+            font-size: 11px;
+            font-weight: 500;
+            color: white;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .event-time {
+            font-size: 10px;
+            color: rgba(255,255,255,0.9);
+            margin-top: 2px;
+        }
+
+        .ghost-event {
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            background: rgba(0, 122, 255, 0.2);
+            border: 2px dashed #007aff;
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .import-button {
+            padding: 8px 16px;
+            background: #34c759;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .import-button:hover {
+            background: #30a852;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #323232;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .debug-info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>TSL Theater Scheduler - Final Version</h1>
+            <button id="authButton" class="auth-button">
+                Connect Google Calendar
+            </button>
+            <div class="sync-status" id="syncStatus">
+                <span>○</span>
+                <span>Not connected</span>
+            </div>
+        </div>
+
+        <div class="debug-info" id="debugInfo">
+            Debug: Not connected to Google Calendar
+        </div>
+
+        <div class="controls">
+            <div class="week-navigation">
+                <button onclick="changeWeek(-1)">← Previous Week</button>
+                <div class="week-display" id="weekDisplay">Week of Dec 9 - Dec 15, 2024</div>
+                <button onclick="changeWeek(1)">Next Week →</button>
+            </div>
+            <div class="week-stats">
+                <div class="stat-item">
+                    <span>Week Total:</span>
+                    <span class="stat-value" id="weekTotal">0 events</span>
+                </div>
+                <button class="collapse-toggle" onclick="toggleCollapse()">
+                    Collapse Tue-Thu
+                </button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="library-panel">
+                <div class="library-header">
+                    <span>Movie/Event Library</span>
+                    <span class="library-count" id="libraryCount">(0)</span>
+                </div>
+                <div class="calendar-filter">
+                    <select id="calendarFilter" onchange="filterLibrary()">
+                        <option value="all">All Calendars</option>
+                        <option value="primary">My Personal Calendar (Test)</option>
+                        <option value="events">TSL Events</option>
+                        <option value="non-public">TSL Events (NON-PUBLIC)</option>
+                        <option value="tbd">TSL TBD</option>
+                        <option value="theater-1">TSL Theater 1</option>
+                        <option value="theater-2">TSL Theater 2</option>
+                    </select>
+                </div>
+                <div id="libraryItems"></div>
+                <button class="import-button" onclick="importFromGoogle()" style="width: 100%; margin-top: 15px;">
+                    Import from Google Calendar
+                </button>
+            </div>
+
+            <div class="schedule-container">
+                <div class="schedule-grid">
+                    <div class="time-column" id="timeColumn"></div>
+                    <div class="days-container" id="daysContainer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script>
+        console.log('TSL Theater Scheduler - Final Version Loading...');
+        
+        // Application State
+        let currentWeekStart = new Date();
+        currentWeekStart.setHours(0, 0, 0, 0);
+        const dayOfWeek = currentWeekStart.getDay();
+        const diff = currentWeekStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        currentWeekStart.setDate(diff);
+
+        let libraryEvents = [];
+        let scheduledEvents = [];
+        let draggedItem = null;
+        let ghostElement = null;
+        let collapsedDays = new Set();
+        let accessToken = null;
+
+        // Google Calendar API Configuration - CORRECT API KEY
+        const CLIENT_ID = '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
+        const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
+        const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
+
+        console.log('Using API Key:', API_KEY);
+
+        // Your TSL Calendar IDs
+        const CALENDAR_IDS = {
+            'primary': 'primary',
+            'events': '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
+            'non-public': '6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700@group.calendar.google.com',
+            'tbd': '7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306@group.calendar.google.com',
+            'theater-1': '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com',
+            'theater-2': 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
+        };
+
+        // Calendar configuration
+        const calendarConfig = {
+            'primary': { color: '#4285f4', name: 'My Personal Calendar' },
+            'events': { color: '#ec407a', name: 'TSL Events' },
+            'non-public': { color: '#ff9800', name: 'TSL Events (NON-PUBLIC)' },
+            'tbd': { color: '#42a5f5', name: 'TSL TBD' },
+            'theater-1': { color: '#757575', name: 'TSL Theater 1' },
+            'theater-2': { color: '#66bb6a', name: 'TSL Theater 2' }
+        };
+
+        function updateDebugInfo(message) {
+            document.getElementById('debugInfo').textContent = `Debug: ${message}`;
+            console.log('DEBUG:', message);
+        }
+
+        // Initialize Google API with new Identity Services
+        function initGoogleAPI() {
+            updateDebugInfo('Loading Google API...');
+            
+            gapi.load('client', async () => {
+                try {
+                    await gapi.client.init({
+                        apiKey: API_KEY,
+                        discoveryDocs: DISCOVERY_DOCS
+                    });
+                    console.log('Google API client initialized successfully');
+                    updateDebugInfo('Google API loaded successfully');
+                } catch (error) {
+                    console.error('Error initializing Google API client:', error);
+                    updateDebugInfo(`API Error: ${error.message || error}`);
+                    document.getElementById('syncStatus').innerHTML = '<span>⚠</span><span>API Error</span>';
+                    showToast('Failed to initialize Google Calendar API');
+                }
+            });
+
+            google.accounts.id.initialize({
+                client_id: CLIENT_ID,
+                callback: handleCredentialResponse,
+                auto_select: false,
+                cancel_on_tap_outside: false
+            });
+        }
+
+        function handleCredentialResponse(response) {
+            console.log('Credential response received');
+            updateDebugInfo('Received Google credential response');
+        }
+
+        function initOAuth() {
+            updateDebugInfo('Setting up OAuth...');
+            
+            const tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (response) => {
+                    if (response.access_token) {
+                        accessToken = response.access_token;
+                        updateDebugInfo(`Access token received: ${response.access_token.substring(0, 20)}...`);
+                        updateSigninStatus(true);
+                        importFromGoogle();
+                    } else {
+                        updateDebugInfo(`OAuth error: ${response.error || 'Unknown error'}`);
+                    }
+                },
+            });
+            
+            window.tokenClient = tokenClient;
+            updateDebugInfo('OAuth ready');
+        }
+
+        function updateSigninStatus(isSignedIn) {
+            const authButton = document.getElementById('authButton');
+            const syncStatus = document.getElementById('syncStatus');
+            
+            if (isSignedIn) {
+                authButton.textContent = 'Sign Out';
+                authButton.classList.add('sign-out');
+                syncStatus.classList.add('connected');
+                syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
+            } else {
+                authButton.textContent = 'Connect Google Calendar';
+                authButton.classList.remove('sign-out');
+                syncStatus.classList.remove('connected');
+                syncStatus.innerHTML = '<span>○</span><span>Not connected</span>';
+                accessToken = null;
+                libraryEvents = [];
+                renderLibrary();
+                updateDebugInfo('Not connected to Google Calendar');
+            }
+        }
+
+        function handleAuthClick() {
+            if (accessToken) {
+                google.accounts.oauth2.revoke(accessToken, () => {
+                    console.log('Access token revoked');
+                });
+                updateSigninStatus(false);
+                showToast('Disconnected from Google Calendar');
+            } else {
+                if (window.tokenClient) {
+                    updateDebugInfo('Requesting access token...');
+                    window.tokenClient.requestAccessToken();
+                } else {
+                    updateDebugInfo('TokenClient not ready');
+                    showToast('Authentication not ready. Please refresh the page.');
+                }
+            }
+        }
+
+        // Helper function to check if event falls within current week view
+        function isEventInCurrentWeek(event) {
+            if (!event.start.dateTime) return false;
+            
+            const eventStart = new Date(event.start.dateTime);
+            const weekStart = new Date(currentWeekStart);
+            const weekEnd = new Date(currentWeekStart);
+            weekEnd.setDate(weekEnd.getDate() + 7);
+            
+            const inWeek = eventStart >= weekStart && eventStart < weekEnd;
+            console.log('Event in current week check:', event.summary, eventStart, 'Week:', weekStart, 'to', weekEnd, 'Result:', inWeek);
+            return inWeek;
+        }
+
+        // Helper function to convert Google Calendar event to scheduled event format
+        function convertToScheduledEvent(eventData) {
+            if (!eventData.startTime || !eventData.startTime.dateTime) {
+                console.log('No dateTime found for event:', eventData.title);
+                return null;
+            }
+            
+            const startDate = new Date(eventData.startTime.dateTime);
+            const weekStart = new Date(currentWeekStart);
+            
+            // Calculate which day of the week (0 = Monday, 6 = Sunday)
+            const daysDiff = Math.floor((startDate - weekStart) / (24 * 60 * 60 * 1000));
+            console.log('Days difference calculation:', eventData.title, startDate, weekStart, daysDiff);
+            
+            if (daysDiff < 0 || daysDiff > 6) {
+                console.log('Event outside week range:', eventData.title, daysDiff);
+                return null;
+            }
+            
+            // Determine theater based on calendar
+            let theater = 0; // Default to Theater 1
+            if (eventData.calendar === 'theater-2') {
+                theater = 1;
+            } else if (eventData.calendar === 'theater-1') {
+                theater = 0;
+            }
+            
+            const result = {
+                ...eventData,
+                day: daysDiff,
+                theater: theater,
+                startHour: startDate.getHours(),
+                startMinute: startDate.getMinutes(),
+                id: `existing-${eventData.googleEventId || Date.now()}`
+            };
+            
+            console.log('Converted event:', result);
+            return result;
+        }
+
+        // Import from Google Calendar (Test all calendars)
+        async function importFromGoogle() {
+            if (!accessToken) {
+                showToast('Please connect to Google Calendar first');
+                return;
+            }
+
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.classList.add('syncing');
+            syncStatus.innerHTML = '<span>↻</span><span>Testing all calendars...</span>';
+            
+            // Clear existing data
+            libraryEvents = [];
+            scheduledEvents = [];
+            
+            // Clear existing scheduled events from grid
+            document.querySelectorAll('.event-block').forEach(block => block.remove());
+            
+            let totalEvents = 0;
+            let successfulCalendars = [];
+            let failedCalendars = [];
+
+            // Test all calendars
+            for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
+                updateDebugInfo(`Testing ${calendarKey}: ${calendarId}`);
+                
+                try {
+                    const events = await importSingleCalendarData(calendarKey, calendarId);
+                    if (events.length > 0) {
+                        successfulCalendars.push(`${calendarKey} (${events.length} events)`);
+                        totalEvents += events.length;
+                    } else {
+                        successfulCalendars.push(`${calendarKey} (0 events)`);
+                    }
+                } catch (error) {
+                    failedCalendars.push(`${calendarKey}: ${error.message}`);
+                    updateDebugInfo(`Failed ${calendarKey}: ${error.message}`);
+                }
+            }
+
+            // Update UI
+            renderLibrary();
+            updateWeekStats();
+            syncStatus.classList.remove('syncing');
+            
+            if (totalEvents > 0) {
+                syncStatus.classList.add('connected');
+                syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
+                updateDebugInfo(`Success! Total: ${totalEvents} events. Successful: ${successfulCalendars.join(', ')}. Failed: ${failedCalendars.join(', ')}`);
+                showToast(`Found ${totalEvents} events across ${successfulCalendars.length} calendars. ${scheduledEvents.length} automatically scheduled on grid.`);
+            } else {
+                syncStatus.innerHTML = '<span>⚠</span><span>No events found</span>';
+                updateDebugInfo(`No events found. Failed calendars: ${failedCalendars.join(', ')}`);
+                showToast('No events found in any calendars');
+            }
+        }
+
+        // Helper function to import from a single calendar and return events
+        async function importSingleCalendarData(calendarKey, calendarId) {
+            const startOfWeek = new Date(currentWeekStart);
+            const endOfWeek = new Date(currentWeekStart);
+            endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+            const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
+                `timeMin=${startOfWeek.toISOString()}&` +
+                `timeMax=${endOfWeek.toISOString()}&` +
+                `showDeleted=false&` +
+                `singleEvents=true&` +
+                `orderBy=startTime&` +
+                `key=${API_KEY}`;
+
+            console.log(`Fetching from ${calendarKey}:`, url);
+
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const events = data.items || [];
+            
+            console.log(`Found ${events.length} events in ${calendarKey}`);
+
+            // Add events to library AND schedule grid if they have specific times
+            events.forEach(event => {
+                console.log('Processing event:', event.summary, 'Start:', event.start);
+                
+                // Calculate duration in minutes
+                let duration = 120; // Default 2 hours
+                if (event.start && event.end) {
+                    const start = new Date(event.start.dateTime || event.start.date);
+                    const end = new Date(event.end.dateTime || event.end.date);
+                    duration = Math.round((end - start) / 60000); // Convert to minutes
+                }
+
+                const eventData = {
+                    id: event.id || Date.now() + Math.random(),
+                    title: event.summary || 'Untitled Event',
+                    duration: duration,
+                    calendar: calendarKey,
+                    description: event.description || '',
+                    location: event.location || '',
+                    googleEventId: event.id,
+                    startTime: event.start,
+                    endTime: event.end,
+                    isAllDay: !event.start.dateTime
+                };
+
+                // If event has specific time and falls within current week, add to schedule grid
+                if (event.start.dateTime && isEventInCurrentWeek(event)) {
+                    console.log('Processing timed event for grid:', event.summary, event.start.dateTime);
+                    const scheduledEvent = convertToScheduledEvent(eventData);
+                    if (scheduledEvent) {
+                        console.log('Successfully converted to scheduled event:', scheduledEvent);
+                        scheduledEvents.push(scheduledEvent);
+                        renderScheduledEvent(scheduledEvent);
+                    } else {
+                        console.log('Failed to convert event to scheduled format:', event.summary);
+                    }
+                } else {
+                    console.log('Event skipped for grid - either no dateTime or outside week:', event.summary, event.start);
+                }
+
+                // Always add to library for potential rescheduling
+                if (!event.start.dateTime) {
+                    eventData.duration = 1440; // Mark as 24 hours for all-day events
+                }
+                libraryEvents.push(eventData);
+            });
+
+            return events;
+        }
+
+        // Initialize the app
+        function init() {
+            console.log('Initializing TSL Theater Scheduler...');
+            generateTimeColumn();
+            generateDaysColumns();
+            updateWeekDisplay();
+            updateWeekStats();
+            
+            // Set up auth button
+            const authButton = document.getElementById('authButton');
+            authButton.onclick = handleAuthClick;
+            
+            // Initialize Google APIs
+            initGoogleAPI();
+            
+            // Initialize OAuth after a short delay to ensure Google APIs are loaded
+            setTimeout(() => {
+                initOAuth();
+            }, 1000);
+            
+            // Render empty library initially
+            renderLibrary();
+        }
+
+        // Generate time column (24 hours with 15-min increments)
+        function generateTimeColumn() {
+            const timeColumn = document.getElementById('timeColumn');
+            for (let hour = 0; hour < 24; hour++) {
+                for (let min = 0; min < 60; min += 15) {
+                    if (min === 0) {
+                        const timeSlot = document.createElement('div');
+                        timeSlot.className = 'time-slot';
+                        timeSlot.textContent = formatTime(hour, min);
+                        timeColumn.appendChild(timeSlot);
+                    }
+                }
+            }
+        }
+
+        // Generate day columns with theater lanes
+        function generateDaysColumns() {
+            const daysContainer = document.getElementById('daysContainer');
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            
+            days.forEach((day, index) => {
+                const dayColumn = document.createElement('div');
+                dayColumn.className = 'day-column';
+                dayColumn.id = `day-${index}`;
+                
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'day-header';
+                const date = new Date(currentWeekStart);
+                date.setDate(date.getDate() + index);
+                dayHeader.textContent = `${day.substr(0, 3)} ${date.getMonth() + 1}/${date.getDate()}`;
+                dayColumn.appendChild(dayHeader);
+                
+                const theaterLanes = document.createElement('div');
+                theaterLanes.className = 'theater-lanes';
+                
+                ['Theater 1', 'Theater 2'].forEach((theater, theaterIndex) => {
+                    const lane = document.createElement('div');
+                    lane.className = 'theater-lane';
+                    lane.dataset.day = index;
+                    lane.dataset.theater = theaterIndex;
+                    
+                    const laneHeader = document.createElement('div');
+                    laneHeader.className = 'theater-lane-header';
+                    laneHeader.textContent = theater;
+                    lane.appendChild(laneHeader);
+                    
+                    // Add drop zone functionality
+                    lane.addEventListener('dragover', handleDragOver);
+                    lane.addEventListener('drop', handleDrop);
+                    lane.addEventListener('dragleave', handleDragLeave);
+                    
+                    theaterLanes.appendChild(lane);
+                });
+                
+                dayColumn.appendChild(theaterLanes);
+                daysContainer.appendChild(dayColumn);
+            });
+        }
+
+        // Format time display
+        function formatTime(hour, min) {
+            const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+            const m = min.toString().padStart(2, '0');
+            const period = hour < 12 ? 'AM' : 'PM';
+            return min === 0 ? `${h}:${m} ${period}` : '';
+        }
+
+        // Render library items
+        function renderLibrary() {
+            const container = document.getElementById('libraryItems');
+            const filter = document.getElementById('calendarFilter').value;
+            container.innerHTML = '';
+            
+            // Check if connected to Google Calendar
+            if (!accessToken) {
+                container.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: #86868b;">
+                        <p style="margin-bottom: 10px;">📅</p>
+                        <p style="font-size: 14px;">Connect to Google Calendar to test calendar access</p>
+                        <p style="font-size: 12px; margin-top: 10px;">We'll start by testing your personal calendar</p>
+                    </div>
+                `;
+                document.getElementById('libraryCount').textContent = '(0)';
+                return;
+            }
+            
+            const filteredEvents = filter === 'all' 
+                ? libraryEvents 
+                : libraryEvents.filter(e => e.calendar === filter);
+            
+            if (filteredEvents.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: #86868b; font-size: 14px;">
+                        No events found. Click "Import from Google Calendar" to test.
+                    </div>
+                `;
+            } else {
+                filteredEvents.forEach(event => {
+                    const item = document.createElement('div');
+                    item.className = `library-item calendar-${event.calendar}`;
+                    item.draggable = true;
+                    item.dataset.eventId = event.id;
+                    
+                    item.innerHTML = `
+                        <div class="library-item-title">${event.title}</div>
+                        <div class="library-item-duration">${Math.floor(event.duration / 60)}h ${event.duration % 60}m</div>
+                    `;
+                    
+                    item.addEventListener('dragstart', handleDragStart);
+                    item.addEventListener('dragend', handleDragEnd);
+                    
+                    container.appendChild(item);
+                });
+            }
+            
+            document.getElementById('libraryCount').textContent = `(${filteredEvents.length})`;
+        }
+
+        // Drag and Drop handlers
+        function handleDragStart(e) {
+            draggedItem = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'copy';
+            
+            const eventId = this.dataset.eventId;
+            const event = libraryEvents.find(e => e.id == eventId) || 
+                         scheduledEvents.find(e => e.id == eventId);
+            
+            if (event) {
+                e.dataTransfer.setData('event', JSON.stringify(event));
+            }
+        }
+
+        function handleDragEnd(e) {
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+            }
+            draggedItem = null;
+            removeGhost();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            this.classList.add('drop-active');
+            
+            const rect = this.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const snapY = Math.floor(y / 10) * 10;
+            
+            showGhost(this, snapY);
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drop-active');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drop-active');
+            
+            const eventData = e.dataTransfer.getData('event');
+            if (!eventData) return;
+            
+            const event = JSON.parse(eventData);
+            const rect = this.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const snapY = Math.floor(y / 10) * 10;
+            
+            const hour = Math.floor(snapY / 40);
+            const minute = ((snapY % 40) / 10) * 15;
+            
+            const scheduledEvent = {
+                ...event,
+                day: parseInt(this.dataset.day),
+                theater: parseInt(this.dataset.theater),
+                startHour: hour,
+                startMinute: minute,
+                id: Date.now()
+            };
+            
+            // Update calendar for theater events
+            if (this.dataset.theater === '0') {
+                scheduledEvent.calendar = 'theater-1';
+            } else {
+                scheduledEvent.calendar = 'theater-2';
+            }
+            
+            scheduledEvents.push(scheduledEvent);
+            renderScheduledEvent(scheduledEvent);
+            updateWeekStats();
+            removeGhost();
+            
+            showToast('Event scheduled successfully!');
+        }
+
+        function showGhost(lane, y) {
+            removeGhost();
+            
+            if (!draggedItem) return;
+            
+            const eventId = draggedItem.dataset.eventId;
+            const event = libraryEvents.find(e => e.id == eventId);
+            if (!event) return;
+            
+            ghostElement = document.createElement('div');
+            ghostElement.className = 'ghost-event';
+            ghostElement.style.top = `${y}px`;
+            
+            const height = (event.duration / 60) * 40;
+            ghostElement.style.height = `${height}px`;
+            
+            lane.appendChild(ghostElement);
+        }
+
+        function removeGhost() {
+            if (ghostElement && ghostElement.parentNode) {
+                ghostElement.parentNode.removeChild(ghostElement);
+            }
+            ghostElement = null;
+        }
+
+        function renderScheduledEvent(event) {
+            console.log('Rendering scheduled event:', event);
+            
+            const dayColumn = document.getElementById(`day-${event.day}`);
+            if (!dayColumn) {
+                console.error('Day column not found for day:', event.day);
+                return;
+            }
+            
+            const lanes = dayColumn.querySelectorAll('.theater-lane');
+            const lane = lanes[event.theater];
+            if (!lane) {
+                console.error('Theater lane not found for theater:', event.theater);
+                return;
+            }
+            
+            const eventBlock = document.createElement('div');
+            eventBlock.className = `event-block calendar-${event.calendar}`;
+            eventBlock.draggable = true;
+            eventBlock.dataset.eventId = event.id;
+            
+            const top = event.startHour * 40 + (event.startMinute / 15) * 10;
+            const height = (event.duration / 60) * 40;
+            
+            eventBlock.style.top = `${top}px`;
+            eventBlock.style.height = `${height}px`;
+            
+            const endHour = event.startHour + Math.floor((event.startMinute + event.duration) / 60);
+            const endMinute = (event.startMinute + event.duration) % 60;
+            
+            eventBlock.innerHTML = `
+                <div class="event-title">${event.title}</div>
+                <div class="event-time">${formatTimeRange(event.startHour, event.startMinute, endHour, endMinute)}</div>
+            `;
+            
+            eventBlock.addEventListener('dragstart', handleDragStart);
+            eventBlock.addEventListener('dragend', handleDragEnd);
+            
+            lane.appendChild(eventBlock);
+            
+            console.log('Event rendered successfully:', event.title, 'at', top, 'px');
         }
 
         function formatTimeRange(startH, startM, endH, endM) {
