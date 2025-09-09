@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TSL Scheduler 2.0</title>
+  <title>TSL Scheduler 2.0 - Theater Scheduling System</title>
   <style>
-    /* Modern CSS Reset & Variables */
+    /* CSS Reset & Variables */
     *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
@@ -81,6 +81,19 @@
       align-items: center;
     }
 
+    /* Status Badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.25rem 0.625rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      background: var(--success);
+      color: white;
+    }
+
     /* Buttons */
     .btn {
       padding: 0.5rem 1rem;
@@ -94,6 +107,14 @@
       align-items: center;
       gap: 0.375rem;
       white-space: nowrap;
+      background: white;
+      color: var(--gray-700);
+      border-color: var(--gray-300);
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--gray-50);
+      transform: translateY(-1px);
     }
 
     .btn-primary {
@@ -106,19 +127,10 @@
       background: var(--primary-dark);
     }
 
-    .btn-secondary {
-      background: white;
-      color: var(--gray-700);
-      border-color: var(--gray-300);
-    }
-
-    .btn-secondary:hover:not(:disabled) {
-      background: var(--gray-50);
-    }
-
     .btn-danger {
       background: var(--danger);
       color: white;
+      border-color: var(--danger);
     }
 
     .btn-danger:hover:not(:disabled) {
@@ -128,6 +140,7 @@
     .btn-success {
       background: var(--success);
       color: white;
+      border-color: var(--success);
     }
 
     .btn-success:hover:not(:disabled) {
@@ -137,6 +150,11 @@
     .btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    .btn-sm {
+      padding: 0.375rem 0.75rem;
+      font-size: 0.8125rem;
     }
 
     /* Main Layout */
@@ -154,6 +172,11 @@
       display: flex;
       flex-direction: column;
       transition: transform 0.3s ease;
+    }
+
+    .sidebar.collapsed {
+      transform: translateX(-100%);
+      margin-right: calc(var(--sidebar-width) * -1);
     }
 
     .sidebar-header {
@@ -175,10 +198,19 @@
       padding: 1rem;
     }
 
+    .sidebar-footer {
+      padding: 0.75rem;
+      border-top: 1px solid var(--gray-200);
+      font-size: 0.75rem;
+      color: var(--gray-500);
+      line-height: 1.5;
+    }
+
     /* Movie Cards */
     .movie-card {
       background: white;
       border: 2px solid var(--gray-200);
+      border-left-width: 4px;
       border-radius: 0.5rem;
       padding: 0.75rem;
       margin-bottom: 0.75rem;
@@ -190,6 +222,7 @@
     .movie-card:hover {
       border-color: var(--primary);
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transform: translateY(-1px);
     }
 
     .movie-card.dragging {
@@ -214,6 +247,12 @@
       right: 0.5rem;
       display: flex;
       gap: 0.25rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .movie-card:hover .movie-actions {
+      opacity: 1;
     }
 
     .icon-btn {
@@ -304,6 +343,11 @@
       z-index: 10;
     }
 
+    .day-header.today {
+      background: var(--primary);
+      color: white;
+    }
+
     .theaters-row {
       display: flex;
       background: white;
@@ -321,6 +365,7 @@
       font-weight: 500;
       color: var(--gray-600);
       border-right: 1px solid var(--gray-200);
+      background: var(--gray-50);
     }
 
     .theater-header {
@@ -330,6 +375,7 @@
       font-size: 0.875rem;
       font-weight: 500;
       border-right: 1px solid var(--gray-200);
+      background: var(--gray-50);
     }
 
     .theater-header:last-child {
@@ -404,16 +450,13 @@
       transition: var(--transition);
       z-index: 5;
       overflow: hidden;
-      user-select: none;
-    }
-
-    .schedule-block:active {
-      cursor: grabbing;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 
     .schedule-block:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
       z-index: 6;
+      transform: scale(1.02);
     }
 
     .schedule-block.dragging {
@@ -432,14 +475,6 @@
       font-size: 0.625rem;
       opacity: 0.9;
       margin-top: 0.125rem;
-      font-weight: 500;
-    }
-
-    .block-duration {
-      font-size: 0.625rem;
-      opacity: 0.8;
-      margin-top: 0.125rem;
-      font-style: italic;
     }
 
     .block-actions {
@@ -448,6 +483,12 @@
       right: 0.25rem;
       display: flex;
       gap: 0.125rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .schedule-block:hover .block-actions {
+      opacity: 1;
     }
 
     .block-btn {
@@ -467,20 +508,6 @@
 
     .block-btn:hover {
       background: rgba(255, 255, 255, 0.5);
-    }
-
-    /* Drag Ghost */
-    .drag-ghost {
-      position: fixed;
-      pointer-events: none;
-      z-index: 1000;
-      background: var(--primary);
-      color: white;
-      padding: 0.5rem 0.75rem;
-      border-radius: 0.375rem;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-      font-size: 0.875rem;
-      font-weight: 500;
     }
 
     /* Drop Preview */
@@ -514,6 +541,12 @@
 
     .dialog.open {
       display: flex;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     .dialog-content {
@@ -526,6 +559,18 @@
       display: flex;
       flex-direction: column;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
     }
 
     .dialog-header {
@@ -647,6 +692,10 @@
       border-left: 4px solid var(--primary);
     }
 
+    .toast.warning {
+      border-left: 4px solid var(--warning);
+    }
+
     @keyframes slideIn {
       from {
         transform: translateX(100%);
@@ -658,57 +707,50 @@
       }
     }
 
-    /* Google Calendar Status */
-    .google-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.375rem;
-      padding: 0.25rem 0.625rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 500;
-    }
-
-    .google-status.connected {
-      background: var(--success);
-      color: white;
-    }
-
-    .google-status.disconnected {
-      background: var(--gray-300);
-      color: var(--gray-700);
+    /* Responsive */
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        z-index: 50;
+        height: 100%;
+      }
+      
+      .schedule-container {
+        padding: 1rem;
+      }
+      
+      .day-column {
+        min-width: calc(var(--time-width) + var(--theater-width));
+      }
     }
 
     /* Utility Classes */
     .hidden { display: none !important; }
     .text-muted { color: var(--gray-500); }
     .text-small { font-size: 0.875rem; }
-    .mt-1 { margin-top: 0.25rem; }
   </style>
 </head>
 <body>
   <!-- Header -->
-  <div class="header">
+  <header class="header">
     <div class="header-title">
       🎬 TSL Scheduler 2.0
-      <span class="google-status disconnected" id="googleStatus">
-        <span id="googleStatusText">Not Connected</span>
-      </span>
+      <span class="status-badge">✓ Ready</span>
     </div>
     <div class="header-controls">
-      <button class="btn btn-secondary" id="toggleSidebar">☰</button>
-      <button class="btn btn-primary" id="saveBtn">💾 Save</button>
-      <button class="btn btn-secondary" id="settingsBtn">⚙️</button>
-      <button class="btn btn-success" id="connectGoogleBtn" disabled>🔗 Google</button>
-      <button class="btn btn-primary hidden" id="syncGoogleBtn">📤 Push</button>
-      <button class="btn btn-secondary hidden" id="loadGoogleBtn">📥 Load</button>
+      <button class="btn" id="toggleSidebar" title="Toggle Sidebar">☰</button>
+      <button class="btn btn-primary" id="saveBtn" title="Save all changes">💾 Save</button>
+      <button class="btn" id="exportBtn" title="Export Schedule">📤 Export</button>
+      <button class="btn" id="importBtn" title="Import Schedule">📥 Import</button>
+      <input type="file" id="importFile" accept=".json" style="display: none;">
+      <button class="btn" id="settingsBtn" title="Settings">⚙️</button>
     </div>
-  </div>
+  </header>
 
   <!-- Main Container -->
-  <div class="main-container">
+  <main class="main-container">
     <!-- Sidebar -->
-    <div class="sidebar" id="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-title">Film Library</div>
         <div class="header-controls">
@@ -718,20 +760,26 @@
       <div class="sidebar-content" id="moviesList">
         <!-- Movies will be rendered here -->
       </div>
-    </div>
+      <div class="sidebar-footer">
+        <div>💡 Tips:</div>
+        <div>• Drag films to schedule</div>
+        <div>• Double-click to edit</div>
+        <div>• Data saves automatically</div>
+      </div>
+    </aside>
 
     <!-- Schedule Container -->
-    <div class="schedule-container">
+    <section class="schedule-container">
       <!-- Week Header -->
       <div class="week-header">
         <div class="week-nav">
-          <button class="btn btn-secondary" id="prevWeekBtn">‹</button>
+          <button class="btn" id="prevWeekBtn">‹ Previous</button>
           <div class="week-label" id="weekLabel">Loading...</div>
-          <button class="btn btn-secondary" id="nextWeekBtn">›</button>
+          <button class="btn" id="nextWeekBtn">Next ›</button>
         </div>
         <div class="header-controls">
-          <button class="btn btn-secondary" id="todayBtn">Today</button>
-          <button class="btn btn-danger" id="clearWeekBtn">Clear</button>
+          <button class="btn btn-success" id="todayBtn">Today</button>
+          <button class="btn btn-danger" id="clearWeekBtn">Clear Week</button>
         </div>
       </div>
 
@@ -741,8 +789,8 @@
           <!-- Days will be rendered here -->
         </div>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
@@ -752,32 +800,34 @@
     <div class="dialog-content">
       <div class="dialog-header">
         <h2 class="dialog-title">Add/Edit Film</h2>
-        <button class="dialog-close" data-close="movieDialog">✕</button>
+        <button class="dialog-close" onclick="tslApp.closeDialog('movieDialog')">✕</button>
       </div>
       <div class="dialog-body">
-        <div class="form-group">
-          <label class="form-label">Title</label>
-          <input type="text" class="form-input" id="movieTitle" placeholder="Film title">
-        </div>
-        <div class="form-row">
+        <form id="movieForm">
           <div class="form-group">
-            <label class="form-label">Hours</label>
-            <input type="number" class="form-input" id="movieHours" min="0" max="6" placeholder="2">
+            <label class="form-label" for="movieTitle">Title</label>
+            <input type="text" class="form-input" id="movieTitle" placeholder="Enter film title" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="movieHours">Hours</label>
+              <input type="number" class="form-input" id="movieHours" min="0" max="12" value="2">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="movieMinutes">Minutes</label>
+              <input type="number" class="form-input" id="movieMinutes" min="0" max="59" value="0">
+            </div>
           </div>
           <div class="form-group">
-            <label class="form-label">Minutes</label>
-            <input type="number" class="form-input" id="movieMinutes" min="0" max="59" placeholder="30">
+            <label class="form-label" for="movieColor">Color</label>
+            <input type="color" class="form-input" id="movieColor" value="#3b82f6">
           </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Color</label>
-          <input type="color" class="form-input" id="movieColor" value="#3b82f6">
-        </div>
-        <input type="hidden" id="movieId">
+          <input type="hidden" id="movieId">
+        </form>
       </div>
       <div class="dialog-footer">
-        <button class="btn btn-secondary" data-close="movieDialog">Cancel</button>
-        <button class="btn btn-primary" id="saveMovieBtn">Save</button>
+        <button class="btn" onclick="tslApp.closeDialog('movieDialog')">Cancel</button>
+        <button class="btn btn-primary" onclick="tslApp.saveMovie()">Save Film</button>
       </div>
     </div>
   </div>
@@ -787,50 +837,50 @@
     <div class="dialog-content">
       <div class="dialog-header">
         <h2 class="dialog-title">Settings</h2>
-        <button class="dialog-close" data-close="settingsDialog">✕</button>
+        <button class="dialog-close" onclick="tslApp.closeDialog('settingsDialog')">✕</button>
       </div>
       <div class="dialog-body">
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Start Hour</label>
-            <input type="number" class="form-input" id="startHour" min="0" max="23" value="14">
+        <form id="settingsForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="startHour">Start Hour (24h)</label>
+              <input type="number" class="form-input" id="startHour" min="0" max="23" value="14">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="endHour">End Hour (24h)</label>
+              <input type="number" class="form-input" id="endHour" min="1" max="24" value="24">
+            </div>
           </div>
           <div class="form-group">
-            <label class="form-label">End Hour</label>
-            <input type="number" class="form-input" id="endHour" min="1" max="24" value="24">
+            <label class="form-label" for="weekStart">Week Starts On</label>
+            <select class="form-input" id="weekStart">
+              <option value="0">Sunday</option>
+              <option value="1">Monday</option>
+              <option value="2" selected>Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+            </select>
           </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Google Client ID (Optional)</label>
-          <input type="text" class="form-input" id="googleClientId" placeholder="Leave blank for default">
-        </div>
+        </form>
       </div>
       <div class="dialog-footer">
-        <button class="btn btn-secondary" data-close="settingsDialog">Cancel</button>
-        <button class="btn btn-primary" id="saveSettingsBtn">Save</button>
+        <button class="btn" onclick="tslApp.closeDialog('settingsDialog')">Cancel</button>
+        <button class="btn btn-primary" onclick="tslApp.saveSettings()">Save Settings</button>
       </div>
     </div>
   </div>
 
   <script>
-    // Wait for DOM to be ready
-    document.addEventListener('DOMContentLoaded', function() {
-      // Initialize the app
-      const app = new TSLScheduler();
-      
-      // Make app globally available for Google callbacks
-      window.tslApp = app;
-    });
-
-    // TSL Scheduler Class
+    // TSL Scheduler Application - No External Dependencies
     class TSLScheduler {
       constructor() {
         this.config = {
           startHour: 14,
           endHour: 24,
           slotMinutes: 15,
-          weekStartDay: 2,
-          googleClientId: null
+          weekStartDay: 2 // Tuesday
         };
         
         this.state = {
@@ -838,7 +888,7 @@
           schedules: {},
           currentWeek: null,
           draggedItem: null,
-          googleConnected: false
+          sidebarCollapsed: false
         };
         
         this.init();
@@ -851,132 +901,23 @@
         this.loadSchedules();
         this.bindEvents();
         this.render();
-        this.initGoogle();
+        this.showWelcome();
       }
 
-      // Google Integration
-      initGoogle() {
-        // Setup Google API
-        window.handleGapiLoad = () => {
-          if (typeof gapi !== 'undefined') {
-            gapi.load('client', async () => {
-              try {
-                await gapi.client.init({
-                  discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
-                });
-                console.log('GAPI initialized');
-                this.checkGoogleReady();
-              } catch (error) {
-                console.error('GAPI init error:', error);
-              }
-            });
-          }
-        };
-
-        window.handleGisLoad = () => {
-          if (typeof google !== 'undefined') {
-            const clientId = this.config.googleClientId || '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
-            window.tokenClient = google.accounts.oauth2.initTokenClient({
-              client_id: clientId,
-              scope: 'https://www.googleapis.com/auth/calendar.events',
-              callback: (response) => {
-                if (response && !response.error) {
-                  this.onGoogleConnected();
-                }
-              }
-            });
-            console.log('GIS initialized');
-            this.checkGoogleReady();
-          }
-        };
-
-        // Load Google scripts
-        const gapiScript = document.createElement('script');
-        gapiScript.src = 'https://apis.google.com/js/api.js';
-        gapiScript.async = true;
-        gapiScript.defer = true;
-        gapiScript.onload = window.handleGapiLoad;
-        document.body.appendChild(gapiScript);
-
-        const gisScript = document.createElement('script');
-        gisScript.src = 'https://accounts.google.com/gsi/client';
-        gisScript.async = true;
-        gisScript.defer = true;
-        gisScript.onload = window.handleGisLoad;
-        document.body.appendChild(gisScript);
-      }
-
-      checkGoogleReady() {
-        if (typeof gapi !== 'undefined' && gapi.client && window.tokenClient) {
-          document.getElementById('connectGoogleBtn').disabled = false;
-          this.updateGoogleStatus('Ready', false);
+      showWelcome() {
+        if (!localStorage.getItem('tsl_welcomed_v2')) {
+          setTimeout(() => {
+            this.showToast('Welcome to TSL Scheduler! All data is saved locally.', 'success');
+            localStorage.setItem('tsl_welcomed_v2', 'true');
+          }, 1000);
         }
       }
 
-      connectGoogle() {
-        if (window.tokenClient) {
-          window.tokenClient.requestAccessToken({ prompt: '' });
-        }
-      }
-
-      onGoogleConnected() {
-        this.state.googleConnected = true;
-        this.updateGoogleStatus('Connected', true);
-        document.getElementById('syncGoogleBtn').classList.remove('hidden');
-        document.getElementById('loadGoogleBtn').classList.remove('hidden');
-        this.showToast('Connected to Google Calendar', 'success');
-      }
-
-      updateGoogleStatus(text, connected) {
-        const status = document.getElementById('googleStatus');
-        const statusText = document.getElementById('googleStatusText');
-        
-        if (connected) {
-          status.classList.add('connected');
-          status.classList.remove('disconnected');
-        } else {
-          status.classList.remove('connected');
-          status.classList.add('disconnected');
-        }
-        
-        statusText.textContent = text;
-      }
-
-      async syncWithGoogle() {
-        if (!this.state.googleConnected) {
-          this.showToast('Please connect to Google first', 'error');
-          return;
-        }
-
-        try {
-          // Implementation would go here
-          this.showToast('Sync feature coming soon', 'info');
-        } catch (error) {
-          console.error('Sync error:', error);
-          this.showToast('Sync failed', 'error');
-        }
-      }
-
-      async loadFromGoogle() {
-        if (!this.state.googleConnected) {
-          this.showToast('Please connect to Google first', 'error');
-          return;
-        }
-
-        try {
-          // Implementation would go here
-          this.showToast('Load feature coming soon', 'info');
-        } catch (error) {
-          console.error('Load error:', error);
-          this.showToast('Load failed', 'error');
-        }
-      }
-
-      // Configuration
+      // Configuration Management
       loadConfig() {
         const saved = localStorage.getItem('tsl_config_v2');
         if (saved) {
-          this.config = Object.assign(this.config, JSON.parse(saved));
+          Object.assign(this.config, JSON.parse(saved));
         }
       }
 
@@ -988,7 +929,11 @@
       loadMovies() {
         const saved = localStorage.getItem('tsl_movies_v2');
         this.state.movies = saved ? JSON.parse(saved) : [
-          { id: 1, title: 'Sample Film', duration: 120, color: '#3b82f6' }
+          { id: 1, title: 'Oppenheimer', duration: 180, color: '#3b82f6' },
+          { id: 2, title: 'Barbie', duration: 114, color: '#ec4899' },
+          { id: 3, title: 'Dune: Part Two', duration: 166, color: '#f59e0b' },
+          { id: 4, title: 'The Batman', duration: 176, color: '#6b7280' },
+          { id: 5, title: 'Spider-Man: Across the Spider-Verse', duration: 140, color: '#ef4444' }
         ];
       }
 
@@ -1031,7 +976,7 @@
         this.render();
       }
 
-      // Rendering
+      // Rendering Methods
       render() {
         this.renderWeekLabel();
         this.renderMoviesList();
@@ -1043,18 +988,30 @@
         const end = new Date(start);
         end.setDate(end.getDate() + 6);
         
+        const today = new Date();
+        const isCurrentWeek = start <= today && today <= end;
+        
         const format = (date) => date.toLocaleDateString('en-US', { 
           month: 'short', 
-          day: 'numeric' 
+          day: 'numeric'
         });
         
-        document.getElementById('weekLabel').textContent = 
-          `${format(start)} - ${format(end)}`;
+        let label = `${format(start)} - ${format(end)}`;
+        if (isCurrentWeek) {
+          label += ' (This Week)';
+        }
+        
+        document.getElementById('weekLabel').textContent = label;
       }
 
       renderMoviesList() {
         const container = document.getElementById('moviesList');
         container.innerHTML = '';
+        
+        if (this.state.movies.length === 0) {
+          container.innerHTML = '<div class="text-muted text-small" style="padding: 1rem; text-align: center;">No films in library. Click "Add Film" to start.</div>';
+          return;
+        }
         
         this.state.movies.forEach(movie => {
           const card = document.createElement('div');
@@ -1064,13 +1021,17 @@
           card.style.borderLeftColor = movie.color;
           
           card.innerHTML = `
-            <div class="movie-title">${movie.title}</div>
+            <div class="movie-title">${this.escapeHtml(movie.title)}</div>
             <div class="movie-info">${this.formatDuration(movie.duration)}</div>
             <div class="movie-actions">
-              <button class="icon-btn" data-action="edit" data-id="${movie.id}">✏️</button>
-              <button class="icon-btn delete" data-action="delete" data-id="${movie.id}">🗑</button>
+              <button class="icon-btn" onclick="tslApp.editMovie(${movie.id})" title="Edit">✏️</button>
+              <button class="icon-btn delete" onclick="tslApp.deleteMovie(${movie.id})" title="Delete">🗑</button>
             </div>
           `;
+          
+          // Add drag event listeners
+          card.addEventListener('dragstart', (e) => this.handleMovieDragStart(e, movie));
+          card.addEventListener('dblclick', () => this.editMovie(movie.id));
           
           container.appendChild(card);
         });
@@ -1080,21 +1041,31 @@
         const container = document.getElementById('daysContainer');
         container.innerHTML = '';
         
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
         for (let i = 0; i < 7; i++) {
-          const dayColumn = this.createDayColumn(i);
+          const dayColumn = this.createDayColumn(i, today);
           container.appendChild(dayColumn);
         }
+        
+        this.renderAllScheduledBlocks();
       }
 
-      createDayColumn(dayIndex) {
+      createDayColumn(dayIndex, today) {
         const date = new Date(this.state.currentWeek);
         date.setDate(date.getDate() + dayIndex);
         
         const column = document.createElement('div');
         column.className = 'day-column';
+        column.dataset.dayIndex = dayIndex;
         
+        // Day header
         const header = document.createElement('div');
         header.className = 'day-header';
+        if (date.toDateString() === today.toDateString()) {
+          header.classList.add('today');
+        }
         header.textContent = date.toLocaleDateString('en-US', { 
           weekday: 'short', 
           month: 'short', 
@@ -1102,6 +1073,7 @@
         });
         column.appendChild(header);
         
+        // Theater headers
         const theatersRow = document.createElement('div');
         theatersRow.className = 'theaters-row';
         theatersRow.innerHTML = `
@@ -1111,12 +1083,15 @@
         `;
         column.appendChild(theatersRow);
         
+        // Day content
         const content = document.createElement('div');
         content.className = 'day-content';
         
+        // Time column
         const timeColumn = this.createTimeColumn();
         content.appendChild(timeColumn);
         
+        // Theater lanes
         const theatersContainer = document.createElement('div');
         theatersContainer.className = 'theaters-container';
         
@@ -1147,7 +1122,9 @@
           
           if (minute === 0) {
             slot.classList.add('hour');
-            slot.textContent = `${hour % 12 || 12}:00`;
+            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+            const ampm = hour < 12 ? 'am' : 'pm';
+            slot.textContent = `${displayHour}:00`;
           } else {
             slot.textContent = `:${String(minute).padStart(2, '0')}`;
           }
@@ -1167,153 +1144,68 @@
         const slots = (this.config.endHour - this.config.startHour) * (60 / this.config.slotMinutes);
         lane.style.height = `${slots * 24}px`;
         
-        // Render schedule blocks for this lane
-        const key = `${dayIndex}-${theater}`;
-        const blocks = this.state.schedules[key] || [];
-        blocks.forEach(block => {
-          const blockEl = document.createElement('div');
-          blockEl.className = 'schedule-block';
-          blockEl.draggable = true;
-          blockEl.dataset.blockId = block.id;
-          blockEl.dataset.day = dayIndex;
-          blockEl.dataset.theater = theater;
-          
-          const slots = Math.ceil(block.duration / this.config.slotMinutes);
-          blockEl.style.top = `${block.startSlot * 24}px`;
-          blockEl.style.height = `${slots * 24 - 4}px`;
-          blockEl.style.backgroundColor = block.color;
-          
-          // Calculate start and end times
-          const startMinutes = block.startSlot * this.config.slotMinutes;
-          const startHour = Math.floor(startMinutes / 60) + this.config.startHour;
-          const startMin = startMinutes % 60;
-          const startTime = this.formatTime(startHour, startMin);
-          
-          const endTotalMinutes = startMinutes + block.duration;
-          const endHour = Math.floor(endTotalMinutes / 60) + this.config.startHour;
-          const endMin = endTotalMinutes % 60;
-          const endTime = this.formatTime(endHour, endMin);
-          
-          blockEl.innerHTML = `
-            <div class="block-title">${block.title}</div>
-            <div class="block-time"><strong>${startTime}</strong> - ${endTime}</div>
-            <div class="block-duration">${this.formatDuration(block.duration)}</div>
-            <div class="block-actions">
-              <button class="block-btn" data-action="delete">✕</button>
-            </div>
-          `;
-          
-          // Add drag handlers
-          blockEl.addEventListener('dragstart', (e) => {
-            this.handleBlockDragStart(e, block, key);
-          });
-          
-          // Add delete handler
-          blockEl.addEventListener('click', (e) => {
-            if (e.target.dataset.action === 'delete') {
-              this.deleteBlock(key, block.id);
-            }
-          });
-          
-          lane.appendChild(blockEl);
-        });
+        // Add drag and drop event listeners
+        lane.addEventListener('dragover', (e) => this.handleDragOver(e));
+        lane.addEventListener('drop', (e) => this.handleDrop(e));
+        lane.addEventListener('dragleave', (e) => this.handleDragLeave(e));
         
         return lane;
       }
 
-      // Event Handlers
-      bindEvents() {
-        // Week navigation
-        document.getElementById('prevWeekBtn').addEventListener('click', () => this.changeWeek(-1));
-        document.getElementById('nextWeekBtn').addEventListener('click', () => this.changeWeek(1));
-        document.getElementById('todayBtn').addEventListener('click', () => {
-          this.setCurrentWeek(new Date());
-          this.loadSchedules();
-          this.render();
-        });
+      renderAllScheduledBlocks() {
+        // Clear existing blocks
+        document.querySelectorAll('.schedule-block').forEach(block => block.remove());
         
-        // Sidebar toggle
-        document.getElementById('toggleSidebar').addEventListener('click', () => {
-          document.getElementById('sidebar').classList.toggle('hidden');
-        });
-        
-        // Save button
-        document.getElementById('saveBtn').addEventListener('click', () => {
-          this.saveSchedules();
-          this.saveMovies();
-          this.showToast('All changes saved', 'success');
-        });
-        
-        // Clear week
-        document.getElementById('clearWeekBtn').addEventListener('click', () => {
-          if (confirm('Clear all schedules for this week?')) {
-            this.state.schedules = {};
-            this.saveSchedules();
-            this.render();
-            this.showToast('Week cleared', 'success');
+        // Render all blocks
+        for (const [key, blocks] of Object.entries(this.state.schedules)) {
+          const [dayIndex, theater] = key.split('-');
+          const lane = document.querySelector(`.theater-lane[data-day="${dayIndex}"][data-theater="${theater}"]`);
+          
+          if (lane) {
+            blocks.forEach(block => {
+              this.renderScheduleBlock(lane, block, key);
+            });
           }
-        });
+        }
+      }
+
+      renderScheduleBlock(lane, block, key) {
+        const blockEl = document.createElement('div');
+        blockEl.className = 'schedule-block';
+        blockEl.draggable = true;
+        blockEl.dataset.blockId = block.id;
+        blockEl.dataset.key = key;
+        blockEl.style.backgroundColor = block.color;
         
-        // Google buttons
-        document.getElementById('connectGoogleBtn').addEventListener('click', () => this.connectGoogle());
-        document.getElementById('syncGoogleBtn').addEventListener('click', () => this.syncWithGoogle());
-        document.getElementById('loadGoogleBtn').addEventListener('click', () => this.loadFromGoogle());
+        const slots = Math.ceil(block.duration / this.config.slotMinutes);
+        blockEl.style.top = `${block.startSlot * 24}px`;
+        blockEl.style.height = `${slots * 24 - 4}px`;
         
-        // Movie dialog
-        document.getElementById('addMovieBtn').addEventListener('click', () => {
-          this.openMovieDialog();
-        });
+        // Calculate time
+        const startMinutes = this.config.startHour * 60 + block.startSlot * this.config.slotMinutes;
+        const startHour = Math.floor(startMinutes / 60);
+        const startMin = startMinutes % 60;
+        const endMinutes = startMinutes + block.duration;
+        const endHour = Math.floor(endMinutes / 60);
+        const endMin = endMinutes % 60;
         
-        document.getElementById('saveMovieBtn').addEventListener('click', () => {
-          this.saveMovie();
-        });
+        const formatTime = (h, m) => {
+          const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+          return `${displayHour}:${String(m).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`;
+        };
         
-        // Settings
-        document.getElementById('settingsBtn').addEventListener('click', () => {
-          this.openSettings();
-        });
+        blockEl.innerHTML = `
+          <div class="block-title">${this.escapeHtml(block.title)}</div>
+          <div class="block-time">${formatTime(startHour, startMin)} - ${formatTime(endHour, endMin)}</div>
+          <div class="block-actions">
+            <button class="block-btn" onclick="tslApp.deleteScheduleBlock('${key}', '${block.id}')" title="Remove">✕</button>
+          </div>
+        `;
         
-        document.getElementById('saveSettingsBtn').addEventListener('click', () => {
-          this.saveSettings();
-        });
+        // Add drag event listener
+        blockEl.addEventListener('dragstart', (e) => this.handleBlockDragStart(e, block, key));
         
-        // Dialog close buttons
-        document.querySelectorAll('[data-close]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const dialogId = btn.dataset.close;
-            this.closeDialog(dialogId);
-          });
-        });
-        
-        // Movie card actions
-        document.getElementById('moviesList').addEventListener('click', (e) => {
-          if (e.target.dataset.action === 'edit') {
-            this.editMovie(parseInt(e.target.dataset.id));
-          } else if (e.target.dataset.action === 'delete') {
-            this.deleteMovie(parseInt(e.target.dataset.id));
-          }
-        });
-        
-        // Drag and drop for movie cards
-        document.getElementById('moviesList').addEventListener('dragstart', (e) => {
-          if (e.target.classList.contains('movie-card')) {
-            const movieId = parseInt(e.target.dataset.movieId);
-            const movie = this.state.movies.find(m => m.id === movieId);
-            if (movie) {
-              this.handleMovieDragStart(e, movie);
-            }
-          }
-        });
-        
-        // Global drag events
-        document.addEventListener('dragover', (e) => this.handleDragOver(e));
-        document.addEventListener('drop', (e) => this.handleDrop(e));
-        document.addEventListener('dragend', () => this.handleDragEnd());
-        
-        // Prevent default drag behavior on schedule grid
-        document.getElementById('daysContainer').addEventListener('dragover', (e) => {
-          e.preventDefault();
-        });
+        lane.appendChild(blockEl);
       }
 
       // Drag and Drop Handlers
@@ -1321,12 +1213,14 @@
         this.state.draggedItem = { type: 'movie', data: movie };
         e.target.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('text/plain', '');
       }
 
       handleBlockDragStart(e, block, key) {
         this.state.draggedItem = { type: 'block', data: block, originalKey: key };
         e.target.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', '');
       }
 
       handleDragOver(e) {
@@ -1346,6 +1240,14 @@
         }
       }
 
+      handleDragLeave(e) {
+        const lane = e.target.closest('.theater-lane');
+        if (lane && !lane.contains(e.relatedTarget)) {
+          lane.classList.remove('drag-over');
+          this.removeDropPreview();
+        }
+      }
+
       handleDrop(e) {
         e.preventDefault();
         
@@ -1362,62 +1264,9 @@
         const slot = Math.max(0, Math.floor(y / 24));
         
         if (this.state.draggedItem.type === 'movie') {
-          // Add new block from movie
-          const movie = this.state.draggedItem.data;
-          const block = {
-            id: Date.now().toString(),
-            title: movie.title,
-            duration: movie.duration,
-            startSlot: slot,
-            color: movie.color
-          };
-          
-          if (!this.state.schedules[key]) {
-            this.state.schedules[key] = [];
-          }
-          
-          // Check for conflicts
-          if (!this.hasConflict(key, slot, movie.duration)) {
-            this.state.schedules[key].push(block);
-            this.saveSchedules();
-            this.render();
-            this.showToast('Added to schedule', 'success');
-          } else {
-            this.showToast('Time conflict!', 'error');
-          }
+          this.addMovieToSchedule(key, slot, this.state.draggedItem.data);
         } else if (this.state.draggedItem.type === 'block') {
-          // Move existing block
-          const block = this.state.draggedItem.data;
-          const originalKey = this.state.draggedItem.originalKey;
-          
-          // Remove from original position
-          if (this.state.schedules[originalKey]) {
-            this.state.schedules[originalKey] = this.state.schedules[originalKey].filter(b => b.id !== block.id);
-            if (this.state.schedules[originalKey].length === 0) {
-              delete this.state.schedules[originalKey];
-            }
-          }
-          
-          // Add to new position
-          block.startSlot = slot;
-          if (!this.state.schedules[key]) {
-            this.state.schedules[key] = [];
-          }
-          
-          if (!this.hasConflict(key, slot, block.duration, block.id)) {
-            this.state.schedules[key].push(block);
-            this.saveSchedules();
-            this.render();
-            this.showToast('Schedule updated', 'success');
-          } else {
-            // Restore to original position if conflict
-            if (!this.state.schedules[originalKey]) {
-              this.state.schedules[originalKey] = [];
-            }
-            this.state.schedules[originalKey].push(block);
-            this.render();
-            this.showToast('Time conflict!', 'error');
-          }
+          this.moveScheduleBlock(this.state.draggedItem.originalKey, key, slot, this.state.draggedItem.data);
         }
         
         this.handleDragEnd();
@@ -1440,7 +1289,7 @@
         const y = e.clientY - rect.top;
         const slot = Math.max(0, Math.floor(y / 24));
         
-        const duration = this.state.draggedItem.data.duration || 120;
+        const duration = this.state.draggedItem.data.duration;
         const slots = Math.ceil(duration / this.config.slotMinutes);
         
         const preview = document.createElement('div');
@@ -1452,6 +1301,7 @@
         // Check for conflicts
         const key = `${lane.dataset.day}-${lane.dataset.theater}`;
         const excludeId = this.state.draggedItem.type === 'block' ? this.state.draggedItem.data.id : null;
+        
         if (this.hasConflict(key, slot, duration, excludeId)) {
           preview.classList.add('conflict');
         }
@@ -1462,6 +1312,73 @@
       removeDropPreview() {
         const preview = document.getElementById('dropPreview');
         if (preview) preview.remove();
+      }
+
+      // Schedule Management
+      addMovieToSchedule(key, startSlot, movie) {
+        const block = {
+          id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          title: movie.title,
+          duration: movie.duration,
+          startSlot: startSlot,
+          color: movie.color
+        };
+        
+        if (!this.state.schedules[key]) {
+          this.state.schedules[key] = [];
+        }
+        
+        if (!this.hasConflict(key, startSlot, movie.duration)) {
+          this.state.schedules[key].push(block);
+          this.saveSchedules();
+          this.renderAllScheduledBlocks();
+          this.showToast(`Added "${movie.title}" to schedule`, 'success');
+        } else {
+          this.showToast('Time conflict! Please choose another slot.', 'error');
+        }
+      }
+
+      moveScheduleBlock(fromKey, toKey, newStartSlot, block) {
+        // Remove from original position
+        if (this.state.schedules[fromKey]) {
+          this.state.schedules[fromKey] = this.state.schedules[fromKey].filter(b => b.id !== block.id);
+          if (this.state.schedules[fromKey].length === 0) {
+            delete this.state.schedules[fromKey];
+          }
+        }
+        
+        // Check for conflicts at new position
+        if (!this.hasConflict(toKey, newStartSlot, block.duration, block.id)) {
+          // Add to new position
+          block.startSlot = newStartSlot;
+          if (!this.state.schedules[toKey]) {
+            this.state.schedules[toKey] = [];
+          }
+          this.state.schedules[toKey].push(block);
+          this.saveSchedules();
+          this.renderAllScheduledBlocks();
+          this.showToast('Schedule updated', 'success');
+        } else {
+          // Restore to original position if conflict
+          if (!this.state.schedules[fromKey]) {
+            this.state.schedules[fromKey] = [];
+          }
+          this.state.schedules[fromKey].push(block);
+          this.renderAllScheduledBlocks();
+          this.showToast('Time conflict! Block restored to original position.', 'error');
+        }
+      }
+
+      deleteScheduleBlock(key, blockId) {
+        if (this.state.schedules[key]) {
+          this.state.schedules[key] = this.state.schedules[key].filter(b => b.id !== blockId);
+          if (this.state.schedules[key].length === 0) {
+            delete this.state.schedules[key];
+          }
+          this.saveSchedules();
+          this.renderAllScheduledBlocks();
+          this.showToast('Removed from schedule', 'info');
+        }
       }
 
       hasConflict(key, startSlot, duration, excludeId = null) {
@@ -1479,6 +1396,9 @@
 
       // Movie Management
       openMovieDialog(movie = null) {
+        const dialog = document.getElementById('movieDialog');
+        const form = document.getElementById('movieForm');
+        
         if (movie) {
           document.getElementById('movieId').value = movie.id;
           document.getElementById('movieTitle').value = movie.title;
@@ -1487,12 +1407,12 @@
           document.getElementById('movieHours').value = hours;
           document.getElementById('movieMinutes').value = minutes;
           document.getElementById('movieColor').value = movie.color;
+          dialog.querySelector('.dialog-title').textContent = 'Edit Film';
         } else {
+          form.reset();
           document.getElementById('movieId').value = '';
-          document.getElementById('movieTitle').value = '';
-          document.getElementById('movieHours').value = '2';
-          document.getElementById('movieMinutes').value = '0';
           document.getElementById('movieColor').value = '#3b82f6';
+          dialog.querySelector('.dialog-title').textContent = 'Add Film';
         }
         
         this.openDialog('movieDialog');
@@ -1506,11 +1426,12 @@
       }
 
       deleteMovie(id) {
-        if (confirm('Delete this movie?')) {
+        const movie = this.state.movies.find(m => m.id === id);
+        if (movie && confirm(`Delete "${movie.title}" from the library?`)) {
           this.state.movies = this.state.movies.filter(m => m.id !== id);
           this.saveMovies();
           this.render();
-          this.showToast('Movie deleted', 'info');
+          this.showToast('Film deleted', 'info');
         }
       }
 
@@ -1522,65 +1443,126 @@
         const duration = hours * 60 + minutes;
         const color = document.getElementById('movieColor').value;
         
-        if (!title || duration < 1) {
-          this.showToast('Please enter title and duration', 'error');
+        if (!title) {
+          this.showToast('Please enter a film title', 'error');
+          return;
+        }
+        
+        if (duration < 15) {
+          this.showToast('Duration must be at least 15 minutes', 'error');
           return;
         }
         
         if (id) {
+          // Edit existing movie
           const movie = this.state.movies.find(m => m.id == id);
           if (movie) {
             movie.title = title;
             movie.duration = duration;
             movie.color = color;
+            this.showToast('Film updated', 'success');
           }
         } else {
-          this.state.movies.push({
+          // Add new movie
+          const newMovie = {
             id: Date.now(),
             title,
             duration,
             color
-          });
+          };
+          this.state.movies.push(newMovie);
+          this.showToast('Film added to library', 'success');
         }
         
         this.saveMovies();
         this.render();
         this.closeDialog('movieDialog');
-        this.showToast('Movie saved', 'success');
       }
 
-      deleteBlock(key, blockId) {
-        if (confirm('Delete this scheduled item?')) {
-          if (this.state.schedules[key]) {
-            this.state.schedules[key] = this.state.schedules[key].filter(b => b.id !== blockId);
-            if (this.state.schedules[key].length === 0) {
-              delete this.state.schedules[key];
-            }
-          }
-          this.saveSchedules();
-          this.render();
-          this.showToast('Schedule item deleted', 'info');
-        }
-      }
-
-      // Settings
+      // Settings Management
       openSettings() {
         document.getElementById('startHour').value = this.config.startHour;
         document.getElementById('endHour').value = this.config.endHour;
-        document.getElementById('googleClientId').value = this.config.googleClientId || '';
-        
+        document.getElementById('weekStart').value = this.config.weekStartDay;
         this.openDialog('settingsDialog');
       }
 
       saveSettings() {
-        this.config.startHour = parseInt(document.getElementById('startHour').value);
-        this.config.endHour = parseInt(document.getElementById('endHour').value);
-        this.config.googleClientId = document.getElementById('googleClientId').value.trim() || null;
+        const startHour = parseInt(document.getElementById('startHour').value);
+        const endHour = parseInt(document.getElementById('endHour').value);
+        const weekStartDay = parseInt(document.getElementById('weekStart').value);
+        
+        if (startHour >= endHour) {
+          this.showToast('End hour must be after start hour', 'error');
+          return;
+        }
+        
+        this.config.startHour = startHour;
+        this.config.endHour = endHour;
+        this.config.weekStartDay = weekStartDay;
         
         this.saveConfig();
+        this.setCurrentWeek(new Date());
         this.render();
         this.closeDialog('settingsDialog');
         this.showToast('Settings saved', 'success');
+      }
+
+      // Import/Export
+      exportSchedule() {
+        const data = {
+          version: '2.0',
+          date: new Date().toISOString(),
+          config: this.config,
+          movies: this.state.movies,
+          week: this.getWeekKey(),
+          schedules: this.state.schedules
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tsl-schedule-${this.getWeekKey()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        this.showToast('Schedule exported', 'success');
+      }
+
+      importSchedule(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+            
+            if (!data.version || !data.movies || !data.schedules) {
+              throw new Error('Invalid schedule file');
+            }
+            
+            // Import movies
+            this.state.movies = data.movies;
+            this.saveMovies();
+            
+            // Import schedules for current week
+            this.state.schedules = data.schedules;
+            this.saveSchedules();
+            
+            // Import config if present
+            if (data.config) {
+              Object.assign(this.config, data.config);
+              this.saveConfig();
+            }
+            
+            this.render();
+            this.showToast('Schedule imported successfully', 'success');
+          } catch (error) {
+            this.showToast('Failed to import schedule', 'error');
+          }
+        };
+        reader.readAsText(file);
       }
 
       // Dialog Management
@@ -1592,14 +1574,88 @@
         document.getElementById(dialogId).classList.remove('open');
       }
 
-      // Utility Functions
-      formatTime(hour, minute) {
-        const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-        const period = hour >= 12 ? 'PM' : 'AM';
-        const displayMinute = minute === 0 ? '' : `:${String(minute).padStart(2, '0')}`;
-        return `${displayHour}${displayMinute}${period}`;
+      // Event Binding
+      bindEvents() {
+        // Week navigation
+        document.getElementById('prevWeekBtn').addEventListener('click', () => this.changeWeek(-1));
+        document.getElementById('nextWeekBtn').addEventListener('click', () => this.changeWeek(1));
+        document.getElementById('todayBtn').addEventListener('click', () => {
+          this.saveSchedules();
+          this.setCurrentWeek(new Date());
+          this.loadSchedules();
+          this.render();
+          this.showToast('Jumped to current week', 'info');
+        });
+        
+        // Sidebar toggle
+        document.getElementById('toggleSidebar').addEventListener('click', () => {
+          this.state.sidebarCollapsed = !this.state.sidebarCollapsed;
+          document.getElementById('sidebar').classList.toggle('collapsed', this.state.sidebarCollapsed);
+        });
+        
+        // Save button
+        document.getElementById('saveBtn').addEventListener('click', () => {
+          this.saveSchedules();
+          this.saveMovies();
+          this.saveConfig();
+          this.showToast('All changes saved', 'success');
+        });
+        
+        // Clear week
+        document.getElementById('clearWeekBtn').addEventListener('click', () => {
+          if (confirm('Clear all schedules for this week? This cannot be undone.')) {
+            this.state.schedules = {};
+            this.saveSchedules();
+            this.render();
+            this.showToast('Week schedule cleared', 'success');
+          }
+        });
+        
+        // Movie management
+        document.getElementById('addMovieBtn').addEventListener('click', () => this.openMovieDialog());
+        
+        // Settings
+        document.getElementById('settingsBtn').addEventListener('click', () => this.openSettings());
+        
+        // Import/Export
+        document.getElementById('exportBtn').addEventListener('click', () => this.exportSchedule());
+        document.getElementById('importBtn').addEventListener('click', () => {
+          document.getElementById('importFile').click();
+        });
+        document.getElementById('importFile').addEventListener('change', (e) => {
+          if (e.target.files[0]) {
+            this.importSchedule(e.target.files[0]);
+            e.target.value = '';
+          }
+        });
+        
+        // Global drag end
+        document.addEventListener('dragend', () => this.handleDragEnd());
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+          // Escape to close dialogs
+          if (e.key === 'Escape') {
+            document.querySelectorAll('.dialog.open').forEach(dialog => {
+              dialog.classList.remove('open');
+            });
+          }
+          
+          // Ctrl/Cmd + S to save
+          if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            document.getElementById('saveBtn').click();
+          }
+        });
+        
+        // Auto-save every 30 seconds
+        setInterval(() => {
+          this.saveSchedules();
+          this.saveMovies();
+        }, 30000);
       }
 
+      // Utility Functions
       formatDuration(minutes) {
         const hours = Math.floor(minutes / 60);
         const mins = minutes % 60;
@@ -1612,20 +1668,41 @@
         }
       }
 
+      escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
       showToast(message, type = 'info') {
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        toast.textContent = message;
+        
+        const icons = {
+          success: '✓',
+          error: '✗',
+          info: 'ℹ',
+          warning: '⚠'
+        };
+        
+        toast.innerHTML = `
+          <span style="font-size: 1.25rem; margin-right: 0.5rem;">${icons[type] || icons.info}</span>
+          <span>${this.escapeHtml(message)}</span>
+        `;
         
         const container = document.getElementById('toastContainer');
         container.appendChild(toast);
         
+        // Auto-remove after 4 seconds
         setTimeout(() => {
           toast.style.animation = 'slideIn 0.3s ease reverse';
           setTimeout(() => toast.remove(), 300);
-        }, 3000);
+        }, 4000);
       }
     }
+
+    // Initialize app when DOM is ready
+    window.tslApp = new TSLScheduler();
   </script>
 </body>
 </html>
