@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Theater Scheduler - Final Version</title>
+    <title>TSL Theater Scheduler</title>
     <style>
         * {
             margin: 0;
@@ -455,7 +455,7 @@
 <body>
     <div class="app-container">
         <div class="header">
-            <h1>TSL Theater Scheduler - Final Version</h1>
+            <h1>TSL Theater Scheduler</h1>
             <button id="authButton" class="auth-button">
                 Connect Google Calendar
             </button>
@@ -495,7 +495,7 @@
                 <div class="calendar-filter">
                     <select id="calendarFilter" onchange="filterLibrary()">
                         <option value="all">All Calendars</option>
-                        <option value="primary">My Personal Calendar (Test)</option>
+                        <option value="primary">My Personal Calendar</option>
                         <option value="events">TSL Events</option>
                         <option value="non-public">TSL Events (NON-PUBLIC)</option>
                         <option value="tbd">TSL TBD</option>
@@ -521,8 +521,6 @@
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     <script>
-        console.log('TSL Theater Scheduler - Final Version Loading...');
-        
         // Application State
         let currentWeekStart = new Date();
         currentWeekStart.setHours(0, 0, 0, 0);
@@ -537,15 +535,13 @@
         let collapsedDays = new Set();
         let accessToken = null;
 
-        // Google Calendar API Configuration - CORRECT API KEY
+        // Google Calendar API Configuration
         const CLIENT_ID = '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
         const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
         const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
 
-        console.log('Using API Key:', API_KEY);
-
-        // Your TSL Calendar IDs
+        // TSL Calendar IDs
         const CALENDAR_IDS = {
             'primary': 'primary',
             'events': '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
@@ -570,7 +566,7 @@
             console.log('DEBUG:', message);
         }
 
-        // Initialize Google API with new Identity Services
+        // Initialize Google API
         function initGoogleAPI() {
             updateDebugInfo('Loading Google API...');
             
@@ -641,6 +637,7 @@
                 syncStatus.innerHTML = '<span>○</span><span>Not connected</span>';
                 accessToken = null;
                 libraryEvents = [];
+                scheduledEvents = [];
                 renderLibrary();
                 updateDebugInfo('Not connected to Google Calendar');
             }
@@ -664,21 +661,7 @@
             }
         }
 
-        // Helper function to check if event falls within current week view
-        function isEventInCurrentWeek(event) {
-            if (!event.start.dateTime) return false;
-            
-            const eventStart = new Date(event.start.dateTime);
-            const weekStart = new Date(currentWeekStart);
-            const weekEnd = new Date(currentWeekStart);
-            weekEnd.setDate(weekEnd.getDate() + 7);
-            
-            const inWeek = eventStart >= weekStart && eventStart < weekEnd;
-            console.log('Event in current week check:', event.summary, eventStart, 'Week:', weekStart, 'to', weekEnd, 'Result:', inWeek);
-            return inWeek;
-        }
-
-        // Helper function to convert Google Calendar event to scheduled event format
+        // Helper function to convert Google Calendar event to scheduled event format with actual dates
         function convertToScheduledEvent(eventData) {
             if (!eventData.startTime || !eventData.startTime.dateTime) {
                 console.log('No dateTime found for event:', eventData.title);
@@ -686,16 +669,10 @@
             }
             
             const startDate = new Date(eventData.startTime.dateTime);
-            const weekStart = new Date(currentWeekStart);
             
-            // Calculate which day of the week (0 = Monday, 6 = Sunday)
-            const daysDiff = Math.floor((startDate - weekStart) / (24 * 60 * 60 * 1000));
-            console.log('Days difference calculation:', eventData.title, startDate, weekStart, daysDiff);
-            
-            if (daysDiff < 0 || daysDiff > 6) {
-                console.log('Event outside week range:', eventData.title, daysDiff);
-                return null;
-            }
+            // Store the actual date instead of relative day number
+            const eventDate = new Date(startDate);
+            eventDate.setHours(0, 0, 0, 0); // Normalize to midnight for date comparison
             
             // Determine theater based on calendar
             let theater = 0; // Default to Theater 1
@@ -707,18 +684,33 @@
             
             const result = {
                 ...eventData,
-                day: daysDiff,
+                actualDate: eventDate, // Store the actual date
                 theater: theater,
                 startHour: startDate.getHours(),
                 startMinute: startDate.getMinutes(),
                 id: `existing-${eventData.googleEventId || Date.now()}`
             };
             
-            console.log('Converted event:', result);
+            console.log('Converted event with actual date:', result);
             return result;
         }
 
-        // Import from Google Calendar (Test all calendars)
+        // Helper function to calculate which day of current week an actual date falls on
+        function calculateDayOfWeek(actualDate) {
+            const weekStart = new Date(currentWeekStart);
+            const weekEnd = new Date(currentWeekStart);
+            weekEnd.setDate(weekEnd.getDate() + 7);
+            
+            // Check if the date falls within this week
+            if (actualDate >= weekStart && actualDate < weekEnd) {
+                // Calculate which day (0 = Monday, 6 = Sunday)
+                const daysDiff = Math.floor((actualDate - weekStart) / (24 * 60 * 60 * 1000));
+                return daysDiff;
+            }
+            return -1; // Not in this week
+        }
+
+        // Import from Google Calendar with 3-month range
         async function importFromGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
@@ -727,7 +719,7 @@
 
             const syncStatus = document.getElementById('syncStatus');
             syncStatus.classList.add('syncing');
-            syncStatus.innerHTML = '<span>↻</span><span>Testing all calendars...</span>';
+            syncStatus.innerHTML = '<span>↻</span><span>Importing from all calendars...</span>';
             
             // Clear existing data
             libraryEvents = [];
@@ -740,9 +732,9 @@
             let successfulCalendars = [];
             let failedCalendars = [];
 
-            // Test all calendars
+            // Import from all calendars
             for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
-                updateDebugInfo(`Testing ${calendarKey}: ${calendarId}`);
+                updateDebugInfo(`Importing from ${calendarKey}...`);
                 
                 try {
                     const events = await importSingleCalendarData(calendarKey, calendarId);
@@ -760,14 +752,15 @@
 
             // Update UI
             renderLibrary();
+            renderEventsForCurrentWeek();
             updateWeekStats();
             syncStatus.classList.remove('syncing');
             
             if (totalEvents > 0) {
                 syncStatus.classList.add('connected');
                 syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
-                updateDebugInfo(`Success! Total: ${totalEvents} events. Successful: ${successfulCalendars.join(', ')}. Failed: ${failedCalendars.join(', ')}`);
-                showToast(`Found ${totalEvents} events across ${successfulCalendars.length} calendars. ${scheduledEvents.length} automatically scheduled on grid.`);
+                updateDebugInfo(`Success! Total: ${totalEvents} events. Grid: ${scheduledEvents.length} scheduled events`);
+                showToast(`Imported ${totalEvents} events. ${scheduledEvents.length} scheduled events on grid.`);
             } else {
                 syncStatus.innerHTML = '<span>⚠</span><span>No events found</span>';
                 updateDebugInfo(`No events found. Failed calendars: ${failedCalendars.join(', ')}`);
@@ -775,15 +768,17 @@
             }
         }
 
-        // Helper function to import from a single calendar and return events
+        // Helper function to import from a single calendar with broader date range
         async function importSingleCalendarData(calendarKey, calendarId) {
-            const startOfWeek = new Date(currentWeekStart);
-            const endOfWeek = new Date(currentWeekStart);
-            endOfWeek.setDate(endOfWeek.getDate() + 7);
+            // Import broader date range - 3 months from now
+            const startOfRange = new Date(currentWeekStart);
+            startOfRange.setDate(startOfRange.getDate() - 14); // Start 2 weeks before current week
+            const endOfRange = new Date(currentWeekStart);
+            endOfRange.setDate(endOfRange.getDate() + (7 * 12)); // End 12 weeks after current week
 
             const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
-                `timeMin=${startOfWeek.toISOString()}&` +
-                `timeMax=${endOfWeek.toISOString()}&` +
+                `timeMin=${startOfRange.toISOString()}&` +
+                `timeMax=${endOfRange.toISOString()}&` +
                 `showDeleted=false&` +
                 `singleEvents=true&` +
                 `orderBy=startTime&` +
@@ -807,7 +802,7 @@
             
             console.log(`Found ${events.length} events in ${calendarKey}`);
 
-            // Add events to library AND schedule grid if they have specific times
+            // Process events
             events.forEach(event => {
                 console.log('Processing event:', event.summary, 'Start:', event.start);
                 
@@ -832,20 +827,13 @@
                     isAllDay: !event.start.dateTime
                 };
 
-                // If event has specific time, add to schedule grid for any week it appears in
+                // If event has specific time, add to scheduled events for multi-week display
                 if (event.start.dateTime) {
                     console.log('Processing timed event for grid:', event.summary, event.start.dateTime);
                     const scheduledEvent = convertToScheduledEvent(eventData);
                     if (scheduledEvent) {
                         console.log('Successfully converted to scheduled event:', scheduledEvent);
                         scheduledEvents.push(scheduledEvent);
-                        
-                        // Only render if it falls within current week view
-                        const dayOfWeek = calculateDayOfWeek(scheduledEvent.actualDate);
-                        if (dayOfWeek >= 0 && dayOfWeek <= 6) {
-                            const renderEvent = { ...scheduledEvent, day: dayOfWeek };
-                            renderScheduledEvent(renderEvent);
-                        }
                     } else {
                         console.log('Failed to convert event to scheduled format:', event.summary);
                     }
@@ -863,9 +851,59 @@
             return events;
         }
 
+        // Helper function to render events for the current week view
+        function renderEventsForCurrentWeek() {
+            // Clear existing event blocks from grid
+            document.querySelectorAll('.event-block').forEach(block => block.remove());
+            
+            // Re-render events that fall within current week
+            scheduledEvents.forEach(event => {
+                if (event.actualDate) {
+                    // For events with actual dates, calculate which day of current week
+                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
+                    if (dayOfWeek >= 0 && dayOfWeek <= 6) {
+                        // Temporarily set the day for rendering
+                        const renderEvent = { ...event, day: dayOfWeek };
+                        renderScheduledEvent(renderEvent);
+                    }
+                } else if (isEventInCurrentWeekByData(event)) {
+                    // For manually scheduled events (legacy format)
+                    renderScheduledEvent(event);
+                }
+            });
+        }
+
+        // Helper function to check if a manually scheduled event falls within current week
+        function isEventInCurrentWeekByData(eventData) {
+            if (eventData.actualDate) return false; // Handle actual dates separately
+            
+            const weekStart = new Date(currentWeekStart);
+            const weekEnd = new Date(currentWeekStart);
+            weekEnd.setDate(weekEnd.getDate() + 7);
+            
+            // Calculate the event's actual date based on relative day
+            const eventDate = new Date(weekStart);
+            eventDate.setDate(eventDate.getDate() + eventData.day);
+            
+            return eventDate >= weekStart && eventDate < weekEnd;
+        }
+
+        // Week navigation that preserves events
+        function changeWeek(direction) {
+            currentWeekStart.setDate(currentWeekStart.getDate() + (direction * 7));
+            
+            // Clear the visual grid but keep the scheduledEvents data
+            document.getElementById('daysContainer').innerHTML = '';
+            generateDaysColumns();
+            updateWeekDisplay();
+            
+            // Re-render all scheduled events that fall within the new week view
+            renderEventsForCurrentWeek();
+            updateWeekStats();
+        }
+
         // Initialize the app
         function init() {
-            console.log('Initializing TSL Theater Scheduler...');
             generateTimeColumn();
             generateDaysColumns();
             updateWeekDisplay();
@@ -878,7 +916,7 @@
             // Initialize Google APIs
             initGoogleAPI();
             
-            // Initialize OAuth after a short delay to ensure Google APIs are loaded
+            // Initialize OAuth after a short delay
             setTimeout(() => {
                 initOAuth();
             }, 1000);
@@ -887,7 +925,7 @@
             renderLibrary();
         }
 
-        // Generate time column (24 hours with 15-min increments)
+        // Generate time column
         function generateTimeColumn() {
             const timeColumn = document.getElementById('timeColumn');
             for (let hour = 0; hour < 24; hour++) {
@@ -960,13 +998,11 @@
             const filter = document.getElementById('calendarFilter').value;
             container.innerHTML = '';
             
-            // Check if connected to Google Calendar
             if (!accessToken) {
                 container.innerHTML = `
                     <div style="padding: 20px; text-align: center; color: #86868b;">
                         <p style="margin-bottom: 10px;">📅</p>
-                        <p style="font-size: 14px;">Connect to Google Calendar to test calendar access</p>
-                        <p style="font-size: 12px; margin-top: 10px;">We'll start by testing your personal calendar</p>
+                        <p style="font-size: 14px;">Connect to Google Calendar to import your events</p>
                     </div>
                 `;
                 document.getElementById('libraryCount').textContent = '(0)';
@@ -980,7 +1016,7 @@
             if (filteredEvents.length === 0) {
                 container.innerHTML = `
                     <div style="padding: 20px; text-align: center; color: #86868b; font-size: 14px;">
-                        No events found. Click "Import from Google Calendar" to test.
+                        No events found. Click "Import from Google Calendar".
                     </div>
                 `;
             } else {
@@ -1059,12 +1095,18 @@
             const hour = Math.floor(snapY / 40);
             const minute = ((snapY % 40) / 10) * 15;
             
+            // Create actual date for manually scheduled event
+            const scheduledDate = new Date(currentWeekStart);
+            scheduledDate.setDate(scheduledDate.getDate() + parseInt(this.dataset.day));
+            scheduledDate.setHours(0, 0, 0, 0);
+            
             const scheduledEvent = {
                 ...event,
                 day: parseInt(this.dataset.day),
                 theater: parseInt(this.dataset.theater),
                 startHour: hour,
                 startMinute: minute,
+                actualDate: scheduledDate,
                 id: Date.now()
             };
             
@@ -1162,46 +1204,6 @@
             return `${formatSingleTime(startH, startM)} - ${formatSingleTime(endH, endM)}`;
         }
 
-        // Week navigation
-        function changeWeek(direction) {
-            currentWeekStart.setDate(currentWeekStart.getDate() + (direction * 7));
-            
-            // Clear the visual grid but keep the scheduledEvents data
-            document.getElementById('daysContainer').innerHTML = '';
-            generateDaysColumns();
-            updateWeekDisplay();
-            
-            // Re-render all scheduled events that fall within the new week view
-            renderEventsForCurrentWeek();
-            updateWeekStats();
-        }
-
-        // Helper function to render events for the current week view
-        function renderEventsForCurrentWeek() {
-            // Clear existing event blocks from grid
-            document.querySelectorAll('.event-block').forEach(block => block.remove());
-            
-            // Re-render events that fall within current week
-            scheduledEvents.forEach(event => {
-                if (isEventInCurrentWeekByData(event)) {
-                    renderScheduledEvent(event);
-                }
-            });
-        }
-
-        // Helper function to check if a scheduled event falls within current week
-        function isEventInCurrentWeekByData(eventData) {
-            const weekStart = new Date(currentWeekStart);
-            const weekEnd = new Date(currentWeekStart);
-            weekEnd.setDate(weekEnd.getDate() + 7);
-            
-            // Calculate the event's actual date
-            const eventDate = new Date(weekStart);
-            eventDate.setDate(eventDate.getDate() + eventData.day);
-            
-            return eventDate >= weekStart && eventDate < weekEnd;
-        }
-
         function updateWeekDisplay() {
             const endDate = new Date(currentWeekStart);
             endDate.setDate(endDate.getDate() + 6);
@@ -1214,7 +1216,15 @@
         }
 
         function updateWeekStats() {
-            const total = scheduledEvents.length;
+            const currentWeekEvents = scheduledEvents.filter(event => {
+                if (event.actualDate) {
+                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
+                    return dayOfWeek >= 0 && dayOfWeek <= 6;
+                }
+                return isEventInCurrentWeekByData(event);
+            });
+            
+            const total = currentWeekEvents.length;
             document.getElementById('weekTotal').textContent = `${total} event${total !== 1 ? 's' : ''}`;
         }
 
