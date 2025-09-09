@@ -537,7 +537,7 @@
 
         // Google Calendar API Configuration
         const CLIENT_ID = '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
-        const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
+        const API_KEY = 'AIzaSyCguPYDlrKVGPmMlQC5vF0T_c5RBk3kQ2M';
         const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
 
@@ -759,7 +759,13 @@
             syncStatus.classList.add('syncing');
             syncStatus.innerHTML = '<span>↻</span><span>Testing all calendars...</span>';
             
+            // Clear existing data
             libraryEvents = [];
+            scheduledEvents = [];
+            
+            // Clear existing scheduled events from grid
+            document.querySelectorAll('.event-block').forEach(block => block.remove());
+            
             let totalEvents = 0;
             let successfulCalendars = [];
             let failedCalendars = [];
@@ -784,13 +790,14 @@
 
             // Update UI
             renderLibrary();
+            updateWeekStats();
             syncStatus.classList.remove('syncing');
             
             if (totalEvents > 0) {
                 syncStatus.classList.add('connected');
                 syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
                 updateDebugInfo(`Success! Total: ${totalEvents} events. Successful: ${successfulCalendars.join(', ')}. Failed: ${failedCalendars.join(', ')}`);
-                showToast(`Found ${totalEvents} events across ${successfulCalendars.length} calendars`);
+                showToast(`Found ${totalEvents} events across ${successfulCalendars.length} calendars. ${scheduledEvents.length} automatically scheduled on grid.`);
             } else {
                 syncStatus.innerHTML = '<span>⚠</span><span>No events found</span>';
                 updateDebugInfo(`No events found. Failed calendars: ${failedCalendars.join(', ')}`);
