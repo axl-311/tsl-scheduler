@@ -481,7 +481,7 @@
                     <span class="stat-value" id="weekTotal">0 events</span>
                 </div>
                 <button class="collapse-toggle" onclick="toggleCollapse()">
-                    Collapse Tue-Thu
+                    Collapse Wed-Fri
                 </button>
             </div>
         </div>
@@ -524,13 +524,15 @@
         // Application State
         let currentWeekStart = new Date();
         currentWeekStart.setHours(0, 0, 0, 0);
+        // Calculate Tuesday as start of week
         const dayOfWeek = currentWeekStart.getDay();
-        const diff = currentWeekStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-        currentWeekStart.setDate(diff);
+        const daysFromTuesday = (dayOfWeek + 5) % 7; // Convert so Tuesday = 0
+        currentWeekStart.setDate(currentWeekStart.getDate() - daysFromTuesday);
 
         let libraryEvents = [];
         let scheduledEvents = [];
         let draggedItem = null;
+        let dragSource = null; // Track if dragging from library or grid
         let ghostElement = null;
         let collapsedDays = new Set();
         let accessToken = null;
@@ -695,7 +697,7 @@
             return result;
         }
 
-        // Helper function to calculate which day of current week an actual date falls on
+        // Helper function to calculate which day of current week an actual date falls on (Tuesday = 0)
         function calculateDayOfWeek(actualDate) {
             const weekStart = new Date(currentWeekStart);
             const weekEnd = new Date(currentWeekStart);
@@ -703,14 +705,14 @@
             
             // Check if the date falls within this week
             if (actualDate >= weekStart && actualDate < weekEnd) {
-                // Calculate which day (0 = Monday, 6 = Sunday)
+                // Calculate which day (0 = Tuesday, 6 = Monday)
                 const daysDiff = Math.floor((actualDate - weekStart) / (24 * 60 * 60 * 1000));
                 return daysDiff;
             }
             return -1; // Not in this week
         }
 
-        // Import from Google Calendar with 3-month range
+        // Import from Google Calendar with 3-month range - prevent duplicates
         async function importFromGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
@@ -721,7 +723,7 @@
             syncStatus.classList.add('syncing');
             syncStatus.innerHTML = '<span>↻</span><span>Importing from all calendars...</span>';
             
-            // Clear existing data
+            // Clear existing data to prevent duplicates
             libraryEvents = [];
             scheduledEvents = [];
             
@@ -802,9 +804,18 @@
             
             console.log(`Found ${events.length} events in ${calendarKey}`);
 
-            // Process events
+            // Process events - prevent duplicates by checking if already exists
             events.forEach(event => {
                 console.log('Processing event:', event.summary, 'Start:', event.start);
+                
+                // Check for duplicates based on googleEventId
+                const existsInLibrary = libraryEvents.some(e => e.googleEventId === event.id);
+                const existsInScheduled = scheduledEvents.some(e => e.googleEventId === event.id);
+                
+                if (existsInLibrary || existsInScheduled) {
+                    console.log('Skipping duplicate event:', event.summary);
+                    return;
+                }
                 
                 // Calculate duration in minutes
                 let duration = 120; // Default 2 hours
@@ -925,25 +936,25 @@
             renderLibrary();
         }
 
-        // Generate time column
+        // Generate time column starting at 2pm (theater hours)
         function generateTimeColumn() {
             const timeColumn = document.getElementById('timeColumn');
-            for (let hour = 0; hour < 24; hour++) {
-                for (let min = 0; min < 60; min += 15) {
-                    if (min === 0) {
-                        const timeSlot = document.createElement('div');
-                        timeSlot.className = 'time-slot';
-                        timeSlot.textContent = formatTime(hour, min);
-                        timeColumn.appendChild(timeSlot);
-                    }
-                }
+            
+            // Theater day: 2pm today through 2pm tomorrow (24 hours)
+            for (let hour = 14; hour < 38; hour++) { // 14 (2pm) to 37 (1pm next day)
+                const displayHour = hour % 24;
+                const timeSlot = document.createElement('div');
+                timeSlot.className = 'time-slot';
+                timeSlot.textContent = formatTime(displayHour, 0);
+                timeColumn.appendChild(timeSlot);
             }
         }
 
-        // Generate day columns with theater lanes
+        // Generate day columns with theater lanes (Tuesday first, Monday last)
         function generateDaysColumns() {
             const daysContainer = document.getElementById('daysContainer');
-            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            // Tuesday = 0, Wednesday = 1, Thursday = 2, Friday = 3, Saturday = 4, Sunday = 5, Monday = 6
+            const days = ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday'];
             
             days.forEach((day, index) => {
                 const dayColumn = document.createElement('div');
@@ -984,12 +995,32 @@
             });
         }
 
-        // Format time display
+        // Format time display (theater hours)
         function formatTime(hour, min) {
             const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
             const m = min.toString().padStart(2, '0');
             const period = hour < 12 ? 'AM' : 'PM';
-            return min === 0 ? `${h}:${m} ${period}` : '';
+            return `${h}:${m} ${period}`;
+        }
+
+        // Convert actual time to theater grid position (2pm = 0, 3pm = 1, etc.)
+        function convertToTheaterHour(actualHour) {
+            // 2pm = hour 0, 3pm = hour 1, etc.
+            // Handle overnight: 1am = hour 23, 2am = hour 24, etc.
+            if (actualHour >= 14) {
+                return actualHour - 14; // 2pm-11pm = 0-9
+            } else {
+                return actualHour + 10; // 12am-1pm = 10-23
+            }
+        }
+
+        // Convert theater grid position back to actual hour
+        function convertFromTheaterHour(theaterHour) {
+            if (theaterHour <= 9) {
+                return theaterHour + 14; // 0-9 = 2pm-11pm
+            } else {
+                return theaterHour - 10; // 10-23 = 12am-1pm
+            }
         }
 
         // Render library items
@@ -1041,11 +1072,14 @@
             document.getElementById('libraryCount').textContent = `(${filteredEvents.length})`;
         }
 
-        // Drag and Drop handlers
+        // Enhanced Drag and Drop handlers - distinguish between library and grid
         function handleDragStart(e) {
             draggedItem = this;
             this.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.effectAllowed = 'move';
+            
+            // Determine if dragging from library or grid
+            dragSource = this.closest('.library-panel') ? 'library' : 'grid';
             
             const eventId = this.dataset.eventId;
             const event = libraryEvents.find(e => e.id == eventId) || 
@@ -1053,6 +1087,8 @@
             
             if (event) {
                 e.dataTransfer.setData('event', JSON.stringify(event));
+                e.dataTransfer.setData('source', dragSource);
+                e.dataTransfer.setData('originalElement', 'true');
             }
         }
 
@@ -1061,12 +1097,13 @@
                 draggedItem.classList.remove('dragging');
             }
             draggedItem = null;
+            dragSource = null;
             removeGhost();
         }
 
         function handleDragOver(e) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
+            e.dataTransfer.dropEffect = 'move';
             this.classList.add('drop-active');
             
             const rect = this.getBoundingClientRect();
@@ -1085,6 +1122,7 @@
             this.classList.remove('drop-active');
             
             const eventData = e.dataTransfer.getData('event');
+            const source = e.dataTransfer.getData('source');
             if (!eventData) return;
             
             const event = JSON.parse(eventData);
@@ -1092,7 +1130,8 @@
             const y = e.clientY - rect.top;
             const snapY = Math.floor(y / 10) * 10;
             
-            const hour = Math.floor(snapY / 40);
+            // Convert to theater hours (2pm = 0)
+            const theaterHour = Math.floor(snapY / 40);
             const minute = ((snapY % 40) / 10) * 15;
             
             // Create actual date for manually scheduled event
@@ -1104,10 +1143,10 @@
                 ...event,
                 day: parseInt(this.dataset.day),
                 theater: parseInt(this.dataset.theater),
-                startHour: hour,
+                startHour: convertFromTheaterHour(theaterHour), // Convert back to actual hour
                 startMinute: minute,
                 actualDate: scheduledDate,
-                id: Date.now()
+                id: source === 'library' ? Date.now() : event.id // New ID if from library, keep ID if moving
             };
             
             // Update calendar for theater events
@@ -1117,12 +1156,29 @@
                 scheduledEvent.calendar = 'theater-2';
             }
             
+            // If moving from grid, remove original
+            if (source === 'grid' && draggedItem) {
+                // Remove from scheduledEvents array
+                const originalId = draggedItem.dataset.eventId;
+                scheduledEvents = scheduledEvents.filter(e => e.id != originalId);
+                // Remove visual element
+                draggedItem.remove();
+            }
+            
             scheduledEvents.push(scheduledEvent);
-            renderScheduledEvent(scheduledEvent);
+            
+            // Render with theater hour conversion for display
+            const displayEvent = {
+                ...scheduledEvent,
+                startHour: convertToTheaterHour(scheduledEvent.startHour)
+            };
+            renderScheduledEvent(displayEvent);
+            
             updateWeekStats();
             removeGhost();
             
-            showToast('Event scheduled successfully!');
+            const action = source === 'library' ? 'scheduled' : 'moved';
+            showToast(`Event ${action} successfully!`);
         }
 
         function showGhost(lane, y) {
@@ -1131,7 +1187,8 @@
             if (!draggedItem) return;
             
             const eventId = draggedItem.dataset.eventId;
-            const event = libraryEvents.find(e => e.id == eventId);
+            const event = libraryEvents.find(e => e.id == eventId) || 
+                         scheduledEvents.find(e => e.id == eventId);
             if (!event) return;
             
             ghostElement = document.createElement('div');
@@ -1172,18 +1229,24 @@
             eventBlock.draggable = true;
             eventBlock.dataset.eventId = event.id;
             
+            // Use theater hour for positioning (event.startHour should already be converted)
             const top = event.startHour * 40 + (event.startMinute / 15) * 10;
             const height = (event.duration / 60) * 40;
             
             eventBlock.style.top = `${top}px`;
             eventBlock.style.height = `${height}px`;
             
-            const endHour = event.startHour + Math.floor((event.startMinute + event.duration) / 60);
-            const endMinute = (event.startMinute + event.duration) % 60;
+            // Convert back to actual time for display
+            const actualStartHour = event.actualDate ? 
+                new Date(event.startTime.dateTime).getHours() : 
+                convertFromTheaterHour(event.startHour);
+            const endMinutes = event.startMinute + event.duration;
+            const actualEndHour = actualStartHour + Math.floor(endMinutes / 60);
+            const endMinute = endMinutes % 60;
             
             eventBlock.innerHTML = `
                 <div class="event-title">${event.title}</div>
-                <div class="event-time">${formatTimeRange(event.startHour, event.startMinute, endHour, endMinute)}</div>
+                <div class="event-time">${formatTimeRange(actualStartHour, event.startMinute, actualEndHour, endMinute)}</div>
             `;
             
             eventBlock.addEventListener('dragstart', handleDragStart);
@@ -1228,16 +1291,16 @@
             document.getElementById('weekTotal').textContent = `${total} event${total !== 1 ? 's' : ''}`;
         }
 
-        // Collapse Tuesday-Thursday
+        // Collapse Wednesday-Friday (middle days)
         function toggleCollapse() {
-            const days = [1, 2, 3];
+            const days = [1, 2, 3]; // Wednesday, Thursday, Friday
             days.forEach(day => {
                 const dayColumn = document.getElementById(`day-${day}`);
                 dayColumn.classList.toggle('collapsed');
             });
             
             const button = event.target;
-            button.textContent = button.textContent.includes('Collapse') ? 'Expand Tue-Thu' : 'Collapse Tue-Thu';
+            button.textContent = button.textContent.includes('Collapse') ? 'Expand Wed-Fri' : 'Collapse Wed-Fri';
         }
 
         // Filter library
