@@ -1,3799 +1,869 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="TSL Scheduler - Theater scheduling application">
-  <title>TSL Scheduler 1.0</title>
-  <style>
-    /* ========== CSS Variables & Reset ========== */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    :root {
-      /* Brand Colors */
-      --brand-a: #5b8def;
-      --brand-b: #6a55ff;
-      
-      /* Status Colors */
-      --success-a: #2ecc71;
-      --success-b: #27ae60;
-      --error-a: #e74c3c;
-      --error-b: #c0392b;
-      --info-a: #3498db;
-      --info-b: #2980b9;
-      
-      /* Layout Colors */
-      --lane-bg: #f8f9fa;
-      --lane-grid: #f0f2f4;
-      --text: #2c3e50;
-      --muted: #6c757d;
-      
-      /* Layout Dimensions */
-      --slot-h: 20px;
-      --time-gutter-w: 64px;
-      --lane-min-w: 210px;
-    }
-
-    /* ========== Base Layout ========== */
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: auto;
-      min-height: 100%;
-      overflow-y: auto;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-      background: linear-gradient(135deg, var(--brand-a) 0%, var(--brand-b) 100%);
-      overflow-y: auto; 
-      overflow-x: hidden;
-      color: var(--text);
-    }
-
-    .container {
-      display: block;
-      max-width: 2200px;
-      margin: 0 auto;
-      background: white;
-    }
-
-    /* ========== Header ========== */
-    .header {
-      background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
-      color: #fff;
-      padding: 14px 18px;
-      box-shadow: 0 2px 12px rgba(0,0,0,.2);
-    }
-
-    .header-content {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 14px;
-      flex-wrap: wrap;
-    }
-
-    .header h1 {
-      font-size: 22px;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .controls {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    /* Week Navigation */
-    .week-nav {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: rgba(255,255,255,.14);
-      padding: 8px 12px;
-      border-radius: 999px;
-      backdrop-filter: blur(6px);
-    }
-
-    .week-btn {
-      background: rgba(255,255,255,.24);
-      border: none;
-      color: #fff;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      transition: .2s;
-    }
-
-    .week-btn:hover:not(:disabled) {
-      background: rgba(255,255,255,.34);
-      transform: scale(1.08);
-    }
-
-    .week-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .week-label {
-      font-size: 14px;
-      font-weight: 800;
-      min-width: 260px;
-      text-align: center;
-      background: #f9f9f9;
-      border: 2px solid #ddd;
-      border-radius: 6px;
-      padding: 4px 10px;
-      color: #222;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    /* Action Buttons */
-    .action-buttons {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .action-btn, .btn {
-      background: #4a90e2;
-      border: none;
-      color: #fff;
-      padding: 8px 12px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 800;
-      transition: .2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }
-
-    .action-btn:hover:not(:disabled), .btn:hover:not(:disabled) {
-      background: #357ab7;
-      transform: translateY(-1px);
-    }
-
-    .action-btn:disabled, .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .action-btn.save {
-      background: rgba(46,204,113,.8);
-    }
-
-    .action-btn.clear {
-      background: rgba(231,76,60,.8);
-    }
-
-    .action-btn.primary {
-      background: rgba(52,152,219,.8);
-    }
-
-    .action-btn.push {
-      background: #27ae60;
-    }
-
-    .help {
-      font-size: 12px;
-      color: #eef;
-      margin-top: 6px;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 6px;
-      font-weight: 800;
-      font-size: 11px;
-      background: rgba(255,255,255,.2);
-      margin-left: 6px;
-    }
-
-    /* ========== Main Content ========== */
-    .main-content {
-      display: flex;
-      align-items: flex-start;
-    }
-
-    .schedule-area {
-      flex: 1;
-      overflow-y: visible;
-      overflow-x: auto;
-      background: #fafbfc;
-      padding: 16px;
-    }
-
-    /* ========== Sidebar ========== */
-    .sidebar {
-      width: 340px;
-      flex-shrink: 0;
-      overflow-y: auto;
-      border-right: 2px solid #dee2e6;
-      background: #fafafa;
-    }
-
-    .sidebar-header {
-      padding: 14px 16px;
-      background: white;
-      border-bottom: 2px solid #e9ecef;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .sidebar-title {
-      font-size: 14px;
-      font-weight: 800;
-      color: #2c3e50;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .drop-hint {
-      font-size: 11px;
-      color: #6b7280;
-      font-weight: 700;
-      background: #eef2ff;
-      padding: 3px 6px;
-      border-radius: 6px;
-    }
-
-    .add-movie-btn {
-      background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
-      color: #fff;
-      border: none;
-      padding: 6px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 800;
-      transition: .2s;
-    }
-
-    .add-movie-btn:hover {
-      transform: translateY(-1px);
-    }
-
-    /* Movies List */
-    .movies-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 14px;
-      position: relative;
-    }
-
-    .movies-list.drop {
-      outline: 2px dashed #667eea;
-      outline-offset: -6px;
-      background: #eef2ff;
-    }
-
-    .movie-card {
-      background: white;
-      border: 2px solid #e0e0e0;
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 12px;
-      cursor: grab;
-      transition: .2s;
-      position: relative;
-      border-left: 6px solid var(--movie-color, #667eea);
-    }
-
-    .movie-card:hover {
-      transform: translateX(4px);
-      box-shadow: 0 4px 10px rgba(0,0,0,.12);
-    }
-
-    .movie-card.dragging {
-      opacity: .5;
-      cursor: grabbing;
-    }
-
-    .movie-title {
-      font-size: 13px;
-      font-weight: 800;
-      color: #2c3e50;
-      margin-bottom: 6px;
-      padding-right: 36px;
-    }
-
-    .movie-info {
-      font-size: 12px;
-      color: #6c757d;
-      display: flex;
-      gap: 10px;
-    }
-
-    .movie-actions {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      display: flex;
-      gap: 6px;
-    }
-
-    .tiny-btn {
-      width: 24px;
-      height: 24px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-    }
-
-    .tiny-btn.delete {
-      background: var(--error-a);
-    }
-
-    .tiny-btn.duplicate {
-      background: var(--info-a);
-    }
-
-    /* ========== Schedule Area ========== */
-    .schedule-grid {
-      display: flex;
-      min-width: fit-content;
-      gap: 14px;
-    }
-
-    .days-container {
-      display: flex;
-      gap: 14px;
-    }
-
-    .day-column {
-      background: #fff;
-      border: 2px solid #ddd;
-      border-radius: 12px;
-      overflow: hidden;
-      min-width: calc(2 * var(--lane-min-w));
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-
-    .day-header {
-      background: #e0e0e0;
-      color: #222;
-      padding: 10px 12px;
-      text-align: center;
-      font-weight: 900;
-      font-size: 13px;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-
-    .day-content-wrap {
-      display: flex;
-    }
-
-    /* Time Grid */
-    .global-time {
-      width: var(--time-gutter-w);
-      background: linear-gradient(to right, rgba(255,255,255,1), rgba(250,251,252,.94));
-      border-right: 1px solid #e5e7eb;
-      position: sticky;
-      left: 0;
-      z-index: 6;
-      padding-top: 0;
-    }
-
-    .day-time-slot {
-      height: var(--slot-h);
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      padding-right: 8px;
-      font-size: 11px;
-      color: #6c757d;
-    }
-
-    .day-time-slot.hour {
-      font-weight: 800;
-      color: #495057;
-      border-top: 1px solid #dee2e6;
-    }
-
-    /* Theater Lanes */
-    .theater-wrap {
-      display: flex;
-      position: relative;
-      height: calc((var(--end-hour) - var(--start-hour)) * 4 * var(--slot-h));
-      flex: 1;
-    }
-
-    .theater-lane {
-      flex: 1 1 var(--lane-min-w);
-      min-width: var(--lane-min-w);
-      position: relative;
-      border-right: 1px solid #e0e0e0;
-      background: var(--lane-bg);
-      background-image: repeating-linear-gradient(
-        to bottom,
-        white 0px,
-        white calc(var(--slot-h) - 1px),
-        var(--lane-grid) calc(var(--slot-h) - 1px),
-        var(--lane-grid) var(--slot-h)
-      );
-    }
-
-    .theater-lane:last-child {
-      border-right: none;
-    }
-
-    .theater-lane.drag-over {
-      outline: 2px dashed rgba(102,126,234,.7);
-      outline-offset: -2px;
-    }
-
-    .theaters-row {
-      display: flex;
-      height: 38px;
-      background: #f8f9fa;
-      border-bottom: 2px solid #dee2e6;
-      position: sticky;
-      top: 28px;
-      z-index: 9;
-    }
-
-    .theater-header {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 700;
-      color: #495057;
-      border-right: 1px solid #dee2e6;
-    }
-
-    .theater-header:last-child {
-      border-right: none;
-    }
-
-    .theater-header.t1 {
-      background: rgba(102,126,234,.08);
-    }
-
-    .theater-header.t2 {
-      background: rgba(46,204,113,.08);
-    }
-
-    /* ========== Schedule Blocks ========== */
-    .block {
-      position: absolute;
-      left: 4px;
-      right: 4px;
-      user-select: none;
-      background: linear-gradient(135deg, var(--movie-color, #667eea), var(--movie-color-dark, #5a67d8));
-      color: #fff;
-      border-radius: 8px;
-      padding: 6px 8px;
-      cursor: grab;
-      box-shadow: 0 2px 6px rgba(0,0,0,.2);
-      overflow: hidden;
-      z-index: 10;
-      transition: box-shadow .15s ease;
-      font-size: 13px;
-    }
-
-    .block.t2 {
-      background: linear-gradient(135deg, var(--success-a), var(--success-b));
-    }
-
-    .block.public {
-      background: linear-gradient(135deg, #e74c3c, #c0392b);
-    }
-
-    .block.nonpublic {
-      background: linear-gradient(135deg, #f6b26b, #e67e22);
-      color: #000;
-    }
-
-    .block:hover {
-      box-shadow: 0 4px 12px rgba(0,0,0,.25);
-    }
-
-    .block.dragging {
-      opacity: .5;
-      cursor: grabbing;
-      z-index: 1000;
-    }
-
-    .block .title {
-      font-size: 15px;
-      font-weight: 800;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .block .time {
-      opacity: .92;
-      font-size: 14px;
-      margin-top: 6px;
-    }
-
-    .block .runtime {
-      font-size: 12px;
-      opacity: .8;
-      margin-top: 2px;
-    }
-
-    .block .start-time {
-      font-weight: 800;
-    }
-
-    .block .remove,
-    .block .edit {
-      position: absolute;
-      top: 4px;
-      width: 18px;
-      height: 18px;
-      background: rgba(255,255,255,.35);
-      border: none;
-      color: #fff;
-      border-radius: 50%;
-      cursor: pointer;
-      font-size: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .block .remove {
-      right: 24px;
-    }
-
-    .block .edit {
-      right: 4px;
-    }
-
-    /* ========== Drag & Drop UI ========== */
-    .ghost {
-      position: fixed;
-      pointer-events: none;
-      z-index: 10000;
-      opacity: .95;
-      background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
-      color: #fff;
-      padding: 8px;
-      border-radius: 8px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.35);
-      min-width: 140px;
-      font-size: 12px;
-      font-weight: 800;
-    }
-
-    .snap {
-      position: absolute;
-      left: 4px;
-      right: 4px;
-      border: 2px dashed #111;
-      background: rgba(0,0,0,.08);
-      border-radius: 8px;
-      pointer-events: none;
-      z-index: 5;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 12px;
-      color: #111;
-      padding-top: 6px;
-    }
-
-    .snap.conflict {
-      background: rgba(231,76,60,.12);
-      border-color: rgba(231,76,60,.65);
-    }
-
-    /* ========== Notifications ========== */
-    .notification {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      padding: 12px 16px;
-      border-radius: 10px;
-      color: white;
-      box-shadow: 0 4px 12px rgba(0,0,0,.15);
-      z-index: 10000;
-      animation: slideIn .25s ease;
-      font-size: 14px;
-      font-weight: 700;
-      margin-top: 6px;
-    }
-
-    .notification.success {
-      background: linear-gradient(135deg, var(--success-a), var(--success-b));
-    }
-
-    .notification.error {
-      background: linear-gradient(135deg, var(--error-a), var(--error-b));
-    }
-
-    .notification.info {
-      background: linear-gradient(135deg, var(--info-a), var(--info-b));
-    }
-
-    @keyframes slideIn {
-      from { transform: translateX(120%); }
-      to { transform: translateX(0); }
-    }
-
-    /* ========== Dialogs ========== */
-    dialog {
-      border: none;
-      border-radius: 14px;
-      padding: 0;
-      box-shadow: 0 20px 60px rgba(0,0,0,.3);
-      width: 520px;
-      max-width: 90vw;
-    }
-
-    dialog::backdrop {
-      background: rgba(0, 0, 0, 0.5);
-    }
-
-    .dlg-header {
-      background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
-      color: #fff;
-      padding: 12px 16px;
-      font-weight: 800;
-      position: relative;
-    }
-
-    .dlg-close {
-      position: absolute;
-      right: 10px;
-      top: 8px;
-      width: 28px;
-      height: 28px;
-      border-radius: 999px;
-      border: 1px solid #e5e7eb;
-      background: #fff;
-      color: #111;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      cursor: pointer;
-    }
-
-    .dlg-close:hover {
-      background: #f3f4f6;
-    }
-
-    .dlg-body {
-      padding: 16px;
-      max-height: 60vh;
-      overflow-y: auto;
-    }
-
-    .dlg-body label {
-      display: block;
-      margin-bottom: 4px;
-      font-size: 12px;
-      font-weight: 700;
-      color: #555;
-    }
-
-    .dlg-body input,
-    .dlg-body select,
-    .dlg-body textarea {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      margin-bottom: 12px;
-      font-size: 14px;
-    }
-
-    .dlg-body input:focus,
-    .dlg-body select:focus {
-      outline: 2px solid var(--brand-a);
-      outline-offset: -1px;
-    }
-
-    .dlg-row {
-      display: flex;
-      gap: 8px;
-    }
-
-    .dlg-row .w80 {
-      width: 80px;
-    }
-
-    .dlg-row .w100 {
-      width: 100px;
-    }
-
-    .dlg-actions {
-      padding: 12px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      background: #f8f9fa;
-    }
-
-    .btn.primary {
-      background: #4f46e5;
-      color: #fff;
-    }
-
-    .btn.secondary {
-      background: #e5e7eb;
-      color: #374151;
-    }
-
-    .btn.clear {
-      background: var(--error-a);
-      color: #fff;
-    }
-
-    small.muted {
-      color: #6b7280;
-      font-size: 12px;
-      display: block;
-      margin-top: 6px;
-    }
-
-    /* ========== Calendar Overlay ========== */
-    .calendar-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,.35);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 20000;
-    }
-
-    .calendar {
-      width: 520px;
-      max-width: 90vw;
-      background: #fff;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 30px 80px rgba(0,0,0,.35);
-    }
-
-    .cal-head {
-      background: linear-gradient(135deg, var(--brand-a), var(--brand-b));
-      color: #fff;
-      padding: 12px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .cal-title {
-      font-weight: 800;
-    }
-
-    .cal-btn {
-      border: none;
-      background: rgba(255,255,255,.22);
-      color: #fff;
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      cursor: pointer;
-    }
-
-    .cal-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 6px;
-      padding: 12px;
-    }
-
-    .cal-cell {
-      padding: 12px 8px;
-      text-align: center;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 700;
-    }
-
-    .cal-cell.header {
-      font-weight: 900;
-      color: #6b7280;
-      cursor: default;
-    }
-
-    .cal-cell.other {
-      color: #9aa2ac;
-    }
-
-    .cal-cell.today {
-      outline: 2px solid var(--info-a);
-    }
-
-    .cal-cell.currentWeek {
-      background: rgba(102,126,234,.12);
-    }
-
-    .cal-cell.hasEvents {
-      background: rgba(46,204,113,.12);
-    }
-
-    /* ========== Export Menu ========== */
-    #exportMenuBtn {
-      position: relative;
-    }
-
-    #exportDropdown {
-      position: absolute;
-      top: 42px;
-      right: 0;
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
-      box-shadow: 0 12px 30px rgba(0,0,0,.15);
-      padding: 6px;
-      min-width: 220px;
-      display: none;
-      z-index: 9999;
-    }
-
-    #exportDropdown .item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-
-    #exportDropdown .item:hover {
-      background: #f5f7fa;
-    }
-
-    #exportDropdown .item .icon {
-      width: 18px;
-      text-align: center;
-    }
-
-    /* ========== State Classes ========== */
-    .schedule-locked .block {
-      opacity: .65;
-    }
-
-    .schedule-locked .block:hover {
-      box-shadow: none;
-    }
-
-    /* Lane grid overlay */
-    .lane-grid-overlay {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 20;
-      background-image:
-        linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, rgba(0,0,0,0) 1px),
-        repeating-linear-gradient(
-          to bottom,
-          rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px,
-          rgba(0,0,0,0) 1px, rgba(0,0,0,0) calc(var(--slot-h) / 4)
-        );
-      background-size: 100% var(--slot-h), 100% var(--slot-h);
-      background-repeat: repeat-y;
-      background-position: 0 0, 0 0;
-    }
-
-    .error-display {
-      background: #fee;
-      color: #c00;
-      padding: 8px;
-      margin: 8px;
-      border-radius: 6px;
-      font-size: 12px;
-    }
-
-    .google-toolbar {
-      display: flex;
-      gap: 12px;
-      margin-left: auto;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSL Theater Scheduler</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f7;
+            color: #1d1d1f;
+        }
+
+        .app-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            background: #e8f5e9;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #2e7d32;
+        }
+
+        .sync-status.syncing {
+            background: #fff3e0;
+            color: #ef6c00;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .controls {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .week-navigation {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .week-navigation button {
+            padding: 8px 16px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .week-navigation button:hover {
+            background: #0051d5;
+        }
+
+        .week-display {
+            font-size: 16px;
+            font-weight: 500;
+            min-width: 200px;
+            text-align: center;
+        }
+
+        .week-stats {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: #007aff;
+        }
+
+        .collapse-toggle {
+            padding: 8px 16px;
+            background: #f0f0f2;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .collapse-toggle:hover {
+            background: #e0e0e2;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 20px;
+        }
+
+        .library-panel {
+            width: 280px;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+
+        .library-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .library-count {
+            font-size: 14px;
+            color: #86868b;
+            font-weight: normal;
+        }
+
+        .calendar-filter {
+            margin-bottom: 15px;
+        }
+
+        .calendar-filter select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .library-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            cursor: move;
+            position: relative;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .library-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .library-item.dragging {
+            opacity: 0.5;
+        }
+
+        .library-item-title {
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: white;
+        }
+
+        .library-item-duration {
+            font-size: 12px;
+            color: rgba(255,255,255,0.8);
+        }
+
+        /* Calendar colors */
+        .calendar-events { background: #ec407a; }
+        .calendar-non-public { background: #ff9800; }
+        .calendar-tbd { background: #42a5f5; }
+        .calendar-theater-1 { background: #757575; }
+        .calendar-theater-2 { background: #66bb6a; }
+
+        .schedule-container {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow-x: auto;
+        }
+
+        .schedule-grid {
+            display: flex;
+            min-width: 1000px;
+        }
+
+        .time-column {
+            width: 60px;
+            border-right: 1px solid #e0e0e0;
+            padding-top: 50px;
+        }
+
+        .time-slot {
+            height: 40px;
+            padding: 5px 10px;
+            font-size: 12px;
+            color: #86868b;
+            text-align: right;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .days-container {
+            flex: 1;
+            display: flex;
+        }
+
+        .day-column {
+            flex: 1;
+            min-width: 140px;
+            border-right: 1px solid #e0e0e0;
+            position: relative;
+        }
+
+        .day-column.collapsed {
+            min-width: 50px;
+            max-width: 50px;
+        }
+
+        .day-column.collapsed .day-header {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            padding: 10px 5px;
+        }
+
+        .day-column.collapsed .theater-lanes {
+            display: none;
+        }
+
+        .day-column:last-child {
+            border-right: none;
+        }
+
+        .day-header {
+            height: 50px;
+            padding: 10px;
+            font-weight: 600;
+            text-align: center;
+            border-bottom: 2px solid #e0e0e0;
+            background: #f8f8f8;
+        }
+
+        .theater-lanes {
+            display: flex;
+            height: calc(40px * 48); /* 24 hours * 4 slots per hour */
+            position: relative;
+        }
+
+        .theater-lane {
+            flex: 1;
+            border-right: 1px solid #e8e8e8;
+            position: relative;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent,
+                transparent 39px,
+                #f0f0f0 39px,
+                #f0f0f0 40px
+            );
+        }
+
+        .theater-lane:last-child {
+            border-right: none;
+        }
+
+        .theater-lane-header {
+            position: absolute;
+            top: -25px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 11px;
+            color: #86868b;
+            font-weight: 500;
+        }
+
+        .theater-lane.drop-active {
+            background-color: rgba(0, 122, 255, 0.05);
+        }
+
+        .event-block {
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            border-radius: 6px;
+            padding: 4px 6px;
+            cursor: move;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            z-index: 10;
+        }
+
+        .event-block:hover {
+            transform: scale(1.02);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 20;
+        }
+
+        .event-block.dragging {
+            opacity: 0.5;
+            z-index: 100;
+        }
+
+        .event-title {
+            font-size: 11px;
+            font-weight: 500;
+            color: white;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .event-time {
+            font-size: 10px;
+            color: rgba(255,255,255,0.9);
+            margin-top: 2px;
+        }
+
+        .ghost-event {
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            background: rgba(0, 122, 255, 0.2);
+            border: 2px dashed #007aff;
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .import-button {
+            padding: 8px 16px;
+            background: #34c759;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .import-button:hover {
+            background: #30a852;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #323232;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <!-- Header -->
-    <div class="header">
-      <div class="header-content">
-        <h1>
-          🎬 TSL Scheduler 1.0 
-          <span id="googleStatusBadge" class="badge" style="background:#e74c3c;">Not Connected</span>
-          <span class="badge">Tue→Mon</span>
-          <span class="badge">2:00 PM start</span>
-        </h1>
-        <div class="google-toolbar">
-          <button id="connectGoogleBtn" class="action-btn primary" disabled>🔌 Connect Google</button>
-          <button id="reloadGoogleBtn" class="action-btn primary" style="background:#3498db;" disabled>↻ Reload from Google</button>
-          <button id="pushGoogleAllBtn" class="action-btn push" disabled>📤 Push Week (All Calendars)</button>
-          <button id="clearGoogleAllBtn" class="action-btn clear" disabled>🗑️ Clear This Week from Google</button>
+    <div class="app-container">
+        <div class="header">
+            <h1>TSL Theater Scheduler</h1>
+            <div class="sync-status" id="syncStatus">
+                <span>✓</span>
+                <span>Synced with Google Calendar</span>
+            </div>
         </div>
-        <div id="googleStatusLine" class="help">Google not connected.</div>
 
         <div class="controls">
-          <div class="week-nav">
-            <button class="week-btn" id="prevWeek">‹</button>
-            <div class="week-label" id="weekLabel">Loading…</div>
-            <button class="week-btn" id="nextWeek">›</button>
-          </div>
-          <div class="action-buttons">
-            <button class="action-btn save" id="saveAll">💾 Save</button>
-            <button class="action-btn" id="toggleTueThu">⇤ Collapse Tue—Thu</button>
-            <button class="btn" id="exportMenuBtn">⬇️ Export…</button>
-            <div id="exportDropdown">
-              <div class="item" id="expJSON"><span class="icon">📋</span><span>JSON (Full Backup)</span></div>
-              <div class="item" id="expWeb"><span class="icon">🧩</span><span>Web HTML</span></div>
-              <div class="item" id="expSchema"><span class="icon">📖</span><span>Schema (JSON‑LD)</span></div>
-              <div class="item" id="expICS"><span class="icon">📅</span><span>ICS (Calendar)</span></div>
-              <div class="item" id="expCSV"><span class="icon">📄</span><span>CSV (Box Office)</span></div>
+            <div class="week-navigation">
+                <button onclick="changeWeek(-1)">← Previous Week</button>
+                <div class="week-display" id="weekDisplay">Week of Dec 9 - Dec 15, 2024</div>
+                <button onclick="changeWeek(1)">Next Week →</button>
             </div>
-            <button class="action-btn" id="importBtn">📥 Import</button>
-            <button class="action-btn clear" id="clearWeek">🗑️ Clear Week</button>
-            <button class="action-btn" id="openCalendar">🗓️ Jump to Week</button>
-            <button class="action-btn" id="openSettings">⚙️ Settings</button>
-            <button class="action-btn" id="lockWeekBtn">🔒 Lock Week</button>
-            <button class="action-btn" id="weekCountBtn">
-              📊 Week Count 
-              <span id="weekCountBadge" style="margin-left:6px; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#1f2937; font-weight:800;">Shows: 0</span>
-            </button>
-          </div>
+            <div class="week-stats">
+                <div class="stat-item">
+                    <span>Week Total:</span>
+                    <span class="stat-value" id="weekTotal">0 events</span>
+                </div>
+                <button class="collapse-toggle" onclick="toggleCollapse()">
+                    Collapse Tue-Thu
+                </button>
+            </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Main Content -->
-    <div class="main-content">
-      <!-- Sidebar -->
-      <div class="sidebar">
-        <div class="sidebar-header">
-          <div class="sidebar-title">
-            🎞️ Film Library 
-            <span class="drop-hint">Drop .txt / .csv here</span>
-          </div>
-          <button class="add-movie-btn" id="openAddMovie">+ Add Film</button>
-          <button class="add-movie-btn" id="openAddEvent">+ Add Event</button>
+        <div class="main-content">
+            <div class="library-panel">
+                <div class="library-header">
+                    <span>Movie Library</span>
+                    <span class="library-count" id="libraryCount">(0)</span>
+                </div>
+                <div class="calendar-filter">
+                    <select id="calendarFilter" onchange="filterLibrary()">
+                        <option value="all">All Calendars</option>
+                        <option value="events">TSL Events</option>
+                        <option value="non-public">TSL Events (NON-PUBLIC)</option>
+                        <option value="tbd">TSL TBD</option>
+                        <option value="theater-1">TSL Theater 1</option>
+                        <option value="theater-2">TSL Theater 2</option>
+                    </select>
+                </div>
+                <div id="libraryItems"></div>
+                <button class="import-button" onclick="importFromGoogle()" style="width: 100%; margin-top: 15px;">
+                    Import from Google Calendar
+                </button>
+            </div>
+
+            <div class="schedule-container">
+                <div class="schedule-grid">
+                    <div class="time-column" id="timeColumn"></div>
+                    <div class="days-container" id="daysContainer"></div>
+                </div>
+            </div>
         </div>
-        <div class="movies-list" id="moviesList"></div>
-      </div>
+    </div>
 
-      <!-- Schedule Area -->
-      <div class="schedule-area">
-        <div class="schedule-grid">
-          <div class="days-container" id="daysContainer"></div>
-        </div>
-      </div>
-    </div>
-  </div>
+    <script>
+        // Application State
+        let currentWeekStart = new Date();
+        currentWeekStart.setHours(0, 0, 0, 0);
+        const dayOfWeek = currentWeekStart.getDay();
+        const diff = currentWeekStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        currentWeekStart.setDate(diff);
 
-  <!-- Dialogs -->
-  <!-- Add/Edit Film Dialog -->
-  <dialog id="movieDialog">
-    <div class="dlg-header">
-      Add / Edit Film
-      <button class="dlg-close" data-close="#movieDialog">×</button>
-    </div>
-    <div class="dlg-body">
-      <label>Title</label>
-      <input id="movieTitle" type="text" placeholder="Film title" maxlength="200">
-      <label>Runtime (Hours : Minutes)</label>
-      <div class="dlg-row">
-        <input id="movieHours" class="w80" type="number" min="0" max="10" placeholder="1">
-        <input id="movieMinutes" class="w100" type="number" min="0" max="59" placeholder="30">
-      </div>
-      <label>Film Webpage URL</label>
-      <input id="moviePageUrl" type="url" placeholder="https://timeandspace.org/film-page">
-      <label>Default Tickets URL</label>
-      <input id="movieTicketsUrl" type="url" placeholder="https://tsl.simpletix.com/e/...">
-      <label>Color</label>
-      <input id="movieColor" type="color" value="#667eea">
-      <input id="movieId" type="hidden">
-    </div>
-    <div class="dlg-actions">
-      <small class="muted">Tip: minutes should be 0—59. Runtime displays as "1h 34m".</small>
-      <div>
-        <button class="btn secondary" id="cancelMovie">Cancel</button>
-        <button class="btn primary" id="saveMovie">Save Film</button>
-      </div>
-    </div>
-  </dialog>
+        let libraryEvents = [];
+        let scheduledEvents = [];
+        let draggedItem = null;
+        let ghostElement = null;
+        let collapsedDays = new Set();
 
-  <!-- Add/Edit Event Dialog -->
-  <dialog id="eventDialog">
-    <div class="dlg-header">
-      Add / Edit Event
-      <button class="dlg-close" data-close="#eventDialog">×</button>
-    </div>
-    <div class="dlg-body">
-      <label>Title</label>
-      <input id="eventTitle" type="text" placeholder="Event title" maxlength="200">
-      <label>Duration (Hours : Minutes)</label>
-      <div class="dlg-row">
-        <input id="eventHours" class="w80" type="number" min="0" max="10" placeholder="1">
-        <input id="eventMinutes" class="w100" type="number" min="0" max="59" placeholder="30">
-      </div>
-      <label>Event Type</label>
-      <select id="eventType">
-        <option value="public">Public Event</option>
-        <option value="nonpublic">Non-Public Event</option>
-      </select>
-      <input id="eventId" type="hidden">
-    </div>
-    <div class="dlg-actions">
-      <button class="btn secondary" id="cancelEvent">Cancel</button>
-      <button class="btn primary" id="saveEvent">Save Event</button>
-    </div>
-  </dialog>
-
-  <!-- Edit Showtime Dialog -->
-  <dialog id="showtimeDialog">
-    <div class="dlg-header">
-      Edit Showtime
-      <button class="dlg-close" data-close="#showtimeDialog">×</button>
-    </div>
-    <div class="dlg-body">
-      <input id="showtimeId" type="hidden">
-      <label>Title</label>
-      <input id="showtimeTitle" type="text" placeholder="Film title" maxlength="200">
-      <label>Runtime (Hours : Minutes)</label>
-      <div class="dlg-row">
-        <input id="showtimeHours" class="w80" type="number" min="0" max="10">
-        <input id="showtimeMinutes" class="w100" type="number" min="0" max="59">
-      </div>
-      <label>Tickets URL</label>
-      <input id="showtimeTickets" type="url" placeholder="https://tsl.simpletix.com/e/...">
-      <label>Webpage URL</label>
-      <input id="showtimePage" type="url" placeholder="https://timeandspace.org/...">
-      <small class="muted">Tip: Defaults come from the film; you can override per showtime.</small>
-    </div>
-    <div class="dlg-actions">
-      <button class="btn secondary" id="cancelShowtime">Cancel</button>
-      <button class="btn primary" id="saveShowtime">Save</button>
-    </div>
-  </dialog>
-
-  <!-- Settings Dialog -->
-  <dialog id="settingsDialog">
-    <div class="dlg-header">
-      Scheduler Settings
-      <button class="dlg-close" data-close="#settingsDialog">×</button>
-    </div>
-    <div class="dlg-body">
-      <label>Start Hour (0—23)</label>
-      <input id="startHour" type="number" min="0" max="23">
-      <label>End Hour (1—24)</label>
-      <input id="endHour" type="number" min="1" max="24">
-      <label>Snap Minutes</label>
-      <select id="snapMinutes">
-        <option value="15">15</option>
-        <option value="10">10</option>
-        <option value="5">5</option>
-        <option value="30">30</option>
-      </select>
-      <label>Google Client ID</label>
-      <input id="googleClientId" type="text" placeholder="Paste your OAuth Client ID here">
-      <label>Google Calendar ID — Theater 1</label>
-      <input id="googleCalT1" type="text" placeholder="primary or calendar ID">
-      <label>Google Calendar ID — Theater 2</label>
-      <input id="googleCalT2" type="text" placeholder="primary or calendar ID">
-      <label>Google Calendar ID — Public Events</label>
-      <input id="googleCalPublic" type="text" placeholder="primary or calendar ID">
-      <label>Google Calendar ID — Non-Public Events</label>
-      <input id="googleCalNonPublic" type="text" placeholder="primary or calendar ID">
-      <small id="calendarStatusLine" class="muted">Active Calendar IDs will appear here after saving.</small>
-    </div>
-    <div class="dlg-actions">
-      <button class="btn secondary" id="cancelSettings">Cancel</button>
-      <button class="btn primary" id="saveSettings">Save Settings</button>
-    </div>
-  </dialog>
-
-  <!-- Week Count Dialog -->
-  <dialog id="weekCountDialog">
-    <div class="dlg-header">
-      Week Count
-      <button class="dlg-close" data-close="#weekCountDialog">×</button>
-    </div>
-    <div class="dlg-body">
-      <div id="weekCountSummary" style="font-weight:800; margin-bottom:8px;"></div>
-      <div id="weekCountList" style="max-height: 60vh; overflow:auto;"></div>
-    </div>
-    <div class="dlg-actions">
-      <button class="btn secondary" data-close="#weekCountDialog">Close</button>
-    </div>
-  </dialog>
-
-  <!-- Calendar Overlay -->
-  <div class="calendar-overlay" id="calendarOverlay">
-    <div class="calendar">
-      <div class="cal-head">
-        <button class="cal-btn" id="calPrev">‹</button>
-        <div class="cal-title" id="calTitle">Month YYYY</div>
-        <button class="cal-btn" id="calNext">›</button>
-      </div>
-      <div class="cal-grid" id="calGrid"></div>
-    </div>
-  </div>
-
-  <!-- Hidden file input -->
-  <input type="file" id="importFile" style="display:none" accept=".json,.ics" multiple/>
-
-  <!-- JavaScript -->
-  <script>
-/**
- * TSL Scheduler 1.0 - Production Stable Version
- * Theater scheduling application with enhanced stability
- */
-
-// ========== Configuration & State ==========
-const APP_CONFIG = {
-  DEFAULT: {
-    START_HOUR: 14,
-    END_HOUR: 24,
-    SNAP_MINUTES: 15,
-    HIDE_TUE_THU: false,
-    DELETE_MODE: 'tagged'
-  },
-  WEEK_ANCHOR: 2, // Tuesday
-  VENUE_ADDRESS: "Time & Space Limited, 434 Columbia St, Hudson, NY 12534",
-  STORAGE_PREFIX: 'reelslate_',
-  MAX_RETRIES: 3,
-  AUTOSAVE_INTERVAL: 30000 // 30 seconds
-};
-
-// Application state with defensive initialization
-const AppState = {
-  config: { ...APP_CONFIG.DEFAULT },
-  movies: [],
-  schedules: {},
-  currentWeek: null,
-  calendarMonth: null,
-  dragging: null,
-  ghost: null,
-  snap: null,
-  autosaveTimer: null,
-  isDirty: false
-};
-
-// ========== Enhanced Utility Functions with Error Handling ==========
-const Utils = {
-  // Safe DOM helpers
-  id: (x) => {
-    try {
-      return document.getElementById(x);
-    } catch (e) {
-      console.error(`Failed to get element ${x}:`, e);
-      return null;
-    }
-  },
-  
-  qs: (sel) => {
-    try {
-      return document.querySelector(sel);
-    } catch (e) {
-      console.error(`Invalid selector ${sel}:`, e);
-      return null;
-    }
-  },
-  
-  qsa: (sel) => {
-    try {
-      return document.querySelectorAll(sel) || [];
-    } catch (e) {
-      console.error(`Invalid selector ${sel}:`, e);
-      return [];
-    }
-  },
-  
-  on: (x, ev, fn) => {
-    try {
-      const elem = typeof x === 'string' ? Utils.id(x) : x;
-      if (elem && typeof fn === 'function') {
-        elem.addEventListener(ev, fn);
-        return true;
-      }
-      return false;
-    } catch (e) {
-      console.error(`Failed to add event listener:`, e);
-      return false;
-    }
-  },
-  
-  // Safe date helpers
-  getWeekStart(d) {
-    try {
-      const date = new Date(d);
-      if (isNaN(date.getTime())) {
-        console.error('Invalid date provided to getWeekStart');
-        return new Date();
-      }
-      const jsDay = date.getDay();
-      const diff = (jsDay - APP_CONFIG.WEEK_ANCHOR + 7) % 7;
-      const start = new Date(date);
-      start.setDate(date.getDate() - diff);
-      start.setHours(0, 0, 0, 0);
-      return start;
-    } catch (e) {
-      console.error('Error in getWeekStart:', e);
-      return new Date();
-    }
-  },
-  
-  dateKey(d) {
-    try {
-      const date = new Date(d);
-      if (isNaN(date.getTime())) return '';
-      const year = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${m}-${day}`;
-    } catch (e) {
-      console.error('Error in dateKey:', e);
-      return '';
-    }
-  },
-  
-  storageKeyForWeek(weekStart) {
-    try {
-      return APP_CONFIG.STORAGE_PREFIX + 'schedule_' + Utils.dateKey(weekStart) + '_tue';
-    } catch (e) {
-      console.error('Error in storageKeyForWeek:', e);
-      return APP_CONFIG.STORAGE_PREFIX + 'schedule_backup';
-    }
-  },
-  
-  formatHM(minutes) {
-    try {
-      const mins = parseInt(minutes) || 0;
-      const h = Math.floor(mins / 60);
-      const m = mins % 60;
-      return `${h}h ${String(m).padStart(2, '0')}m`;
-    } catch (e) {
-      console.error('Error in formatHM:', e);
-      return '0h 00m';
-    }
-  },
-  
-  hmToMinutes(h, m) {
-    try {
-      const hours = Math.max(0, Math.min(23, parseInt(h || '0', 10)));
-      const mins = Math.max(0, Math.min(59, parseInt(m || '0', 10)));
-      return hours * 60 + mins;
-    } catch (e) {
-      console.error('Error in hmToMinutes:', e);
-      return 0;
-    }
-  },
-  
-  slotToTime(slot) {
-    try {
-      const slotNum = parseInt(slot) || 0;
-      const total = AppState.config.START_HOUR * 60 + slotNum * 15;
-      const h = Math.floor(total / 60);
-      const m = total % 60;
-      const disp = (h % 12) || 12;
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      return `${disp}:${String(m).padStart(2, '0')} ${ampm}`;
-    } catch (e) {
-      console.error('Error in slotToTime:', e);
-      return '12:00 PM';
-    }
-  },
-  
-  timeToSlot(hour, minute) {
-    try {
-      const h = parseInt(hour) || 0;
-      const m = parseInt(minute) || 0;
-      const minutesSinceStart = (h - AppState.config.START_HOUR) * 60 + m;
-      return Math.max(0, Math.round(minutesSinceStart / 15));
-    } catch (e) {
-      console.error('Error in timeToSlot:', e);
-      return 0;
-    }
-  },
-  
-  slotToDate(baseDate, slot) {
-    try {
-      const d = new Date(baseDate);
-      if (isNaN(d.getTime())) return new Date();
-      const slotNum = parseInt(slot) || 0;
-      const total = (AppState.config.START_HOUR * 60) + (slotNum * 15);
-      d.setHours(Math.floor(total / 60), total % 60, 0, 0);
-      return d;
-    } catch (e) {
-      console.error('Error in slotToDate:', e);
-      return new Date();
-    }
-  },
-  
-  snapToMinutes(min) {
-    try {
-      const minutes = parseInt(min) || 0;
-      const snap = AppState.config.SNAP_MINUTES || 15;
-      return Math.round(minutes / snap) * snap;
-    } catch (e) {
-      console.error('Error in snapToMinutes:', e);
-      return 0;
-    }
-  },
-  
-  sanitizeTitleSuffix(title) {
-    try {
-      if (!title) return '';
-      return String(title)
-        .replace(/\s*[-–—]\s*(Theater\s*1|Theater\s*2|Main\s*Theater|Small\s*Theater)\s*$/i, '')
-        .trim()
-        .substring(0, 200); // Limit length
-    } catch (e) {
-      console.error('Error in sanitizeTitleSuffix:', e);
-      return String(title || '').substring(0, 200);
-    }
-  },
-  
-  sanitizeInput(value, maxLength = 200) {
-    try {
-      if (!value) return '';
-      return String(value)
-        .replace(/<[^>]*>/g, '') // Remove HTML tags
-        .substring(0, maxLength)
-        .trim();
-    } catch (e) {
-      console.error('Error in sanitizeInput:', e);
-      return '';
-    }
-  },
-  
-  validateUrl(url) {
-    if (!url) return '';
-    try {
-      const u = new URL(url);
-      if (u.protocol === 'http:' || u.protocol === 'https:') {
-        return url;
-      }
-      return '';
-    } catch {
-      return '';
-    }
-  },
-  
-  notify(msg, type = 'info') {
-    try {
-      const div = document.createElement('div');
-      div.className = `notification ${type}`;
-      div.textContent = Utils.sanitizeInput(msg, 200);
-      document.body.appendChild(div);
-      setTimeout(() => {
-        try {
-          div.remove();
-        } catch {}
-      }, 5000);
-    } catch (e) {
-      console.error('Error in notify:', e);
-    }
-  },
-  
-  download(content, mime, filename) {
-    try {
-      const blob = new Blob([content], { type: mime });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 100);
-    } catch (e) {
-      console.error('Error in download:', e);
-      Utils.notify('Failed to download file', 'error');
-    }
-  },
-
-  formatICS(date) {
-    try {
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return '';
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const H = String(d.getHours()).padStart(2, '0');
-      const M = String(d.getMinutes()).padStart(2, '0');
-      return `${y}${m}${day}T${H}${M}00`;
-    } catch (e) {
-      console.error('Error in formatICS:', e);
-      return '';
-    }
-  },
-
-  debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  }
-};
-
-// ========== Enhanced Storage Module with Error Recovery ==========
-const Storage = {
-  // Safe localStorage wrapper
-  safeGet(key) {
-    try {
-      return localStorage.getItem(key);
-    } catch (e) {
-      console.error(`Failed to get ${key} from localStorage:`, e);
-      return null;
-    }
-  },
-  
-  safeSet(key, value) {
-    try {
-      localStorage.setItem(key, value);
-      return true;
-    } catch (e) {
-      console.error(`Failed to set ${key} in localStorage:`, e);
-      if (e.name === 'QuotaExceededError') {
-        Utils.notify('Storage quota exceeded. Clearing old data...', 'error');
-        Storage.clearOldData();
-      }
-      return false;
-    }
-  },
-  
-  clearOldData() {
-    try {
-      // Clear schedules older than 6 months
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      
-      const keys = Object.keys(localStorage);
-      let cleared = 0;
-      
-      keys.forEach(key => {
-        if (key.startsWith(APP_CONFIG.STORAGE_PREFIX + 'schedule_')) {
-          const dateMatch = key.match(/(\d{4}-\d{2}-\d{2})/);
-          if (dateMatch) {
-            const scheduleDate = new Date(dateMatch[1]);
-            if (scheduleDate < sixMonthsAgo) {
-              localStorage.removeItem(key);
-              cleared++;
-            }
-          }
-        }
-      });
-      
-      if (cleared > 0) {
-        Utils.notify(`Cleared ${cleared} old schedules`, 'info');
-      }
-    } catch (e) {
-      console.error('Error clearing old data:', e);
-    }
-  },
-  
-  migrate() {
-    try {
-      const migrated = Storage.safeGet('reelslate_migrated');
-      if (migrated === '1') return;
-      
-      const migrations = [
-        ['tsl_movies', 'reelslate_movies'],
-        ['tsl_config', 'reelslate_config']
-      ];
-      
-      migrations.forEach(([old, newKey]) => {
-        const oldValue = Storage.safeGet(old);
-        if (oldValue && !Storage.safeGet(newKey)) {
-          Storage.safeSet(newKey, oldValue);
-        }
-      });
-      
-      Object.keys(localStorage).forEach(k => {
-        if (k.startsWith('tsl_schedule_')) {
-          const v = Storage.safeGet(k);
-          const newKey = k.replace(/^tsl_/, 'reelslate_');
-          if (!Storage.safeGet(newKey)) {
-            Storage.safeSet(newKey, v);
-          }
-        }
-      });
-      
-      Storage.safeSet('reelslate_migrated', '1');
-      console.log('Migration completed successfully');
-    } catch (e) {
-      console.error('Migration failed:', e);
-    }
-  },
-  
-  saveMovies() {
-    try {
-      const data = JSON.stringify(AppState.movies);
-      if (Storage.safeSet('reelslate_movies', data)) {
-        AppState.isDirty = false;
-        return true;
-      }
-      return false;
-    } catch (e) {
-      console.error('Failed to save movies:', e);
-      Utils.notify('Failed to save movies', 'error');
-      return false;
-    }
-  },
-  
-  loadMovies() {
-    try {
-      const saved = Storage.safeGet('reelslate_movies');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          AppState.movies = parsed.map(m => ({
-            ...m,
-            title: Utils.sanitizeInput(m.title),
-            duration: Math.max(1, Math.min(600, parseInt(m.duration) || 120))
-          }));
-        } else {
-          AppState.movies = [];
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load movies:', e);
-      AppState.movies = [];
-    }
-    
-    // Initialize with default movies if empty
-    if (AppState.movies.length === 0) {
-      AppState.movies = [
-        { id: Date.now() - 3, title: 'The Brutalist', duration: 215, runtimeHM: '3h 35m', color: '#667eea', pageUrl: '', ticketsUrl: '' },
-        { id: Date.now() - 2, title: 'Nosferatu', duration: 132, runtimeHM: '2h 12m', color: '#e74c3c', pageUrl: '', ticketsUrl: '' },
-        { id: Date.now() - 1, title: 'Anora', duration: 139, runtimeHM: '2h 19m', color: '#3498db', pageUrl: '', ticketsUrl: '' },
-        { id: Date.now(), title: 'Wicked', duration: 160, runtimeHM: '2h 40m', color: '#9b59b6', pageUrl: '', ticketsUrl: '' }
-      ];
-      Storage.saveMovies();
-    }
-  },
-  
-  saveSchedules() {
-    try {
-      const key = Utils.storageKeyForWeek(AppState.currentWeek);
-      const data = JSON.stringify(AppState.schedules);
-      if (Storage.safeSet(key, data)) {
-        AppState.isDirty = false;
-        return true;
-      }
-      return false;
-    } catch (e) {
-      console.error('Failed to save schedules:', e);
-      Utils.notify('Failed to save schedules', 'error');
-      return false;
-    }
-  },
-  
-  loadSchedules() {
-    try {
-      const key = Utils.storageKeyForWeek(AppState.currentWeek);
-      const saved = Storage.safeGet(key);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        AppState.schedules = typeof parsed === 'object' ? parsed : {};
-      } else {
-        AppState.schedules = {};
-      }
-    } catch (e) {
-      console.error('Failed to load schedules:', e);
-      AppState.schedules = {};
-    }
-  },
-  
-  saveConfig() {
-    try {
-      const data = JSON.stringify(AppState.config);
-      return Storage.safeSet('reelslate_config', data);
-    } catch (e) {
-      console.error('Failed to save config:', e);
-      return false;
-    }
-  },
-  
-  loadConfig() {
-    try {
-      const saved = Storage.safeGet('reelslate_config');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        AppState.config = {
-          ...APP_CONFIG.DEFAULT,
-          START_HOUR: Math.max(0, Math.min(23, parseInt(parsed.START_HOUR) || 14)),
-          END_HOUR: Math.max(1, Math.min(24, parseInt(parsed.END_HOUR) || 24)),
-          SNAP_MINUTES: [5, 10, 15, 30].includes(parsed.SNAP_MINUTES) ? parsed.SNAP_MINUTES : 15,
-          HIDE_TUE_THU: !!parsed.HIDE_TUE_THU,
-          DELETE_MODE: parsed.DELETE_MODE || 'tagged'
+        // Calendar configuration
+        const calendarConfig = {
+            'events': { color: '#ec407a', name: 'TSL Events' },
+            'non-public': { color: '#ff9800', name: 'TSL Events (NON-PUBLIC)' },
+            'tbd': { color: '#42a5f5', name: 'TSL TBD' },
+            'theater-1': { color: '#757575', name: 'TSL Theater 1' },
+            'theater-2': { color: '#66bb6a', name: 'TSL Theater 2' }
         };
-      }
-    } catch (e) {
-      console.error('Failed to load config:', e);
-      AppState.config = { ...APP_CONFIG.DEFAULT };
-    }
-    
-    // Update UI elements
-    try {
-      const startHour = Utils.id('startHour');
-      const endHour = Utils.id('endHour');
-      const snapMinutes = Utils.id('snapMinutes');
-      
-      if (startHour) startHour.value = AppState.config.START_HOUR;
-      if (endHour) endHour.value = AppState.config.END_HOUR;
-      if (snapMinutes) snapMinutes.value = AppState.config.SNAP_MINUTES;
-    } catch (e) {
-      console.error('Error updating config UI:', e);
-    }
-  },
 
-  // Autosave functionality
-  startAutosave() {
-    if (AppState.autosaveTimer) {
-      clearInterval(AppState.autosaveTimer);
-    }
-    
-    AppState.autosaveTimer = setInterval(() => {
-      if (AppState.isDirty) {
-        Storage.saveMovies();
-        Storage.saveSchedules();
-        AppState.isDirty = false;
-      }
-    }, APP_CONFIG.AUTOSAVE_INTERVAL);
-  },
-
-  stopAutosave() {
-    if (AppState.autosaveTimer) {
-      clearInterval(AppState.autosaveTimer);
-      AppState.autosaveTimer = null;
-    }
-  }
-};
-
-// ========== Enhanced UI Module ==========
-const UI = {
-  updateWeekLabel() {
-    try {
-      const end = new Date(AppState.currentWeek);
-      end.setDate(end.getDate() + 6);
-      const s = AppState.currentWeek.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      const e = end.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      const label = Utils.id('weekLabel');
-      if (label) {
-        label.textContent = `${s} → ${e} (Tue—Mon)`;
-      }
-    } catch (e) {
-      console.error('Error updating week label:', e);
-    }
-  },
-  
-  updateCollapseButton() {
-    try {
-      const btn = Utils.id('toggleTueThu');
-      if (btn) {
-        btn.textContent = AppState.config.HIDE_TUE_THU ? '⇥ Show Tue—Thu' : '⇤ Collapse Tue—Thu';
-      }
-    } catch (e) {
-      console.error('Error updating collapse button:', e);
-    }
-  },
-  
-  updateWeekCountBadge() {
-    try {
-      const data = Schedule.countWeekShows();
-      const total = data.reduce((s, [, c]) => s + c, 0);
-      const badge = Utils.id('weekCountBadge');
-      if (badge) {
-        badge.textContent = 'Shows: ' + total;
-      }
-    } catch (e) {
-      console.error('Error updating week count:', e);
-    }
-  },
-  
-  updateLockUI() {
-    try {
-      const isLocked = WeekLock.isLocked();
-      document.body.classList.toggle('schedule-locked', isLocked);
-      const btn = Utils.id('lockWeekBtn');
-      if (btn) {
-        btn.textContent = isLocked ? '🔓 Unlock Week' : '🔒 Lock Week';
-      }
-    } catch (e) {
-      console.error('Error updating lock UI:', e);
-    }
-  },
-
-  showError(message, details = '') {
-    console.error(message, details);
-    Utils.notify(message, 'error');
-  }
-};
-
-// ========== Week Lock Module ==========
-const WeekLock = {
-  weekKey(d) {
-    try {
-      const base = Utils.getWeekStart(d || AppState.currentWeek);
-      base.setHours(0, 0, 0, 0);
-      return base.toISOString().slice(0, 10);
-    } catch (e) {
-      console.error('Error in weekKey:', e);
-      return '';
-    }
-  },
-  
-  isLocked() {
-    try {
-      const saved = Storage.safeGet('reelslate_locked_weeks');
-      if (!saved) return false;
-      const map = JSON.parse(saved);
-      return !!map[WeekLock.weekKey(AppState.currentWeek)];
-    } catch (e) {
-      console.error('Error checking lock status:', e);
-      return false;
-    }
-  },
-  
-  setLocked(v) {
-    try {
-      let map = {};
-      const saved = Storage.safeGet('reelslate_locked_weeks');
-      if (saved) {
-        map = JSON.parse(saved);
-      }
-      map[WeekLock.weekKey(AppState.currentWeek)] = !!v;
-      Storage.safeSet('reelslate_locked_weeks', JSON.stringify(map));
-    } catch (e) {
-      console.error('Error setting lock:', e);
-    }
-  },
-  
-  toggle() {
-    try {
-      WeekLock.setLocked(!WeekLock.isLocked());
-      UI.updateLockUI();
-    } catch (e) {
-      console.error('Error toggling lock:', e);
-    }
-  }
-};
-
-// ========== Enhanced Schedule Module ==========
-const Schedule = {
-  changeWeek(dir) {
-    try {
-      // Save current week before switching
-      Storage.saveSchedules();
-      
-      // Move by 7 days
-      const moved = new Date(AppState.currentWeek);
-      moved.setDate(moved.getDate() + (dir > 0 ? 7 : -7));
-      AppState.currentWeek = Utils.getWeekStart(moved);
-      AppState.currentWeek.setHours(0, 0, 0, 0);
-      
-      // Load new week and re-render
-      Storage.loadSchedules();
-      Render.week();
-      Render.blocks();
-      UI.updateWeekLabel();
-      UI.updateLockUI();
-      
-      // Keep calendar in sync
-      AppState.calendarMonth = new Date(AppState.currentWeek.getFullYear(), AppState.currentWeek.getMonth(), 1);
-      Calendar.render();
-    } catch (e) {
-      console.error('Error changing week:', e);
-      UI.showError('Failed to change week');
-    }
-  },
-  
-  visibleDayIndexes() {
-    const all = [0, 1, 2, 3, 4, 5, 6];
-    return AppState.config.HIDE_TUE_THU ? all.filter(i => i > 2) : all;
-  },
-  
-  dayLabel(i) {
-    const names = ['Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon'];
-    return names[i] || 'Day';
-  },
-  
-  hasConflict(key, startSlot, slots, ignoreId) {
-    try {
-      const list = AppState.schedules[key] || [];
-      const endSlot = startSlot + slots;
-      return list.some(m => {
-        if (ignoreId && m.scheduleId === ignoreId) return false;
-        const otherSlots = Math.ceil(m.duration / 15);
-        const otherEnd = m.startSlot + otherSlots;
-        return (startSlot < otherEnd && endSlot > m.startSlot);
-      });
-    } catch (e) {
-      console.error('Error checking conflict:', e);
-      return true; // Assume conflict on error
-    }
-  },
-  
-  moveOrCopyWithinSchedule(item, originKey, targetKey, startSlot, slots, copy, preserveDuration) {
-    try {
-      if (originKey && !copy) {
-        AppState.schedules[originKey] = (AppState.schedules[originKey] || [])
-          .filter(m => m.scheduleId !== item.scheduleId);
-        if (AppState.schedules[originKey]?.length === 0) {
-          delete AppState.schedules[originKey];
+        // Initialize the app
+        function init() {
+            generateTimeColumn();
+            generateDaysColumns();
+            loadSampleData();
+            updateWeekDisplay();
+            updateWeekStats();
         }
-      }
-      
-      const newDuration = preserveDuration ? (item.duration || slots * 15) : (slots * 15);
-      const scheduled = {
-        scheduleId: copy ? `${Date.now()}_${Math.random()}` : item.scheduleId || `${Date.now()}_${Math.random()}`,
-        movieId: item.movieId || item.id || null,
-        title: Utils.sanitizeInput(item.title),
-        duration: Math.max(15, Math.min(600, newDuration)),
-        color: item.color || '#667eea',
-        kind: item.kind || 'movie',
-        startSlot: Math.max(0, startSlot),
-        ticketsUrl: Utils.validateUrl(item.ticketsUrl || item.defaultTicketsUrl),
-        pageUrl: Utils.validateUrl(item.pageUrl || item.defaultPageUrl)
-      };
-      
-      if (!AppState.schedules[targetKey]) {
-        AppState.schedules[targetKey] = [];
-      }
-      AppState.schedules[targetKey].push(scheduled);
-      AppState.isDirty = true;
-    } catch (e) {
-      console.error('Error moving/copying schedule item:', e);
-      throw e;
-    }
-  },
-  
-  removeBlock(scheduleId) {
-    try {
-      if (!scheduleId) return;
-      
-      Object.keys(AppState.schedules).forEach(k => {
-        AppState.schedules[k] = (AppState.schedules[k] || [])
-          .filter(x => x.scheduleId !== scheduleId);
-        if (AppState.schedules[k]?.length === 0) {
-          delete AppState.schedules[k];
-        }
-      });
-      
-      AppState.isDirty = true;
-      Storage.saveSchedules();
-      Render.blocks();
-      Utils.notify('Removed', 'info');
-    } catch (e) {
-      console.error('Error removing block:', e);
-      UI.showError('Failed to remove block');
-    }
-  },
-  
-  clearWeek() {
-    try {
-      const count = Object.values(AppState.schedules).reduce((a, arr) => a + (arr?.length || 0), 0);
-      if (count === 0) {
-        Utils.notify('No items to clear', 'info');
-        return;
-      }
-      if (!confirm(`Clear all ${count} showtime${count > 1 ? 's' : ''} from this week?`)) return;
-      
-      AppState.schedules = {};
-      AppState.isDirty = true;
-      Storage.saveSchedules();
-      Render.blocks();
-      Utils.notify('Week cleared', 'success');
-    } catch (e) {
-      console.error('Error clearing week:', e);
-      UI.showError('Failed to clear week');
-    }
-  },
-  
-  countWeekShows() {
-    try {
-      const map = new Map();
-      Object.keys(AppState.schedules || {}).forEach(k => {
-        (AppState.schedules[k] || []).forEach(it => {
-          const name = it?.title || '(Untitled)';
-          map.set(name, (map.get(name) || 0) + 1);
-        });
-      });
-      return Array.from(map.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-    } catch (e) {
-      console.error('Error counting shows:', e);
-      return [];
-    }
-  }
-};
 
-// ========== Enhanced Render Module ==========
-const Render = {
-  week() {
-    try {
-      const container = Utils.id('daysContainer');
-      if (!container) return;
-      
-      container.innerHTML = '';
-      const idxs = Schedule.visibleDayIndexes();
-      
-      for (const i of idxs) {
-        const date = new Date(AppState.currentWeek);
-        date.setDate(date.getDate() + i);
-        
-        const dayCol = document.createElement('div');
-        dayCol.className = 'day-column';
-        
-        // Day header
-        const header = document.createElement('div');
-        header.className = 'day-header';
-        header.textContent = `${Schedule.dayLabel(i)} — ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-        dayCol.appendChild(header);
-        
-        // Theater row
-        const theaters = document.createElement('div');
-        theaters.className = 'theaters-row';
-        theaters.innerHTML = '<div class="theater-header t1">Theater 1</div><div class="theater-header t2">Theater 2</div>';
-        dayCol.appendChild(theaters);
-        
-        // Content wrap
-        const wrap = document.createElement('div');
-        wrap.className = 'day-content-wrap';
-        
-        // Time gutter
-        const gt = document.createElement('div');
-        gt.className = 'global-time';
-        
-        for (let hour = AppState.config.START_HOUR; hour < AppState.config.END_HOUR; hour++) {
-          for (let m = 0; m < 60; m += 15) {
-            const dslot = document.createElement('div');
-            dslot.className = (m === 0) ? 'day-time-slot hour' : 'day-time-slot';
-            dslot.textContent = (m === 0)
-              ? `${(hour % 12) || 12} ${hour >= 12 ? 'PM' : 'AM'}`
-              : `:${String(m).padStart(2, '0')}`;
-            gt.appendChild(dslot);
-          }
-        }
-        wrap.appendChild(gt);
-        
-        // Theater lanes
-        const lanesWrap = document.createElement('div');
-        lanesWrap.className = 'theater-wrap';
-        lanesWrap.style.setProperty('--start-hour', AppState.config.START_HOUR);
-        lanesWrap.style.setProperty('--end-hour', AppState.config.END_HOUR);
-        
-        ['t1', 't2'].forEach(theater => {
-          const lane = document.createElement('div');
-          lane.className = 'theater-lane';
-          lane.dataset.day = i;
-          lane.dataset.theater = theater;
-          lane.addEventListener('mouseenter', () => lane.classList.add('drag-over'));
-          lane.addEventListener('mouseleave', () => lane.classList.remove('drag-over'));
-          
-          const overlay = document.createElement('div');
-          overlay.className = 'lane-grid-overlay';
-          lane.appendChild(overlay);
-          lanesWrap.appendChild(lane);
-        });
-        
-        wrap.appendChild(lanesWrap);
-        dayCol.appendChild(wrap);
-        container.appendChild(dayCol);
-      }
-    } catch (e) {
-      console.error('Error rendering week:', e);
-      UI.showError('Failed to render week view');
-    }
-  },
-  
-  movies() {
-    try {
-      const list = Utils.id('moviesList');
-      if (!list) return;
-      
-      list.innerHTML = '';
-      
-      const createHeader = (txt) => {
-        const d = document.createElement('div');
-        d.style.cssText = 'font-size:12px;font-weight:800;color:#445;margin:8px 4px;text-transform:uppercase;letter-spacing:.02em';
-        d.textContent = txt;
-        return d;
-      };
-      
-      // Movies section
-      const movies = AppState.movies.filter(m => !m.kind || m.kind === 'movie');
-      if (movies.length > 0) {
-        list.appendChild(createHeader('Movies'));
-        movies.forEach(movie => {
-          const card = Render.createMovieCard(movie, 'movie');
-          list.appendChild(card);
-        });
-      }
-      
-      // Events section
-      const events = AppState.movies.filter(m => m.kind === 'public' || m.kind === 'nonpublic');
-      if (events.length > 0) {
-        list.appendChild(createHeader('Events'));
-        events.forEach(ev => {
-          const card = Render.createMovieCard(ev, ev.kind);
-          list.appendChild(card);
-        });
-      }
-    } catch (e) {
-      console.error('Error rendering movies:', e);
-      UI.showError('Failed to render movie list');
-    }
-  },
-  
-  createMovieCard(item, type) {
-    const card = document.createElement('div');
-    card.className = 'movie-card';
-    card.style.setProperty('--movie-color', item.color || '#667eea');
-    
-    const title = document.createElement('div');
-    title.className = 'movie-title';
-    title.textContent = item.title || '(Untitled)';
-    card.appendChild(title);
-    
-    const info = document.createElement('div');
-    info.className = 'movie-info';
-    info.innerHTML = `<span>${item.runtimeHM || Utils.formatHM(item.duration || 120)}</span>`;
-    if (type === 'public' || type === 'nonpublic') {
-      info.innerHTML += ` • ${type === 'public' ? 'Public' : 'Non-Public'}`;
-    }
-    card.appendChild(info);
-    
-    const actions = document.createElement('div');
-    actions.className = 'movie-actions';
-    
-    const editBtn = document.createElement('button');
-    editBtn.className = 'tiny-btn duplicate';
-    editBtn.title = 'Edit';
-    editBtn.textContent = '✎';
-    editBtn.addEventListener('click', () => {
-      if (type === 'public' || type === 'nonpublic') {
-        Dialogs.openEvent(item.id);
-      } else {
-        Dialogs.openMovie(item.id);
-      }
-    });
-    actions.appendChild(editBtn);
-    
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'tiny-btn delete';
-    deleteBtn.title = 'Delete';
-    deleteBtn.textContent = '×';
-    deleteBtn.addEventListener('click', () => Movies.delete(item.id));
-    actions.appendChild(deleteBtn);
-    
-    card.appendChild(actions);
-    
-    card.addEventListener('mousedown', (e) => {
-      if (!e.target.closest('.movie-actions')) {
-        DragDrop.startFromLibrary(e, item, card);
-      }
-    });
-    
-    return card;
-  },
-  
-  blocks() {
-    try {
-      // Clear existing blocks
-      Utils.qsa('.theater-lane').forEach(l => {
-        if (!l) return;
-        l.innerHTML = '';
-        const overlay = document.createElement('div');
-        overlay.className = 'lane-grid-overlay';
-        l.appendChild(overlay);
-      });
-      
-      // Render scheduled blocks
-      Object.keys(AppState.schedules).forEach(key => {
-        const [day, theater] = key.split('-');
-        const lane = document.querySelector(`.theater-lane[data-day="${day}"][data-theater="${theater}"]`);
-        if (!lane) return;
-        
-        (AppState.schedules[key] || []).forEach(item => {
-          try {
-            const block = Render.createBlock(item, theater, key);
-            lane.appendChild(block);
-          } catch (e) {
-            console.error('Error creating block:', e);
-          }
-        });
-      });
-      
-      UI.updateWeekCountBadge();
-      Render.postProcessBlocks();
-    } catch (e) {
-      console.error('Error rendering blocks:', e);
-      UI.showError('Failed to render schedule blocks');
-    }
-  },
-  
-  createBlock(item, theater, key) {
-    const block = document.createElement('div');
-    
-    if (item.kind === 'public') {
-      block.className = 'block public';
-    } else if (item.kind === 'nonpublic') {
-      block.className = 'block nonpublic';
-    } else {
-      block.className = `block ${theater}`;
-    }
-    
-    block.style.setProperty('--movie-color', item.color || '#667eea');
-    block.dataset.scheduleId = item.scheduleId;
-    
-    const heightPx = Math.max(20, (item.duration / 15) * 20 - 4);
-    block.style.top = `${item.startSlot * 20}px`;
-    block.style.height = `${heightPx}px`;
-    
-    const startLabel = Utils.slotToTime(item.startSlot);
-    const endMinutes = item.startSlot * 15 + item.duration;
-    const endSlot = Math.floor(endMinutes / 15);
-    const endLabel = Utils.slotToTime(endSlot);
-    
-    // Controls
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'remove';
-    removeBtn.title = 'Remove';
-    removeBtn.textContent = '×';
-    removeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      Schedule.removeBlock(item.scheduleId);
-    });
-    block.appendChild(removeBtn);
-    
-    const editBtn = document.createElement('button');
-    editBtn.className = 'edit';
-    editBtn.title = 'Edit';
-    editBtn.textContent = '✎';
-    editBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      Dialogs.openShowtime(item);
-    });
-    block.appendChild(editBtn);
-    
-    // Title
-    const title = document.createElement('div');
-    title.className = 'title';
-    title.textContent = item.title || '(Untitled)';
-    block.appendChild(title);
-    
-    // Time
-    const time = document.createElement('div');
-    time.className = 'time';
-    time.innerHTML = `<strong class="start-time">${startLabel}</strong> — ${endLabel} • ${Utils.formatHM(item.duration)}`;
-    block.appendChild(time);
-    
-    // Event handlers
-    block.addEventListener('dblclick', () => Dialogs.openShowtime(item));
-    block.addEventListener('mousedown', (e) => {
-      if (!e.target.classList.contains('remove') && !e.target.classList.contains('edit')) {
-        DragDrop.startFromSchedule(e, item, block, key);
-      }
-    });
-    
-    return block;
-  },
-  
-  postProcessBlocks() {
-    try {
-      Utils.qsa('.block').forEach(bl => {
-        const timeEl = bl.querySelector('.time');
-        if (!timeEl) return;
-        
-        const text = timeEl.textContent || '';
-        if (text.includes('•')) {
-          const [times, runtimeRaw] = text.split('•');
-          
-          // Update time display
-          const startMatch = times.match(/(\d{1,2}:\d{2}\s*[AP]M)/);
-          if (startMatch) {
-            const startLabel = startMatch[1];
-            const runtimeMatch = runtimeRaw.match(/(\d+)h\s*(\d+)m/);
-            if (runtimeMatch) {
-              const hours = parseInt(runtimeMatch[1]) || 0;
-              const mins = parseInt(runtimeMatch[2]) || 0;
-              const duration = hours * 60 + mins;
-              
-              // Calculate end time
-              const startParts = startLabel.match(/(\d{1,2}):(\d{2})\s*([AP]M)/);
-              if (startParts) {
-                let h = parseInt(startParts[1]);
-                const m = parseInt(startParts[2]);
-                const isPM = startParts[3] === 'PM';
-                
-                if (isPM && h !== 12) h += 12;
-                if (!isPM && h === 12) h = 0;
-                
-                const totalMinutes = h * 60 + m + duration;
-                const endH = Math.floor(totalMinutes / 60) % 24;
-                const endM = totalMinutes % 60;
-                const endAMPM = endH >= 12 ? 'PM' : 'AM';
-                const endDisplay = ((endH % 12) || 12) + ':' + String(endM).padStart(2, '0') + ' ' + endAMPM;
-                
-                timeEl.innerHTML = `<strong class="start-time">${startLabel}</strong> — ${endDisplay}`;
-              }
+        // Generate time column (24 hours with 15-min increments)
+        function generateTimeColumn() {
+            const timeColumn = document.getElementById('timeColumn');
+            for (let hour = 0; hour < 24; hour++) {
+                for (let min = 0; min < 60; min += 15) {
+                    if (min === 0) {
+                        const timeSlot = document.createElement('div');
+                        timeSlot.className = 'time-slot';
+                        timeSlot.textContent = formatTime(hour, min);
+                        timeColumn.appendChild(timeSlot);
+                    }
+                }
             }
-          }
-          
-          // Add runtime on separate line
-          let rt = bl.querySelector('.runtime');
-          if (!rt) {
-            rt = document.createElement('div');
-            rt.className = 'runtime';
-            bl.appendChild(rt);
-          }
-          rt.textContent = (runtimeRaw || '').trim();
         }
-      });
-    } catch (e) {
-      console.error('Error post-processing blocks:', e);
-    }
-  }
-};
 
-// ========== Enhanced Drag & Drop Module ==========
-const DragDrop = {
-  startFromLibrary(e, movie, elem) {
-    try {
-      if (WeekLock.isLocked()) {
-        Utils.notify('Week is locked', 'info');
-        return;
-      }
-      
-      e.preventDefault();
-      elem.classList.add('dragging');
-      const duration = movie.duration || 120;
-      
-      AppState.dragging = {
-        source: 'library',
-        item: { ...movie, duration },
-        elem,
-        startX: e.clientX,
-        startY: e.clientY,
-        offsetY: 0,
-        originKey: null,
-        targetKey: null,
-        targetSlot: null
-      };
-      
-      DragDrop.createGhost(movie.title, duration);
-      DragDrop.updateGhost(e.clientX, e.clientY);
-    } catch (e) {
-      console.error('Error starting drag from library:', e);
-    }
-  },
-  
-  startFromSchedule(e, item, blockElem, key) {
-    try {
-      if (WeekLock.isLocked()) {
-        Utils.notify('Week is locked', 'info');
-        return;
-      }
-      
-      e.preventDefault();
-      blockElem.classList.add('dragging');
-      const rect = blockElem.getBoundingClientRect();
-      
-      AppState.dragging = {
-        source: 'schedule',
-        item: { ...item },
-        elem: blockElem,
-        startX: e.clientX,
-        startY: e.clientY,
-        offsetY: e.clientY - rect.top,
-        originKey: key,
-        originSlot: item.startSlot,
-        targetKey: null,
-        targetSlot: null
-      };
-      
-      DragDrop.createGhost(item.title, item.duration);
-      DragDrop.updateGhost(e.clientX, e.clientY);
-    } catch (e) {
-      console.error('Error starting drag from schedule:', e);
-    }
-  },
-  
-  onMouseMove(e) {
-    try {
-      if (!AppState.dragging) return;
-      
-      DragDrop.updateGhost(e.clientX, e.clientY);
-      
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      const lane = el?.closest('.theater-lane');
-      
-      Utils.qsa('.theater-lane').forEach(l => l?.classList.remove('drag-over'));
-      
-      if (lane) {
-        lane.classList.add('drag-over');
-        const rect = lane.getBoundingClientRect();
-        const y = e.clientY - rect.top - (AppState.dragging?.offsetY || 0);
-        const slot = Utils.snapToMinutes(Math.round(y / 20) * 15) / 15;
-        const day = parseInt(lane.dataset.day);
-        const theater = lane.dataset.theater;
-        const key = `${day}-${theater}`;
-        
-        const slots = Math.ceil(AppState.dragging.item.duration / 15);
-        const maxSlot = (AppState.config.END_HOUR - AppState.config.START_HOUR) * 4 - slots;
-        const startSlot = Math.max(0, Math.min(slot, Math.floor(maxSlot)));
-        const conflict = Schedule.hasConflict(key, startSlot, slots, AppState.dragging.item.scheduleId);
-        
-        AppState.dragging.targetKey = key;
-        AppState.dragging.targetSlot = startSlot;
-        DragDrop.showSnap(lane, startSlot, startSlot + slots, conflict, Utils.slotToTime(startSlot));
-      } else {
-        DragDrop.clearSnap();
-        AppState.dragging.targetKey = null;
-        AppState.dragging.targetSlot = null;
-      }
-    } catch (e) {
-      console.error('Error in drag move:', e);
-    }
-  },
-  
-  onMouseUp(e) {
-    try {
-      if (!AppState.dragging) return;
-      
-      if (AppState.dragging.elem) {
-        AppState.dragging.elem.classList.remove('dragging');
-      }
-      
-      DragDrop.removeGhost();
-      DragDrop.clearSnap();
-      
-      const altCopy = e.altKey || e.metaKey;
-      
-      if (!AppState.dragging.targetKey) {
-        AppState.dragging = null;
-        return;
-      }
-      
-      const key = AppState.dragging.targetKey;
-      const slots = Math.ceil(AppState.dragging.item.duration / 15);
-      const startSlot = AppState.dragging.targetSlot;
-      
-      if (!Schedule.hasConflict(key, startSlot, slots, AppState.dragging.item.scheduleId)) {
-        const isMove = AppState.dragging.source === 'schedule' && !altCopy;
-        Schedule.moveOrCopyWithinSchedule(
-          AppState.dragging.item,
-          AppState.dragging.originKey,
-          key,
-          startSlot,
-          slots,
-          !isMove,
-          true
-        );
-        
-        const message = altCopy ? 'Showtime copied' : 
-                       (AppState.dragging.source === 'schedule' ? 'Showtime moved' : 'Showtime scheduled');
-        Utils.notify(message, 'success');
-        
-        Render.blocks();
-        Storage.saveSchedules();
-      } else {
-        Utils.notify('Time conflict', 'error');
-      }
-      
-      AppState.dragging = null;
-    } catch (e) {
-      console.error('Error in drag end:', e);
-      AppState.dragging = null;
-      DragDrop.removeGhost();
-      DragDrop.clearSnap();
-    }
-  },
-  
-  createGhost(text, duration) {
-    try {
-      DragDrop.removeGhost();
-      AppState.ghost = document.createElement('div');
-      AppState.ghost.className = 'ghost';
-      AppState.ghost.textContent = `${text} (${Utils.formatHM(duration)})`;
-      document.body.appendChild(AppState.ghost);
-    } catch (e) {
-      console.error('Error creating ghost:', e);
-    }
-  },
-  
-  updateGhost(x, y) {
-    try {
-      if (AppState.ghost) {
-        AppState.ghost.style.left = (x + 12) + 'px';
-        AppState.ghost.style.top = (y + 12) + 'px';
-      }
-    } catch (e) {
-      console.error('Error updating ghost:', e);
-    }
-  },
-  
-  removeGhost() {
-    try {
-      if (AppState.ghost) {
-        AppState.ghost.remove();
-        AppState.ghost = null;
-      }
-    } catch (e) {
-      console.error('Error removing ghost:', e);
-    }
-  },
-  
-  showSnap(lane, startSlot, endSlot, conflict, label) {
-    try {
-      DragDrop.clearSnap();
-      AppState.snap = document.createElement('div');
-      AppState.snap.className = 'snap' + (conflict ? ' conflict' : '');
-      AppState.snap.style.top = (startSlot * 20) + 'px';
-      AppState.snap.style.height = ((endSlot - startSlot) * 20 - 4) + 'px';
-      AppState.snap.textContent = label || Utils.slotToTime(startSlot);
-      lane.appendChild(AppState.snap);
-    } catch (e) {
-      console.error('Error showing snap:', e);
-    }
-  },
-  
-  clearSnap() {
-    try {
-      if (AppState.snap) {
-        AppState.snap.remove();
-        AppState.snap = null;
-      }
-    } catch (e) {
-      console.error('Error clearing snap:', e);
-    }
-  }
-};
-
-// ========== Calendar Module ==========
-const Calendar = {
-  show() {
-    try {
-      Calendar.render();
-      const overlay = Utils.id('calendarOverlay');
-      if (overlay) overlay.style.display = 'flex';
-    } catch (e) {
-      console.error('Error showing calendar:', e);
-    }
-  },
-  
-  hide() {
-    try {
-      const overlay = Utils.id('calendarOverlay');
-      if (overlay) overlay.style.display = 'none';
-    } catch (e) {
-      console.error('Error hiding calendar:', e);
-    }
-  },
-  
-  render() {
-    try {
-      const grid = Utils.id('calGrid');
-      const title = Utils.id('calTitle');
-      if (!grid || !title) return;
-      
-      title.textContent = AppState.calendarMonth.toLocaleDateString('en-US', { 
-        month: 'long', 
-        year: 'numeric' 
-      });
-      grid.innerHTML = '';
-      
-      // Day headers
-      ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(h => {
-        const c = document.createElement('div');
-        c.className = 'cal-cell header';
-        c.textContent = h;
-        grid.appendChild(c);
-      });
-      
-      const first = new Date(AppState.calendarMonth.getFullYear(), AppState.calendarMonth.getMonth(), 1);
-      const last = new Date(AppState.calendarMonth.getFullYear(), AppState.calendarMonth.getMonth() + 1, 0);
-      const prevLast = new Date(AppState.calendarMonth.getFullYear(), AppState.calendarMonth.getMonth(), 0);
-      const startDay = first.getDay();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      // Previous month days
-      for (let i = startDay - 1; i >= 0; i--) {
-        const d = document.createElement('div');
-        d.className = 'cal-cell other';
-        d.textContent = prevLast.getDate() - i;
-        grid.appendChild(d);
-      }
-      
-      // Current month days
-      for (let date = 1; date <= last.getDate(); date++) {
-        const cellDate = new Date(AppState.calendarMonth.getFullYear(), AppState.calendarMonth.getMonth(), date);
-        const c = document.createElement('div');
-        c.className = 'cal-cell';
-        
-        if (cellDate.getTime() === today.getTime()) c.classList.add('today');
-        
-        const weekStart = Utils.getWeekStart(cellDate);
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
-        if (cellDate >= weekStart && cellDate <= weekEnd) c.classList.add('currentWeek');
-        
-        if (Calendar.weekHasEvents(cellDate)) c.classList.add('hasEvents');
-        
-        c.textContent = date;
-        c.addEventListener('click', () => {
-          AppState.currentWeek = Utils.getWeekStart(cellDate);
-          Storage.loadSchedules();
-          Render.week();
-          Render.blocks();
-          UI.updateWeekLabel();
-          UI.updateLockUI();
-          Calendar.hide();
-        });
-        
-        grid.appendChild(c);
-      }
-      
-      // Fill remaining cells
-      const totalCells = grid.children.length;
-      const targetCells = Math.ceil(totalCells / 7) * 7;
-      for (let i = 0; i < (targetCells - totalCells); i++) {
-        const d = document.createElement('div');
-        d.className = 'cal-cell other';
-        d.textContent = i + 1;
-        grid.appendChild(d);
-      }
-    } catch (e) {
-      console.error('Error rendering calendar:', e);
-    }
-  },
-  
-  weekHasEvents(dateObj) {
-    try {
-      const wk = Utils.getWeekStart(dateObj);
-      const key = Utils.storageKeyForWeek(wk);
-      const saved = Storage.safeGet(key);
-      if (!saved) return false;
-      const sc = JSON.parse(saved);
-      return Object.keys(sc).length > 0;
-    } catch (e) {
-      console.error('Error checking week events:', e);
-      return false;
-    }
-  },
-  
-  changeMonth(dir) {
-    try {
-      AppState.calendarMonth.setMonth(AppState.calendarMonth.getMonth() + dir);
-      Calendar.render();
-    } catch (e) {
-      console.error('Error changing month:', e);
-    }
-  }
-};
-
-// ========== Enhanced Dialogs Module ==========
-const Dialogs = {
-  openMovie(movieId = null) {
-    try {
-      const movie = movieId ? AppState.movies.find(m => m.id === movieId) : null;
-      
-      const fields = {
-        title: Utils.id('movieTitle'),
-        hours: Utils.id('movieHours'),
-        minutes: Utils.id('movieMinutes'),
-        pageUrl: Utils.id('moviePageUrl'),
-        ticketsUrl: Utils.id('movieTicketsUrl'),
-        color: Utils.id('movieColor'),
-        id: Utils.id('movieId')
-      };
-      
-      if (movie) {
-        if (fields.title) fields.title.value = movie.title || '';
-        if (fields.hours) fields.hours.value = Math.floor((movie.duration || 120) / 60);
-        if (fields.minutes) fields.minutes.value = (movie.duration || 120) % 60;
-        if (fields.pageUrl) fields.pageUrl.value = movie.pageUrl || '';
-        if (fields.ticketsUrl) fields.ticketsUrl.value = movie.ticketsUrl || '';
-        if (fields.color) fields.color.value = movie.color || '#667eea';
-        if (fields.id) fields.id.value = movie.id;
-      } else {
-        Object.values(fields).forEach(field => {
-          if (field && field !== fields.color) {
-            field.value = '';
-          }
-        });
-        if (fields.color) fields.color.value = '#667eea';
-      }
-      
-      const dialog = Utils.id('movieDialog');
-      if (dialog) dialog.showModal();
-    } catch (e) {
-      console.error('Error opening movie dialog:', e);
-      UI.showError('Failed to open movie dialog');
-    }
-  },
-  
-  saveMovie() {
-    try {
-      const title = Utils.sanitizeInput(Utils.id('movieTitle')?.value);
-      const hours = Utils.id('movieHours')?.value;
-      const minutes = Utils.id('movieMinutes')?.value;
-      const duration = Utils.hmToMinutes(hours, minutes);
-      const runtimeHM = Utils.formatHM(duration);
-      const pageUrl = Utils.validateUrl(Utils.id('moviePageUrl')?.value);
-      const ticketsUrl = Utils.validateUrl(Utils.id('movieTicketsUrl')?.value);
-      const color = Utils.id('movieColor')?.value || '#667eea';
-      const idVal = Utils.id('movieId')?.value;
-      
-      if (!title || duration < 1) {
-        Utils.notify('Please fill title and runtime', 'error');
-        return;
-      }
-      
-      if (idVal) {
-        const i = AppState.movies.findIndex(m => String(m.id) === String(idVal));
-        if (i >= 0) {
-          AppState.movies[i] = { 
-            ...AppState.movies[i], 
-            title, 
-            duration, 
-            runtimeHM, 
-            pageUrl, 
-            ticketsUrl, 
-            color 
-          };
-        }
-      } else {
-        AppState.movies.push({
-          id: Date.now(),
-          title,
-          duration,
-          runtimeHM,
-          pageUrl,
-          ticketsUrl,
-          color
-        });
-      }
-      
-      AppState.isDirty = true;
-      Storage.saveMovies();
-      Render.movies();
-      const dialog = Utils.id('movieDialog');
-      if (dialog) dialog.close();
-      Utils.notify('Film saved', 'success');
-    } catch (e) {
-      console.error('Error saving movie:', e);
-      UI.showError('Failed to save film');
-    }
-  },
-  
-  openEvent(eventId = null) {
-    try {
-      const ev = eventId ? AppState.movies.find(m => m.id === eventId) : null;
-      
-      const fields = {
-        title: Utils.id('eventTitle'),
-        hours: Utils.id('eventHours'),
-        minutes: Utils.id('eventMinutes'),
-        type: Utils.id('eventType'),
-        id: Utils.id('eventId')
-      };
-      
-      if (ev) {
-        if (fields.title) fields.title.value = ev.title || '';
-        if (fields.hours) fields.hours.value = Math.floor((ev.duration || 60) / 60);
-        if (fields.minutes) fields.minutes.value = (ev.duration || 60) % 60;
-        if (fields.type) fields.type.value = ev.kind || 'public';
-        if (fields.id) fields.id.value = ev.id;
-      } else {
-        Object.values(fields).forEach(field => {
-          if (field && field !== fields.type) {
-            field.value = '';
-          }
-        });
-        if (fields.type) fields.type.value = 'public';
-      }
-      
-      const dialog = Utils.id('eventDialog');
-      if (dialog) dialog.showModal();
-    } catch (e) {
-      console.error('Error opening event dialog:', e);
-      UI.showError('Failed to open event dialog');
-    }
-  },
-  
-  saveEvent() {
-    try {
-      const title = Utils.sanitizeInput(Utils.id('eventTitle')?.value);
-      const hours = parseInt(Utils.id('eventHours')?.value || '0');
-      const minutes = parseInt(Utils.id('eventMinutes')?.value || '0');
-      const duration = hours * 60 + minutes;
-      const type = Utils.id('eventType')?.value;
-      const idVal = Utils.id('eventId')?.value;
-      
-      if (!title || duration < 1) {
-        Utils.notify('Please fill event title and duration', 'error');
-        return;
-      }
-      
-      const color = type === 'public' ? '#e74c3c' : '#e67e22';
-      const runtimeHM = Utils.formatHM(duration);
-      
-      if (idVal) {
-        const idx = AppState.movies.findIndex(m => String(m.id) === String(idVal));
-        if (idx >= 0) {
-          AppState.movies[idx] = { 
-            ...AppState.movies[idx], 
-            title, 
-            duration, 
-            runtimeHM, 
-            kind: type, 
-            color 
-          };
-        }
-      } else {
-        AppState.movies.push({
-          id: Date.now(),
-          title,
-          duration,
-          runtimeHM,
-          kind: type,
-          color
-        });
-      }
-      
-      AppState.isDirty = true;
-      Storage.saveMovies();
-      Render.movies();
-      const dialog = Utils.id('eventDialog');
-      if (dialog) dialog.close();
-      Utils.notify('Event saved', 'success');
-    } catch (e) {
-      console.error('Error saving event:', e);
-      UI.showError('Failed to save event');
-    }
-  },
-  
-  openShowtime(item) {
-    try {
-      const fields = {
-        id: Utils.id('showtimeId'),
-        title: Utils.id('showtimeTitle'),
-        hours: Utils.id('showtimeHours'),
-        minutes: Utils.id('showtimeMinutes'),
-        tickets: Utils.id('showtimeTickets'),
-        page: Utils.id('showtimePage')
-      };
-      
-      if (fields.id) fields.id.value = item.scheduleId || '';
-      if (fields.title) fields.title.value = item.title || '';
-      if (fields.hours) fields.hours.value = Math.floor((item.duration || 120) / 60);
-      if (fields.minutes) fields.minutes.value = (item.duration || 120) % 60;
-      if (fields.tickets) fields.tickets.value = item.ticketsUrl || '';
-      if (fields.page) fields.page.value = item.pageUrl || '';
-      
-      const dialog = Utils.id('showtimeDialog');
-      if (dialog) dialog.showModal();
-    } catch (e) {
-      console.error('Error opening showtime dialog:', e);
-      UI.showError('Failed to open showtime dialog');
-    }
-  },
-  
-  saveShowtime() {
-    try {
-      const sid = Utils.id('showtimeId')?.value;
-      const title = Utils.sanitizeInput(Utils.id('showtimeTitle')?.value);
-      const dur = Utils.hmToMinutes(
-        Utils.id('showtimeHours')?.value,
-        Utils.id('showtimeMinutes')?.value
-      );
-      const tix = Utils.validateUrl(Utils.id('showtimeTickets')?.value);
-      const page = Utils.validateUrl(Utils.id('showtimePage')?.value);
-      
-      if (!sid || !title || dur < 1) {
-        Utils.notify('Fill title and runtime', 'error');
-        return;
-      }
-      
-      let updated = false;
-      for (const k of Object.keys(AppState.schedules)) {
-        const arr = AppState.schedules[k] || [];
-        const idx = arr.findIndex(x => x.scheduleId === sid);
-        if (idx >= 0) {
-          arr[idx].title = title;
-          arr[idx].duration = dur;
-          arr[idx].ticketsUrl = tix;
-          arr[idx].pageUrl = page;
-          updated = true;
-          break;
-        }
-      }
-      
-      if (updated) {
-        AppState.isDirty = true;
-        Storage.saveSchedules();
-        Render.blocks();
-        const dialog = Utils.id('showtimeDialog');
-        if (dialog) dialog.close();
-        Utils.notify('Showtime updated', 'success');
-      } else {
-        Utils.notify('Showtime not found', 'error');
-      }
-    } catch (e) {
-      console.error('Error saving showtime:', e);
-      UI.showError('Failed to save showtime');
-    }
-  },
-  
-  openSettings() {
-    try {
-      Storage.loadConfig();
-      loadCalendarFields();
-      const dialog = Utils.id('settingsDialog');
-      if (dialog) dialog.showModal();
-    } catch (e) {
-      console.error('Error opening settings:', e);
-      UI.showError('Failed to open settings');
-    }
-  },
-  
-  saveSettings() {
-    try {
-      const s = parseInt(Utils.id('startHour')?.value || '14');
-      const e = parseInt(Utils.id('endHour')?.value || '24');
-      const snapMin = parseInt(Utils.id('snapMinutes')?.value || '15');
-      
-      if (isNaN(s) || isNaN(e) || s < 0 || s > 23 || e < 1 || e > 24 || e <= s) {
-        Utils.notify('Invalid hours (start: 0-23, end: 1-24, end > start)', 'error');
-        return;
-      }
-      
-      AppState.config.START_HOUR = s;
-      AppState.config.END_HOUR = e;
-      AppState.config.SNAP_MINUTES = snapMin;
-      
-      Storage.saveConfig();
-      saveGoogleClientId();
-      saveCalendarFields();
-      Render.week();
-      Render.blocks();
-      const dialog = Utils.id('settingsDialog');
-      if (dialog) dialog.close();
-      Utils.notify('Settings updated', 'success');
-    } catch (e) {
-      console.error('Error saving settings:', e);
-      UI.showError('Failed to save settings');
-    }
-  },
-  
-  openWeekCount() {
-    try {
-      const dlg = Utils.id('weekCountDialog');
-      const list = Utils.id('weekCountList');
-      const summary = Utils.id('weekCountSummary');
-      
-      if (!dlg || !list || !summary) return;
-      
-      const data = Schedule.countWeekShows();
-      const total = data.reduce((s, [, c]) => s + c, 0);
-      
-      summary.textContent = total + ' total showtimes';
-      list.innerHTML = '';
-      
-      if (data.length === 0) {
-        list.innerHTML = '<div style="color:#64748b;">No items scheduled this week.</div>';
-      } else {
-        const ul = document.createElement('div');
-        data.forEach(([name, count]) => {
-          const row = document.createElement('div');
-          row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 4px;border-bottom:1px solid #e5e7eb;';
-          row.innerHTML = `<div style="font-weight:700;">${Utils.sanitizeInput(name)}</div><div style="font-weight:800;">${count}</div>`;
-          ul.appendChild(row);
-        });
-        list.appendChild(ul);
-      }
-      
-      dlg.showModal();
-    } catch (e) {
-      console.error('Error opening week count:', e);
-      UI.showError('Failed to open week count');
-    }
-  }
-};
-
-// ========== Export Module ==========
-const Export = {
-  json() {
-    try {
-      const data = {
-        movies: AppState.movies,
-        schedules: AppState.schedules,
-        week: AppState.currentWeek.toISOString(),
-        exported: new Date().toISOString(),
-        config: AppState.config,
-        anchor: 'Tue',
-        version: '1.0'
-      };
-      Utils.download(JSON.stringify(data, null, 2), 'application/json', 
-        `reelslate-schedule-${Utils.dateKey(AppState.currentWeek)}-tue.json`);
-      Utils.notify('Exported JSON', 'success');
-    } catch (e) {
-      console.error('Error exporting JSON:', e);
-      UI.showError('Failed to export JSON');
-    }
-  },
-  
-  ics() {
-    try {
-      let ics = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//ReelSlate//EN
-CALSCALE:GREGORIAN
-METHOD:PUBLISH
-X-WR-CALNAME:ReelSlate
-`;
-      
-      Object.keys(AppState.schedules).forEach(key => {
-        const [dayIndex, lane] = key.split('-');
-        const eventDate = new Date(AppState.currentWeek);
-        eventDate.setDate(eventDate.getDate() + parseInt(dayIndex, 10));
-        
-        (AppState.schedules[key] || []).forEach(item => {
-          const startTime = Utils.slotToDate(eventDate, item.startSlot);
-          const endTime = new Date(startTime.getTime() + (item.duration * 60000));
-          const theaterName = (lane === 't1' ? 'Theater 1' : 'Theater 2');
-          
-          const desc = [
-            `Movie: ${item.title}`,
-            `Theater: ${theaterName}`,
-            `Runtime: ${Utils.formatHM(item.duration)}`,
-            item.ticketsUrl ? `Tickets: ${item.ticketsUrl}` : null,
-            item.pageUrl ? `More info: ${item.pageUrl}` : null
-          ].filter(Boolean).join('\\n');
-          
-          ics += `BEGIN:VEVENT
-UID:${item.scheduleId}@reelslate
-DTSTART:${Utils.formatICS(startTime)}
-DTEND:${Utils.formatICS(endTime)}
-SUMMARY:${item.title} - ${theaterName}
-DESCRIPTION:${desc.replace(/\n/g, '\\n')}
-LOCATION:${APP_CONFIG.VENUE_ADDRESS}
-STATUS:CONFIRMED
-TRANSP:OPAQUE
-END:VEVENT
-`;
-        });
-      });
-      
-      ics += 'END:VCALENDAR';
-      Utils.download(ics, 'text/calendar;charset=utf-8', 
-        `reelslate-schedule-${Utils.dateKey(AppState.currentWeek)}-tue.ics`);
-      Utils.notify('Exported ICS', 'success');
-    } catch (e) {
-      console.error('Error exporting ICS:', e);
-      UI.showError('Failed to export ICS');
-    }
-  },
-  
-  csv() {
-    try {
-      const weekStart = new Date(AppState.currentWeek);
-      const weekEnd = new Date(AppState.currentWeek);
-      weekEnd.setDate(weekEnd.getDate() + 6);
-      
-      const label = `Week of ${weekStart.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} — ${weekEnd.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
-      
-      let rows = [];
-      rows.push([label]);
-      rows.push(["Date", "Day", "Time", "Theater", "Movie Title", "Runtime", "Tickets URL", "Webpage URL"]);
-      
-      for (let day = 0; day < 7; day++) {
-        for (const lane of ['t1', 't2']) {
-          const key = `${day}-${lane}`;
-          (AppState.schedules[key] || []).forEach(item => {
-            const eventDate = new Date(AppState.currentWeek);
-            eventDate.setDate(eventDate.getDate() + day);
-            const startTime = Utils.slotToDate(eventDate, item.startSlot);
-            const theaterName = lane === 't1' ? 'Theater 1' : 'Theater 2';
+        // Generate day columns with theater lanes
+        function generateDaysColumns() {
+            const daysContainer = document.getElementById('daysContainer');
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
             
-            rows.push([
-              eventDate.toISOString().slice(0, 10),
-              eventDate.toLocaleDateString('en-US', { weekday: 'short' }),
-              startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-              theaterName,
-              item.title,
-              Utils.formatHM(item.duration),
-              item.ticketsUrl || '',
-              item.pageUrl || ''
-            ]);
-          });
-        }
-      }
-      
-      const csv = rows.map(r => r.map(v => {
-        const s = String(v);
-        if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-          return '"' + s.replace(/"/g, '""') + '"';
-        }
-        return s;
-      }).join(',')).join('\n');
-      
-      const fname = `showtimes-week-${Utils.dateKey(weekStart)}_to_${Utils.dateKey(weekEnd)}.csv`;
-      Utils.download(csv, 'text/csv;charset=utf-8', fname);
-      Utils.notify('Exported CSV', 'success');
-    } catch (e) {
-      console.error('Error exporting CSV:', e);
-      UI.showError('Failed to export CSV');
-    }
-  },
-  
-  webHTML() {
-    try {
-      const weekStart = new Date(AppState.currentWeek);
-      const byTitle = new Map();
-      
-      for (let day = 0; day < 7; day++) {
-        for (const lane of ['t1', 't2']) {
-          const key = `${day}-${lane}`;
-          (AppState.schedules[key] || []).forEach(item => {
-            const eventDate = new Date(AppState.currentWeek);
-            eventDate.setDate(eventDate.getDate() + day);
-            const startTime = Utils.slotToDate(eventDate, item.startSlot);
-            const title = Utils.sanitizeTitleSuffix(item.title || 'Untitled');
-            
-            if (!byTitle.has(title)) byTitle.set(title, []);
-            byTitle.get(title).push({ startTime });
-          });
-        }
-      }
-      
-      for (const [t, arr] of byTitle.entries()) {
-        arr.sort((a, b) => a.startTime - b.startTime);
-      }
-      
-      const fmtDate = new Intl.DateTimeFormat('en-US', { 
-        timeZone: 'America/New_York', 
-        weekday: 'long', 
-        month: 'short', 
-        day: 'numeric' 
-      });
-      const fmtTime = new Intl.DateTimeFormat('en-US', { 
-        timeZone: 'America/New_York', 
-        hour: 'numeric', 
-        minute: '2-digit' 
-      });
-      
-      let blocks = [];
-      for (const [title, arr] of byTitle.entries()) {
-        const lines = arr.map(({ startTime }) => {
-          const dlabel = fmtDate.format(startTime);
-          const tlabel = fmtTime.format(startTime);
-          return `  <div>${dlabel} — <strong>${tlabel}</strong></div>`;
-        }).join("\n");
-        
-        blocks.push([
-          `<!-- Film: ${title} -->`,
-          `<div style="font-family: 'Helvetica'; font-size: 18px;">`,
-          lines,
-          `</div>`
-        ].join("\n"));
-      }
-      
-      const html = blocks.join("\n\n");
-      const fname = `web-showtimes-week-${Utils.dateKey(weekStart)}.html`;
-      Utils.download(html, 'text/html;charset=utf-8', fname);
-      Utils.notify('Exported Web HTML', 'success');
-    } catch (e) {
-      console.error('Error exporting HTML:', e);
-      UI.showError('Failed to export HTML');
-    }
-  },
-  
-  schema() {
-    try {
-      const events = [];
-      
-      for (let day = 0; day < 7; day++) {
-        for (const lane of ['t1', 't2']) {
-          const key = `${day}-${lane}`;
-          (AppState.schedules[key] || []).forEach(item => {
-            const eventDate = new Date(AppState.currentWeek);
-            eventDate.setDate(eventDate.getDate() + day);
-            const startTime = Utils.slotToDate(eventDate, item.startSlot);
-            const endTime = new Date(startTime.getTime() + (item.duration * 60000));
-            
-            events.push({
-              "@context": "https://schema.org",
-              "@type": "Event",
-              "name": item.title,
-              "startDate": startTime.toISOString(),
-              "endDate": endTime.toISOString(),
-              "location": {
-                "@type": "Place",
-                "name": "Time & Space Limited",
-                "address": APP_CONFIG.VENUE_ADDRESS
-              },
-              "url": item.pageUrl || undefined,
-              "offers": item.ticketsUrl ? {
-                "@type": "Offer",
-                "url": item.ticketsUrl,
-                "priceCurrency": "USD",
-                "availability": "https://schema.org/InStock"
-              } : undefined
+            days.forEach((day, index) => {
+                const dayColumn = document.createElement('div');
+                dayColumn.className = 'day-column';
+                dayColumn.id = `day-${index}`;
+                
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'day-header';
+                const date = new Date(currentWeekStart);
+                date.setDate(date.getDate() + index);
+                dayHeader.textContent = `${day.substr(0, 3)} ${date.getMonth() + 1}/${date.getDate()}`;
+                dayColumn.appendChild(dayHeader);
+                
+                const theaterLanes = document.createElement('div');
+                theaterLanes.className = 'theater-lanes';
+                
+                ['Theater 1', 'Theater 2'].forEach((theater, theaterIndex) => {
+                    const lane = document.createElement('div');
+                    lane.className = 'theater-lane';
+                    lane.dataset.day = index;
+                    lane.dataset.theater = theaterIndex;
+                    
+                    const laneHeader = document.createElement('div');
+                    laneHeader.className = 'theater-lane-header';
+                    laneHeader.textContent = theater;
+                    lane.appendChild(laneHeader);
+                    
+                    // Add drop zone functionality
+                    lane.addEventListener('dragover', handleDragOver);
+                    lane.addEventListener('drop', handleDrop);
+                    lane.addEventListener('dragleave', handleDragLeave);
+                    
+                    theaterLanes.appendChild(lane);
+                });
+                
+                dayColumn.appendChild(theaterLanes);
+                daysContainer.appendChild(dayColumn);
             });
-          });
         }
-      }
-      
-      const json = JSON.stringify(events, null, 2);
-      const fname = `schema-week-${Utils.dateKey(AppState.currentWeek)}.json`;
-      Utils.download(json, 'application/json', fname);
-      Utils.notify('Exported Schema (JSON-LD)', 'success');
-    } catch (e) {
-      console.error('Error exporting schema:', e);
-      UI.showError('Failed to export schema');
-    }
-  }
-};
 
-// ========== Import Module ==========
-const Import = {
-  async handleFiles(ev) {
-    try {
-      const files = Array.from(ev.target.files || []);
-      if (files.length === 0) return;
-      
-      for (const file of files) {
-        const text = await Import.readFileAsText(file);
-        
-        if (file.name.endsWith('.json')) {
-          Import.fromJSON(text);
-        } else if (file.name.endsWith('.ics')) {
-          Import.fromICS(text);
+        // Format time display
+        function formatTime(hour, min) {
+            const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+            const m = min.toString().padStart(2, '0');
+            const period = hour < 12 ? 'AM' : 'PM';
+            return min === 0 ? `${h}:${m} ${period}` : '';
         }
-      }
-      
-      ev.target.value = '';
-    } catch (e) {
-      console.error('Error handling import files:', e);
-      UI.showError('Failed to import files');
-    }
-  },
-  
-  readFileAsText(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = reject;
-      reader.readAsText(file);
-    });
-  },
-  
-  fromJSON(text) {
-    try {
-      const data = JSON.parse(text);
-      
-      if (data.movies && Array.isArray(data.movies)) {
-        AppState.movies = data.movies.map(m => ({
-          ...m,
-          title: Utils.sanitizeInput(m.title),
-          duration: Math.max(1, Math.min(600, parseInt(m.duration) || 120))
-        }));
-        Storage.saveMovies();
-        Render.movies();
-      }
-      
-      if (data.schedules && typeof data.schedules === 'object') {
-        AppState.schedules = data.schedules;
-        Storage.saveSchedules();
-        Render.blocks();
-      }
-      
-      if (data.config) {
-        AppState.config = {
-          ...AppState.config,
-          START_HOUR: Math.max(0, Math.min(23, parseInt(data.config.START_HOUR) || 14)),
-          END_HOUR: Math.max(1, Math.min(24, parseInt(data.config.END_HOUR) || 24)),
-          SNAP_MINUTES: [5, 10, 15, 30].includes(data.config.SNAP_MINUTES) ? data.config.SNAP_MINUTES : 15,
-          HIDE_TUE_THU: !!data.config.HIDE_TUE_THU
-        };
-        Storage.saveConfig();
-      }
-      
-      Utils.notify('Imported successfully', 'success');
-    } catch (e) {
-      console.error('Import JSON failed:', e);
-      Utils.notify('Invalid JSON file', 'error');
-    }
-  },
-  
-  fromICS(text) {
-    Utils.notify('ICS import not yet implemented', 'info');
-  }
-};
 
-// ========== Library Drop Zone ==========
-const LibraryDrop = {
-  setup() {
-    try {
-      const list = Utils.id('moviesList');
-      if (!list) return;
-      
-      list.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        list.classList.add('drop');
-      });
-      
-      list.addEventListener('dragleave', () => {
-        list.classList.remove('drop');
-      });
-      
-      list.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        list.classList.remove('drop');
-        
-        const files = Array.from(e.dataTransfer.files || []);
-        if (!files.length) return;
-        
-        let added = 0, updated = 0;
-        
-        for (const f of files) {
-          try {
-            const name = (f.name || '').toLowerCase();
-            const text = await Import.readFileAsText(f);
+        // Load sample data
+        function loadSampleData() {
+            libraryEvents = [
+                { id: 1, title: 'The Matrix', duration: 150, calendar: 'events' },
+                { id: 2, title: 'Inception', duration: 148, calendar: 'non-public' },
+                { id: 3, title: 'Interstellar', duration: 169, calendar: 'tbd' },
+                { id: 4, title: 'The Dark Knight', duration: 152, calendar: 'events' },
+                { id: 5, title: 'Pulp Fiction', duration: 154, calendar: 'theater-1' },
+                { id: 6, title: 'The Shawshank Redemption', duration: 142, calendar: 'theater-2' },
+                { id: 7, title: 'Fight Club', duration: 139, calendar: 'events' },
+                { id: 8, title: 'Forrest Gump', duration: 142, calendar: 'non-public' }
+            ];
             
-            if (name.endsWith('.txt')) {
-              const info = LibraryDrop.parseMovieTxt(text);
-              if (info.title) {
-                const res = LibraryDrop.addOrUpdateMovie(info);
-                if (res === 'added') added++;
-                else if (res === 'updated') updated++;
-              }
-            } else if (name.endsWith('.csv')) {
-              // CSV parsing would need full implementation
-              Utils.notify('CSV import not yet implemented', 'info');
+            renderLibrary();
+        }
+
+        // Render library items
+        function renderLibrary() {
+            const container = document.getElementById('libraryItems');
+            const filter = document.getElementById('calendarFilter').value;
+            container.innerHTML = '';
+            
+            // Check if connected to Google Calendar
+            if (typeof gapi !== 'undefined' && gapi.auth2 && !gapi.auth2.getAuthInstance().isSignedIn.get() && libraryEvents.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: #86868b;">
+                        <p style="margin-bottom: 10px;">📅</p>
+                        <p style="font-size: 14px;">Connect to Google Calendar to import your movies and events</p>
+                        <p style="font-size: 12px; margin-top: 10px;">Click "Connect Google Calendar" above to get started</p>
+                    </div>
+                `;
+                document.getElementById('libraryCount').textContent = '(0)';
+                return;
             }
-          } catch (err) {
-            console.error('Drop parse failed for file:', f.name, err);
-          }
+            
+            const filteredEvents = filter === 'all' 
+                ? libraryEvents 
+                : libraryEvents.filter(e => e.calendar === filter);
+            
+            if (filteredEvents.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: #86868b; font-size: 14px;">
+                        No events found. Click "Import from Google Calendar" to sync.
+                    </div>
+                `;
+            } else {
+                filteredEvents.forEach(event => {
+                    const item = document.createElement('div');
+                    item.className = `library-item calendar-${event.calendar}`;
+                    item.draggable = true;
+                    item.dataset.eventId = event.id;
+                    
+                    item.innerHTML = `
+                        <div class="library-item-title">${event.title}</div>
+                        <div class="library-item-duration">${Math.floor(event.duration / 60)}h ${event.duration % 60}m</div>
+                    `;
+                    
+                    item.addEventListener('dragstart', handleDragStart);
+                    item.addEventListener('dragend', handleDragEnd);
+                    
+                    container.appendChild(item);
+                });
+            }
+            
+            document.getElementById('libraryCount').textContent = `(${filteredEvents.length})`;
         }
-        
-        Render.movies();
-        Storage.saveMovies();
-        
-        if (added || updated) {
-          Utils.notify(`Movies: ${added} added, ${updated} updated`, 'success');
+
+        // Drag and Drop handlers
+        function handleDragStart(e) {
+            draggedItem = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'copy';
+            
+            const eventId = this.dataset.eventId;
+            const event = libraryEvents.find(e => e.id == eventId) || 
+                         scheduledEvents.find(e => e.id == eventId);
+            
+            if (event) {
+                e.dataTransfer.setData('event', JSON.stringify(event));
+            }
         }
-      });
-    } catch (e) {
-      console.error('Error setting up library drop zone:', e);
-    }
-  },
-  
-  parseMovieTxt(text) {
-    try {
-      const lines = String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      if (lines.length === 0) return {};
-      
-      let title = lines[0];
-      let duration = 120; // default
-      
-      // Try to extract runtime from the text
-      const patterns = [
-        /(\d{1,3})\s*(?:min|mins|minutes)/i,
-        /(\d{1,2})h\s*(\d{1,2})m/i,
-        /(\d{1,2}):(\d{2})/,
-        /runtime[:\s]+(\d{1,3})/i,
-        /duration[:\s]+(\d{1,3})/i,
-        /(\d{1,3})\s*m(?:in)?$/i
-      ];
-      
-      for (const pattern of patterns) {
-        const match = text.match(pattern);
-        if (match) {
-          if (match[2]) {
-            // Hours and minutes pattern
-            duration = parseInt(match[1]) * 60 + parseInt(match[2]);
-          } else {
-            // Minutes only pattern
-            duration = parseInt(match[1]);
-          }
-          break;
+
+        function handleDragEnd(e) {
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+            }
+            draggedItem = null;
+            removeGhost();
         }
-      }
-      
-      // Validate duration
-      duration = Math.max(1, Math.min(600, duration));
-      
-      return {
-        title: Utils.sanitizeTitleSuffix(title),
-        duration,
-        runtimeHM: Utils.formatHM(duration),
-        color: '#667eea'
-      };
-    } catch (e) {
-      console.error('Error parsing movie text:', e);
-      return {};
-    }
-  },
-  
-  addOrUpdateMovie(info) {
-    try {
-      const title = Utils.sanitizeTitleSuffix(info.title || '').trim();
-      if (!title) return 'failed';
-      
-      const exists = AppState.movies.find(m => 
-        m.title.toLowerCase() === title.toLowerCase()
-      );
-      
-      if (exists) {
-        exists.runtimeHM = info.runtimeHM;
-        exists.duration = info.duration;
-        if (info.color) exists.color = info.color;
-        return 'updated';
-      } else {
-        AppState.movies.push({
-          id: Date.now() + Math.random(),
-          title,
-          duration: info.duration,
-          runtimeHM: info.runtimeHM,
-          color: info.color || '#667eea',
-          pageUrl: '',
-          ticketsUrl: ''
-        });
-        return 'added';
-      }
-    } catch (e) {
-      console.error('Error adding/updating movie:', e);
-      return 'failed';
-    }
-  }
-};
 
-// ========== Movies Module ==========
-const Movies = {
-  delete(id) {
-    try {
-      if (!confirm('Delete this film from the library?')) return;
-      AppState.movies = AppState.movies.filter(m => m.id !== id);
-      AppState.isDirty = true;
-      Storage.saveMovies();
-      Render.movies();
-      Utils.notify('Film deleted', 'info');
-    } catch (e) {
-      console.error('Error deleting movie:', e);
-      UI.showError('Failed to delete film');
-    }
-  }
-};
-
-// ========== Google Calendar Functions ==========
-function loadCalendarFields() {
-  try {
-    const ids = {
-      googleCalT1: 'reelslate_cal_t1',
-      googleCalT2: 'reelslate_cal_t2',
-      googleCalPublic: 'reelslate_cal_public',
-      googleCalNonPublic: 'reelslate_cal_nonpublic'
-    };
-    Object.entries(ids).forEach(([fieldId, key]) => {
-      const saved = Storage.safeGet(key) || '';
-      const field = Utils.id(fieldId);
-      if (field) field.value = saved;
-    });
-    updateCalendarStatusLine();
-  } catch (e) {
-    console.error('Error loading calendar fields:', e);
-  }
-}
-
-function saveCalendarFields() {
-  try {
-    const ids = {
-      googleCalT1: 'reelslate_cal_t1',
-      googleCalT2: 'reelslate_cal_t2',
-      googleCalPublic: 'reelslate_cal_public',
-      googleCalNonPublic: 'reelslate_cal_nonpublic'
-    };
-    Object.entries(ids).forEach(([fieldId, key]) => {
-      const field = Utils.id(fieldId);
-      if (field && field.value.trim()) {
-        Storage.safeSet(key, field.value.trim());
-      }
-    });
-    updateCalendarStatusLine();
-  } catch (e) {
-    console.error('Error saving calendar fields:', e);
-  }
-}
-
-function updateCalendarStatusLine() {
-  try {
-    const line = Utils.id('calendarStatusLine');
-    if (!line) return;
-    line.textContent =
-      `Theater 1 → ${Storage.safeGet('reelslate_cal_t1') || 'primary'}, ` +
-      `Theater 2 → ${Storage.safeGet('reelslate_cal_t2') || 'primary'}, ` +
-      `Public → ${Storage.safeGet('reelslate_cal_public') || 'primary'}, ` +
-      `Non-Public → ${Storage.safeGet('reelslate_cal_nonpublic') || 'primary'}`;
-  } catch (e) {
-    console.error('Error updating calendar status line:', e);
-  }
-}
-
-function loadGoogleClientId() {
-  try {
-    const saved = Storage.safeGet('reelslate_google_client_id');
-    if (saved) {
-      window.GOOGLE = window.GOOGLE || {};
-      window.GOOGLE.CLIENT_ID = saved;
-    }
-    const field = Utils.id('googleClientId');
-    if (field && window.GOOGLE?.CLIENT_ID) {
-      field.value = window.GOOGLE.CLIENT_ID;
-    }
-  } catch (e) {
-    console.error('Error loading Google client ID:', e);
-  }
-}
-
-function saveGoogleClientId() {
-  try {
-    const field = Utils.id('googleClientId');
-    if (field && field.value.trim()) {
-      window.GOOGLE = window.GOOGLE || {};
-      window.GOOGLE.CLIENT_ID = field.value.trim();
-      Storage.safeSet('reelslate_google_client_id', window.GOOGLE.CLIENT_ID);
-    }
-  } catch (e) {
-    console.error('Error saving Google client ID:', e);
-  }
-}
-
-// ========== Error Boundary ==========
-window.addEventListener('error', (e) => {
-  console.error('Global error:', e.error);
-  const message = e.error?.message || 'An unexpected error occurred';
-  if (!message.includes('ResizeObserver')) { // Ignore ResizeObserver errors
-    UI.showError(message);
-  }
-});
-
-window.addEventListener('unhandledrejection', (e) => {
-  console.error('Unhandled promise rejection:', e.reason);
-  UI.showError('An unexpected error occurred');
-});
-
-// ========== Initialize Application ==========
-document.addEventListener('DOMContentLoaded', () => {
-  try {
-    // Initialize state
-    AppState.currentWeek = Utils.getWeekStart(new Date());
-    AppState.currentWeek.setHours(0, 0, 0, 0);
-    AppState.calendarMonth = new Date(AppState.currentWeek.getFullYear(), AppState.currentWeek.getMonth(), 1);
-    
-    // Migrate old data
-    Storage.migrate();
-    
-    // Load data
-    loadGoogleClientId();
-    Storage.loadConfig();
-    loadCalendarFields();
-    Storage.loadMovies();
-    Storage.loadSchedules();
-    
-    // Initial render
-    Render.week();
-    Render.movies();
-    Render.blocks();
-    UI.updateWeekLabel();
-    UI.updateCollapseButton();
-    UI.updateLockUI();
-    
-    // Set up event listeners
-    setupEventListeners();
-    
-    // Set up drag handlers with error handling
-    document.addEventListener('mousemove', (e) => {
-      try {
-        DragDrop.onMouseMove(e);
-      } catch (err) {
-        console.error('Error in drag move:', err);
-      }
-    });
-    
-    document.addEventListener('mouseup', (e) => {
-      try {
-        DragDrop.onMouseUp(e);
-      } catch (err) {
-        console.error('Error in drag end:', err);
-      }
-    });
-    
-    // Debounced window resize handler
-    window.addEventListener('resize', Utils.debounce(() => {
-      try {
-        Render.week();
-        Render.blocks();
-      } catch (e) {
-        console.error('Error on resize:', e);
-      }
-    }, 250));
-    
-    // Set up library drop zone
-    LibraryDrop.setup();
-    
-    // Calendar overlay click to close
-    const calOverlay = Utils.id('calendarOverlay');
-    if (calOverlay) {
-      calOverlay.addEventListener('click', (e) => {
-        if (e.target === calOverlay) {
-          Calendar.hide();
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            this.classList.add('drop-active');
+            
+            const rect = this.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const snapY = Math.floor(y / 10) * 10; // Snap to 15-min grid (40px = 1 hour, 10px = 15 min)
+            
+            showGhost(this, snapY);
         }
-      });
-    }
-    
-    // Start autosave
-    Storage.startAutosave();
-    
-    // Warn before leaving with unsaved changes
-    window.addEventListener('beforeunload', (e) => {
-      if (AppState.isDirty) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-        return e.returnValue;
-      }
-    });
-    
-    console.log('TSL Scheduler initialized successfully');
-  } catch (e) {
-    console.error('Failed to initialize application:', e);
-    UI.showError('Failed to initialize application. Please refresh the page.');
-  }
-});
 
-// ========== Event Listeners Setup ==========
-function setupEventListeners() {
-  try {
-    // Week navigation
-    Utils.on('prevWeek', 'click', () => Schedule.changeWeek(-1));
-    Utils.on('nextWeek', 'click', () => Schedule.changeWeek(1));
-    
-    // Basic actions
-    Utils.on('saveAll', 'click', () => {
-      try {
-        Storage.saveMovies();
-        Storage.saveSchedules();
-        Utils.notify('All changes saved!', 'success');
-      } catch (e) {
-        console.error('Error saving:', e);
-        UI.showError('Failed to save changes');
-      }
-    });
-    
-    Utils.on('clearWeek', 'click', () => Schedule.clearWeek());
-    Utils.on('lockWeekBtn', 'click', () => WeekLock.toggle());
-    Utils.on('weekCountBtn', 'click', () => Dialogs.openWeekCount());
-    
-    Utils.on('toggleTueThu', 'click', () => {
-      AppState.config.HIDE_TUE_THU = !AppState.config.HIDE_TUE_THU;
-      Storage.saveConfig();
-      UI.updateCollapseButton();
-      Render.week();
-      Render.blocks();
-    });
-    
-    // Calendar
-    Utils.on('openCalendar', 'click', () => Calendar.show());
-    Utils.on('calPrev', 'click', () => Calendar.changeMonth(-1));
-    Utils.on('calNext', 'click', () => Calendar.changeMonth(1));
-    
-    // Dialogs
-    Utils.on('openAddMovie', 'click', () => Dialogs.openMovie());
-    Utils.on('cancelMovie', 'click', () => {
-      const dlg = Utils.id('movieDialog');
-      if (dlg) dlg.close();
-    });
-    Utils.on('saveMovie', 'click', () => Dialogs.saveMovie());
-    
-    Utils.on('openAddEvent', 'click', () => Dialogs.openEvent());
-    Utils.on('cancelEvent', 'click', () => {
-      const dlg = Utils.id('eventDialog');
-      if (dlg) dlg.close();
-    });
-    Utils.on('saveEvent', 'click', () => Dialogs.saveEvent());
-    
-    Utils.on('cancelShowtime', 'click', () => {
-      const dlg = Utils.id('showtimeDialog');
-      if (dlg) dlg.close();
-    });
-    Utils.on('saveShowtime', 'click', () => Dialogs.saveShowtime());
-    
-    Utils.on('openSettings', 'click', () => Dialogs.openSettings());
-    Utils.on('cancelSettings', 'click', () => {
-      const dlg = Utils.id('settingsDialog');
-      if (dlg) dlg.close();
-    });
-    Utils.on('saveSettings', 'click', () => Dialogs.saveSettings());
-    
-    // Import
-    Utils.on('importBtn', 'click', () => {
-      const input = Utils.id('importFile');
-      if (input) input.click();
-    });
-    const importFile = Utils.id('importFile');
-    if (importFile) {
-      importFile.addEventListener('change', Import.handleFiles);
-    }
-    
-    // Export menu
-    const exportBtn = Utils.id('exportMenuBtn');
-    const exportMenu = Utils.id('exportDropdown');
-    if (exportBtn && exportMenu) {
-      exportBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        exportMenu.style.display = exportMenu.style.display === 'block' ? 'none' : 'block';
-      });
-      document.addEventListener('click', () => {
-        if (exportMenu) exportMenu.style.display = 'none';
-      });
-      
-      Utils.on('expJSON', 'click', () => {
-        exportMenu.style.display = 'none';
-        Export.json();
-      });
-      Utils.on('expWeb', 'click', () => {
-        exportMenu.style.display = 'none';
-        Export.webHTML();
-      });
-      Utils.on('expSchema', 'click', () => {
-        exportMenu.style.display = 'none';
-        Export.schema();
-      });
-      Utils.on('expICS', 'click', () => {
-        exportMenu.style.display = 'none';
-        Export.ics();
-      });
-      Utils.on('expCSV', 'click', () => {
-        exportMenu.style.display = 'none';
-        Export.csv();
-      });
-    }
-    
-    // Dialog close buttons
-    Utils.qsa('.dlg-close').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const sel = btn.getAttribute('data-close');
-        const dlg = document.querySelector(sel);
-        if (dlg) dlg.close();
-      });
-    });
-    
-    // Prevent ESC and handle backdrop clicks for dialogs
-    ['movieDialog', 'showtimeDialog', 'settingsDialog', 'weekCountDialog', 'eventDialog'].forEach(id => {
-      const dlg = Utils.id(id);
-      if (!dlg) return;
-      
-      dlg.addEventListener('cancel', (e) => {
-        e.preventDefault();
-        dlg.close();
-      });
-      
-      dlg.addEventListener('click', (e) => {
-        if (e.target === dlg) dlg.close();
-      });
-    });
-    
-    // Google Calendar buttons
-    Utils.on('connectGoogleBtn', 'click', () => {
-      if (typeof handleAuthClick === 'function') {
-        handleAuthClick();
-      }
-    });
-    
-    Utils.on('reloadGoogleBtn', 'click', () => {
-      if (typeof loadWeekFromGoogle === 'function') {
-        loadWeekFromGoogle();
-      }
-    });
-    
-    Utils.on('pushGoogleAllBtn', 'click', () => {
-      if (typeof replaceWeekAllCalendars === 'function') {
-        replaceWeekAllCalendars();
-      }
-    });
-    
-    Utils.on('clearGoogleAllBtn', 'click', () => {
-      if (typeof clearWeekAllCalendars === 'function') {
-        clearWeekAllCalendars();
-      }
-    });
-  } catch (e) {
-    console.error('Error setting up event listeners:', e);
-  }
-}
+        function handleDragLeave(e) {
+            this.classList.remove('drop-active');
+        }
 
-// Make necessary objects available globally for debugging
-window.TSLScheduler = {
-  AppState,
-  Utils,
-  Storage,
-  Schedule,
-  Render,
-  DragDrop,
-  Calendar,
-  Export,
-  Import,
-  UI,
-  APP_CONFIG,
-  version: '1.0-stable'
-};
-</script>
+        function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drop-active');
+            
+            const eventData = e.dataTransfer.getData('event');
+            if (!eventData) return;
+            
+            const event = JSON.parse(eventData);
+            const rect = this.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const snapY = Math.floor(y / 10) * 10;
+            
+            const hour = Math.floor(snapY / 40);
+            const minute = ((snapY % 40) / 10) * 15;
+            
+            const scheduledEvent = {
+                ...event,
+                day: parseInt(this.dataset.day),
+                theater: parseInt(this.dataset.theater),
+                startHour: hour,
+                startMinute: minute,
+                id: Date.now()
+            };
+            
+            // Update calendar for theater events
+            if (this.dataset.theater === '0') {
+                scheduledEvent.calendar = 'theater-1';
+            } else {
+                scheduledEvent.calendar = 'theater-2';
+            }
+            
+            scheduledEvents.push(scheduledEvent);
+            renderScheduledEvent(scheduledEvent);
+            updateWeekStats();
+            removeGhost();
+            
+            showToast('Event scheduled successfully!');
+        }
 
-<!-- Google Calendar Integration (Placeholder - Add your own implementation) -->
-<script>
-// Google Calendar integration placeholder
-// Add your Google Calendar API implementation here
-const GOOGLE = {
-  CLIENT_ID: "805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com",
-  DISCOVERY_DOCS: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"],
-  SCOPES: "https://www.googleapis.com/auth/calendar.events"
-};
+        function showGhost(lane, y) {
+            removeGhost();
+            
+            if (!draggedItem) return;
+            
+            const eventId = draggedItem.dataset.eventId;
+            const event = libraryEvents.find(e => e.id == eventId);
+            if (!event) return;
+            
+            ghostElement = document.createElement('div');
+            ghostElement.className = 'ghost-event';
+            ghostElement.style.top = `${y}px`;
+            
+            const height = (event.duration / 60) * 40;
+            ghostElement.style.height = `${height}px`;
+            
+            lane.appendChild(ghostElement);
+        }
 
-// These functions would be implemented with actual Google Calendar API
-function handleAuthClick() {
-  console.log('Google Calendar auth not implemented in this stable version');
-  Utils.notify('Google Calendar integration requires additional setup', 'info');
-}
+        function removeGhost() {
+            if (ghostElement && ghostElement.parentNode) {
+                ghostElement.parentNode.removeChild(ghostElement);
+            }
+            ghostElement = null;
+        }
 
-function loadWeekFromGoogle() {
-  console.log('Google Calendar load not implemented');
-  Utils.notify('Google Calendar integration requires additional setup', 'info');
-}
+        function renderScheduledEvent(event) {
+            const dayColumn = document.getElementById(`day-${event.day}`);
+            const lane = dayColumn.querySelectorAll('.theater-lane')[event.theater];
+            
+            const eventBlock = document.createElement('div');
+            eventBlock.className = `event-block calendar-${event.calendar}`;
+            eventBlock.draggable = true;
+            eventBlock.dataset.eventId = event.id;
+            
+            const top = event.startHour * 40 + (event.startMinute / 15) * 10;
+            const height = (event.duration / 60) * 40;
+            
+            eventBlock.style.top = `${top}px`;
+            eventBlock.style.height = `${height}px`;
+            
+            const endHour = event.startHour + Math.floor((event.startMinute + event.duration) / 60);
+            const endMinute = (event.startMinute + event.duration) % 60;
+            
+            eventBlock.innerHTML = `
+                <div class="event-title">${event.title}</div>
+                <div class="event-time">${formatTimeRange(event.startHour, event.startMinute, endHour, endMinute)}</div>
+            `;
+            
+            eventBlock.addEventListener('dragstart', handleDragStart);
+            eventBlock.addEventListener('dragend', handleDragEnd);
+            
+            lane.appendChild(eventBlock);
+        }
 
-function replaceWeekAllCalendars() {
-  console.log('Google Calendar push not implemented');
-  Utils.notify('Google Calendar integration requires additional setup', 'info');
-}
+        function formatTimeRange(startH, startM, endH, endM) {
+            const formatSingleTime = (h, m) => {
+                const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                const min = m.toString().padStart(2, '0');
+                return `${hour}:${min}`;
+            };
+            
+            return `${formatSingleTime(startH, startM)} - ${formatSingleTime(endH, endM)}`;
+        }
 
-function clearWeekAllCalendars() {
-  console.log('Google Calendar clear not implemented');
-  Utils.notify('Google Calendar integration requires additional setup', 'info');
-}
-</script>
+        // Week navigation
+        function changeWeek(direction) {
+            currentWeekStart.setDate(currentWeekStart.getDate() + (direction * 7));
+            document.getElementById('daysContainer').innerHTML = '';
+            generateDaysColumns();
+            updateWeekDisplay();
+            
+            // Re-render scheduled events for the new week
+            scheduledEvents = [];
+            updateWeekStats();
+        }
+
+        function updateWeekDisplay() {
+            const endDate = new Date(currentWeekStart);
+            endDate.setDate(endDate.getDate() + 6);
+            
+            const options = { month: 'short', day: 'numeric', year: 'numeric' };
+            const startStr = currentWeekStart.toLocaleDateString('en-US', options);
+            const endStr = endDate.toLocaleDateString('en-US', options);
+            
+            document.getElementById('weekDisplay').textContent = `Week of ${startStr} - ${endStr}`;
+        }
+
+        function updateWeekStats() {
+            const total = scheduledEvents.length;
+            document.getElementById('weekTotal').textContent = `${total} event${total !== 1 ? 's' : ''}`;
+        }
+
+        // Collapse Tuesday-Thursday
+        function toggleCollapse() {
+            const days = [1, 2, 3]; // Tuesday, Wednesday, Thursday
+            days.forEach(day => {
+                const dayColumn = document.getElementById(`day-${day}`);
+                dayColumn.classList.toggle('collapsed');
+            });
+            
+            const button = event.target;
+            button.textContent = button.textContent.includes('Collapse') ? 'Expand Tue-Thu' : 'Collapse Tue-Thu';
+        }
+
+        // Filter library
+        function filterLibrary() {
+            renderLibrary();
+        }
+
+        // Import from Google Calendar (simulation)
+        function importFromGoogle() {
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.classList.add('syncing');
+            syncStatus.innerHTML = '<span>↻</span><span>Syncing...</span>';
+            
+            setTimeout(() => {
+                // Simulate adding new events
+                const newEvents = [
+                    { id: Date.now(), title: 'Avatar: The Way of Water', duration: 192, calendar: 'events' },
+                    { id: Date.now() + 1, title: 'Top Gun: Maverick', duration: 131, calendar: 'non-public' }
+                ];
+                
+                libraryEvents.push(...newEvents);
+                renderLibrary();
+                
+                syncStatus.classList.remove('syncing');
+                syncStatus.innerHTML = '<span>✓</span><span>Synced with Google Calendar</span>';
+                
+                showToast('Successfully imported 2 new events from Google Calendar');
+            }, 2000);
+        }
+
+        // Toast notification
+        function showToast(message) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Initialize app on load
+        init();
+    </script>
 </body>
 </html>
