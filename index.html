@@ -4,6 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TSL Theater Scheduler</title>
+    <!-- 
+    TSL Theater Scheduler - Google Calendar Integration
+    ====================================================
+    
+    This app is configured with your TSL Google Calendar credentials.
+    
+    IMPORTANT SECURITY STEPS:
+    -------------------------
+    1. Restrict your API key in Google Cloud Console:
+       - Go to APIs & Services > Credentials
+       - Click on "API key 1"
+       - Under "Application restrictions", select "HTTP referrers"
+       - Add these URLs:
+         * http://localhost/*
+         * http://127.0.0.1/*
+         * https://axl-311.github.io/*
+       - Save changes
+    
+    2. Update OAuth 2.0 Authorized Origins:
+       - In Google Cloud Console > Credentials
+       - Click on your OAuth 2.0 Client ID
+       - Add to Authorized JavaScript origins:
+         * http://localhost
+         * http://127.0.0.1
+         * https://axl-311.github.io
+       - Add to Authorized redirect URIs:
+         * https://axl-311.github.io/tsl-scheduler
+    
+    Configured Calendars:
+    - TSL Events (Pink)
+    - TSL Events NON-PUBLIC (Orange)
+    - TSL TBD (Blue)
+    - TSL Theater 1 (Gray)
+    - TSL Theater 2 (Green)
+    -->
     <style>
         * {
             margin: 0;
@@ -39,14 +74,44 @@
             font-weight: 600;
         }
 
+        .auth-button {
+            padding: 8px 16px;
+            background: #34c759;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+            margin-left: auto;
+            margin-right: 15px;
+        }
+
+        .auth-button:hover {
+            background: #30a852;
+        }
+
+        .auth-button.sign-out {
+            background: #ff3b30;
+        }
+
+        .auth-button.sign-out:hover {
+            background: #d70015;
+        }
+
         .sync-status {
             display: flex;
             align-items: center;
             gap: 10px;
             padding: 8px 16px;
-            background: #e8f5e9;
+            background: #e8e8e8;
             border-radius: 20px;
             font-size: 14px;
+            color: #86868b;
+        }
+
+        .sync-status.connected {
+            background: #e8f5e9;
             color: #2e7d32;
         }
 
@@ -416,9 +481,12 @@
     <div class="app-container">
         <div class="header">
             <h1>TSL Theater Scheduler</h1>
+            <button id="authButton" class="auth-button">
+                Connect Google Calendar
+            </button>
             <div class="sync-status" id="syncStatus">
-                <span>✓</span>
-                <span>Synced with Google Calendar</span>
+                <span>○</span>
+                <span>Not connected</span>
             </div>
         </div>
 
@@ -442,7 +510,7 @@
         <div class="main-content">
             <div class="library-panel">
                 <div class="library-header">
-                    <span>Movie Library</span>
+                    <span>Movie/Event Library</span>
                     <span class="library-count" id="libraryCount">(0)</span>
                 </div>
                 <div class="calendar-filter">
@@ -470,6 +538,7 @@
         </div>
     </div>
 
+    <script src="https://apis.google.com/js/api.js"></script>
     <script>
         // Application State
         let currentWeekStart = new Date();
@@ -484,6 +553,21 @@
         let ghostElement = null;
         let collapsedDays = new Set();
 
+        // Google Calendar API Configuration
+        const CLIENT_ID = '305806936738-svlg4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyCguPYDlrKVGPmMlQC5vF0T_c5RBk3kQ2M';
+        const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
+        const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
+
+        // Your TSL Calendar IDs
+        const CALENDAR_IDS = {
+            'events': '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
+            'non-public': '6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700@group.calendar.google.com',
+            'tbd': '7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306@group.calendar.google.com',
+            'theater-1': '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com',
+            'theater-2': 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
+        };
+
         // Calendar configuration
         const calendarConfig = {
             'events': { color: '#ec407a', name: 'TSL Events' },
@@ -493,13 +577,89 @@
             'theater-2': { color: '#66bb6a', name: 'TSL Theater 2' }
         };
 
+        // Initialize Google API
+        function handleClientLoad() {
+            gapi.load('client:auth2', initClient);
+        }
+
+        function initClient() {
+            gapi.client.init({
+                apiKey: API_KEY,
+                clientId: CLIENT_ID,
+                discoveryDocs: DISCOVERY_DOCS,
+                scope: SCOPES
+            }).then(() => {
+                // Listen for sign-in state changes
+                gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+                // Handle initial sign-in state
+                updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+                
+                console.log('Google Calendar API initialized successfully');
+            }, (error) => {
+                console.error('Error initializing Google API client:', error);
+                document.getElementById('syncStatus').innerHTML = '<span>⚠</span><span>API Error</span>';
+                showToast('Failed to initialize Google Calendar API. Check console.');
+                loadSampleData();
+            });
+        }
+
+        function updateSigninStatus(isSignedIn) {
+            const authButton = document.getElementById('authButton');
+            const syncStatus = document.getElementById('syncStatus');
+            
+            if (isSignedIn) {
+                authButton.textContent = 'Sign Out';
+                authButton.classList.add('sign-out');
+                syncStatus.classList.add('connected');
+                syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
+                // Automatically sync when signed in
+                importFromGoogle();
+            } else {
+                authButton.textContent = 'Connect Google Calendar';
+                authButton.classList.remove('sign-out');
+                syncStatus.classList.remove('connected');
+                syncStatus.innerHTML = '<span>○</span><span>Not connected</span>';
+            }
+        }
+
+        function handleAuthClick() {
+            if (!gapi || !gapi.auth2) {
+                showToast('Google API not loaded. Please refresh the page.');
+                return;
+            }
+            
+            if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                gapi.auth2.getAuthInstance().signOut();
+                libraryEvents = [];
+                renderLibrary();
+                showToast('Disconnected from Google Calendar');
+            } else {
+                gapi.auth2.getAuthInstance().signIn().catch(error => {
+                    console.error('Sign-in error:', error);
+                    showToast('Sign-in failed. Check console for details.');
+                });
+            }
+        }
+
         // Initialize the app
         function init() {
             generateTimeColumn();
             generateDaysColumns();
-            loadSampleData();
             updateWeekDisplay();
             updateWeekStats();
+            
+            // Set up auth button
+            const authButton = document.getElementById('authButton');
+            authButton.onclick = handleAuthClick;
+            
+            // Initialize Google API if available
+            if (typeof gapi !== 'undefined') {
+                handleClientLoad();
+            } else {
+                console.error('Google API script not loaded');
+                document.getElementById('syncStatus').innerHTML = '<span>⚠</span><span>API not loaded</span>';
+                loadSampleData();
+            }
         }
 
         // Generate time column (24 hours with 15-min increments)
@@ -636,6 +796,126 @@
             document.getElementById('libraryCount').textContent = `(${filteredEvents.length})`;
         }
 
+        // Import from Google Calendar (Real Implementation)
+        async function importFromGoogle() {
+            if (!gapi || !gapi.auth2 || !gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                showToast('Please connect to Google Calendar first');
+                return;
+            }
+
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.classList.add('syncing');
+            syncStatus.innerHTML = '<span>↻</span><span>Syncing with Google Calendar...</span>';
+            
+            try {
+                libraryEvents = [];
+                const startOfWeek = new Date(currentWeekStart);
+                const endOfWeek = new Date(currentWeekStart);
+                endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+                // Fetch events from all calendars
+                for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
+                    try {
+                        const response = await gapi.client.calendar.events.list({
+                            'calendarId': calendarId,
+                            'timeMin': startOfWeek.toISOString(),
+                            'timeMax': endOfWeek.toISOString(),
+                            'showDeleted': false,
+                            'singleEvents': true,
+                            'orderBy': 'startTime'
+                        });
+
+                        const events = response.result.items;
+                        if (events && events.length > 0) {
+                            events.forEach(event => {
+                                // Calculate duration in minutes
+                                let duration = 120; // Default 2 hours
+                                if (event.start && event.end) {
+                                    const start = new Date(event.start.dateTime || event.start.date);
+                                    const end = new Date(event.end.dateTime || event.end.date);
+                                    duration = Math.round((end - start) / 60000); // Convert to minutes
+                                }
+
+                                libraryEvents.push({
+                                    id: event.id || Date.now() + Math.random(),
+                                    title: event.summary || 'Untitled Event',
+                                    duration: duration,
+                                    calendar: calendarKey,
+                                    description: event.description || '',
+                                    location: event.location || '',
+                                    googleEventId: event.id,
+                                    startTime: event.start,
+                                    endTime: event.end
+                                });
+                            });
+                        }
+                    } catch (err) {
+                        console.warn(`Failed to fetch from calendar ${calendarKey}:`, err);
+                    }
+                }
+
+                renderLibrary();
+                syncStatus.classList.remove('syncing');
+                syncStatus.classList.add('connected');
+                syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
+                showToast(`Successfully imported ${libraryEvents.length} events from Google Calendar`);
+                
+            } catch (error) {
+                console.error('Error fetching calendar events:', error);
+                syncStatus.classList.remove('syncing');
+                syncStatus.innerHTML = '<span>⚠</span><span>Sync failed</span>';
+                showToast('Failed to sync with Google Calendar');
+                
+                // Fall back to sample data
+                loadSampleData();
+            }
+        }
+
+        // Push event back to Google Calendar
+        async function pushEventToCalendar(scheduledEvent) {
+            if (!gapi || !gapi.auth2 || !gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                return;
+            }
+
+            try {
+                const calendarId = CALENDAR_IDS[scheduledEvent.calendar];
+                const date = new Date(currentWeekStart);
+                date.setDate(date.getDate() + scheduledEvent.day);
+                
+                const startDateTime = new Date(date);
+                startDateTime.setHours(scheduledEvent.startHour, scheduledEvent.startMinute, 0);
+                
+                const endDateTime = new Date(startDateTime);
+                endDateTime.setMinutes(endDateTime.getMinutes() + scheduledEvent.duration);
+
+                const event = {
+                    'summary': scheduledEvent.title,
+                    'start': {
+                        'dateTime': startDateTime.toISOString(),
+                        'timeZone': 'America/New_York'  // Adjust if your theaters are in a different timezone
+                    },
+                    'end': {
+                        'dateTime': endDateTime.toISOString(),
+                        'timeZone': 'America/New_York'  // Adjust if your theaters are in a different timezone
+                    },
+                    'description': `Scheduled via TSL Theater Scheduler\nTheater: ${scheduledEvent.theater === 0 ? '1' : '2'}`
+                };
+
+                const request = gapi.client.calendar.events.insert({
+                    'calendarId': calendarId,
+                    'resource': event
+                });
+
+                request.execute((event) => {
+                    if (event.id) {
+                        showToast(`Event "${scheduledEvent.title}" added to Google Calendar`);
+                    }
+                });
+            } catch (error) {
+                console.error('Error pushing event to calendar:', error);
+            }
+        }
+
         // Drag and Drop handlers
         function handleDragStart(e) {
             draggedItem = this;
@@ -710,6 +990,9 @@
             renderScheduledEvent(scheduledEvent);
             updateWeekStats();
             removeGhost();
+            
+            // Push to Google Calendar if connected
+            pushEventToCalendar(scheduledEvent);
             
             showToast('Event scheduled successfully!');
         }
@@ -822,29 +1105,6 @@
         // Filter library
         function filterLibrary() {
             renderLibrary();
-        }
-
-        // Import from Google Calendar (simulation)
-        function importFromGoogle() {
-            const syncStatus = document.getElementById('syncStatus');
-            syncStatus.classList.add('syncing');
-            syncStatus.innerHTML = '<span>↻</span><span>Syncing...</span>';
-            
-            setTimeout(() => {
-                // Simulate adding new events
-                const newEvents = [
-                    { id: Date.now(), title: 'Avatar: The Way of Water', duration: 192, calendar: 'events' },
-                    { id: Date.now() + 1, title: 'Top Gun: Maverick', duration: 131, calendar: 'non-public' }
-                ];
-                
-                libraryEvents.push(...newEvents);
-                renderLibrary();
-                
-                syncStatus.classList.remove('syncing');
-                syncStatus.innerHTML = '<span>✓</span><span>Synced with Google Calendar</span>';
-                
-                showToast('Successfully imported 2 new events from Google Calendar');
-            }, 2000);
         }
 
         // Toast notification
