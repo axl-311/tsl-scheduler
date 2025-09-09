@@ -1159,13 +1159,41 @@
         // Week navigation
         function changeWeek(direction) {
             currentWeekStart.setDate(currentWeekStart.getDate() + (direction * 7));
+            
+            // Clear the visual grid but keep the scheduledEvents data
             document.getElementById('daysContainer').innerHTML = '';
             generateDaysColumns();
             updateWeekDisplay();
             
-            // Re-render scheduled events for the new week
-            scheduledEvents = [];
+            // Re-render all scheduled events that fall within the new week view
+            renderEventsForCurrentWeek();
             updateWeekStats();
+        }
+
+        // Helper function to render events for the current week view
+        function renderEventsForCurrentWeek() {
+            // Clear existing event blocks from grid
+            document.querySelectorAll('.event-block').forEach(block => block.remove());
+            
+            // Re-render events that fall within current week
+            scheduledEvents.forEach(event => {
+                if (isEventInCurrentWeekByData(event)) {
+                    renderScheduledEvent(event);
+                }
+            });
+        }
+
+        // Helper function to check if a scheduled event falls within current week
+        function isEventInCurrentWeekByData(eventData) {
+            const weekStart = new Date(currentWeekStart);
+            const weekEnd = new Date(currentWeekStart);
+            weekEnd.setDate(weekEnd.getDate() + 7);
+            
+            // Calculate the event's actual date
+            const eventDate = new Date(weekStart);
+            eventDate.setDate(eventDate.getDate() + eventData.day);
+            
+            return eventDate >= weekStart && eventDate < weekEnd;
         }
 
         function updateWeekDisplay() {
