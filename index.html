@@ -314,7 +314,7 @@
 
         .theater-lanes {
             display: flex;
-            height: calc(40px * 48);
+            height: calc(40px * 24);
             position: relative;
         }
 
@@ -460,7 +460,7 @@
                 Connect Google Calendar
             </button>
             <div class="sync-status" id="syncStatus">
-                <span>○</span>
+                <span>◯</span>
                 <span>Not connected</span>
             </div>
         </div>
@@ -636,7 +636,7 @@
                 authButton.textContent = 'Connect Google Calendar';
                 authButton.classList.remove('sign-out');
                 syncStatus.classList.remove('connected');
-                syncStatus.innerHTML = '<span>○</span><span>Not connected</span>';
+                syncStatus.innerHTML = '<span>◯</span><span>Not connected</span>';
                 accessToken = null;
                 libraryEvents = [];
                 scheduledEvents = [];
@@ -688,7 +688,7 @@
                 ...eventData,
                 actualDate: eventDate, // Store the actual date
                 theater: theater,
-                startHour: startDate.getHours(),
+                startHour: startDate.getHours(), // Keep actual hour for calculations
                 startMinute: startDate.getMinutes(),
                 id: `existing-${eventData.googleEventId || Date.now()}`
             };
@@ -936,11 +936,11 @@
             renderLibrary();
         }
 
-        // Generate time column starting at 2pm (theater hours)
+        // Generate time column starting at 2pm (theater hours) - FIXED: 24 hour display
         function generateTimeColumn() {
             const timeColumn = document.getElementById('timeColumn');
             
-            // Theater day: 2pm today through 2pm tomorrow (24 hours)
+            // Theater day: 2pm today through 1pm tomorrow (24 hours)
             for (let hour = 14; hour < 38; hour++) { // 14 (2pm) to 37 (1pm next day)
                 const displayHour = hour % 24;
                 const timeSlot = document.createElement('div');
@@ -1167,12 +1167,8 @@
             
             scheduledEvents.push(scheduledEvent);
             
-            // Render with theater hour conversion for display
-            const displayEvent = {
-                ...scheduledEvent,
-                startHour: convertToTheaterHour(scheduledEvent.startHour)
-            };
-            renderScheduledEvent(displayEvent);
+            // Render the event (actual hour will be converted to theater hour in renderScheduledEvent)
+            renderScheduledEvent(scheduledEvent);
             
             updateWeekStats();
             removeGhost();
@@ -1208,6 +1204,7 @@
             ghostElement = null;
         }
 
+        // FIXED: Correct time conversion in renderScheduledEvent
         function renderScheduledEvent(event) {
             console.log('Rendering scheduled event:', event);
             
@@ -1229,24 +1226,22 @@
             eventBlock.draggable = true;
             eventBlock.dataset.eventId = event.id;
             
-            // Use theater hour for positioning (event.startHour should already be converted)
-            const top = event.startHour * 40 + (event.startMinute / 15) * 10;
+            // FIXED: Convert actual hour to theater hour for positioning
+            const theaterHour = convertToTheaterHour(event.startHour);
+            const top = theaterHour * 40 + (event.startMinute / 15) * 10;
             const height = (event.duration / 60) * 40;
             
             eventBlock.style.top = `${top}px`;
             eventBlock.style.height = `${height}px`;
             
-            // Convert back to actual time for display
-            const actualStartHour = event.actualDate ? 
-                new Date(event.startTime.dateTime).getHours() : 
-                convertFromTheaterHour(event.startHour);
+            // Display actual time in the event block
             const endMinutes = event.startMinute + event.duration;
-            const actualEndHour = actualStartHour + Math.floor(endMinutes / 60);
+            const actualEndHour = event.startHour + Math.floor(endMinutes / 60);
             const endMinute = endMinutes % 60;
             
             eventBlock.innerHTML = `
                 <div class="event-title">${event.title}</div>
-                <div class="event-time">${formatTimeRange(actualStartHour, event.startMinute, actualEndHour, endMinute)}</div>
+                <div class="event-time">${formatTimeRange(event.startHour, event.startMinute, actualEndHour, endMinute)}</div>
             `;
             
             eventBlock.addEventListener('dragstart', handleDragStart);
@@ -1254,7 +1249,7 @@
             
             lane.appendChild(eventBlock);
             
-            console.log('Event rendered successfully:', event.title, 'at', top, 'px');
+            console.log(`Event rendered: ${event.title} at actual hour ${event.startHour} (theater hour ${theaterHour}) = ${top}px`);
         }
 
         function formatTimeRange(startH, startM, endH, endM) {
