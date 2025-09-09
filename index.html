@@ -3,42 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Theater Scheduler</title>
-    <!-- 
-    TSL Theater Scheduler - Google Calendar Integration
-    ====================================================
-    
-    This app is configured with your TSL Google Calendar credentials.
-    
-    IMPORTANT SECURITY STEPS:
-    -------------------------
-    1. Restrict your API key in Google Cloud Console:
-       - Go to APIs & Services > Credentials
-       - Click on "API key 1"
-       - Under "Application restrictions", select "HTTP referrers"
-       - Add these URLs:
-         * http://localhost/*
-         * http://127.0.0.1/*
-         * https://axl-311.github.io/*
-       - Save changes
-    
-    2. Update OAuth 2.0 Authorized Origins:
-       - In Google Cloud Console > Credentials
-       - Click on your OAuth 2.0 Client ID
-       - Add to Authorized JavaScript origins:
-         * http://localhost
-         * http://127.0.0.1
-         * https://axl-311.github.io
-       - Add to Authorized redirect URIs:
-         * https://axl-311.github.io/tsl-scheduler
-    
-    Configured Calendars:
-    - TSL Events (Pink)
-    - TSL Events NON-PUBLIC (Orange)
-    - TSL TBD (Blue)
-    - TSL Theater 1 (Gray)
-    - TSL Theater 2 (Green)
-    -->
+    <title>TSL Theater Scheduler - Test Version</title>
     <style>
         * {
             margin: 0;
@@ -272,6 +237,7 @@
         }
 
         /* Calendar colors */
+        .calendar-primary { background: #4285f4; }
         .calendar-events { background: #ec407a; }
         .calendar-non-public { background: #ff9800; }
         .calendar-tbd { background: #42a5f5; }
@@ -348,7 +314,7 @@
 
         .theater-lanes {
             display: flex;
-            height: calc(40px * 48); /* 24 hours * 4 slots per hour */
+            height: calc(40px * 48);
             position: relative;
         }
 
@@ -475,12 +441,21 @@
                 opacity: 1;
             }
         }
+
+        .debug-info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
     <div class="app-container">
         <div class="header">
-            <h1>TSL Theater Scheduler</h1>
+            <h1>TSL Theater Scheduler - Test Version</h1>
             <button id="authButton" class="auth-button">
                 Connect Google Calendar
             </button>
@@ -488,6 +463,10 @@
                 <span>○</span>
                 <span>Not connected</span>
             </div>
+        </div>
+
+        <div class="debug-info" id="debugInfo">
+            Debug: Not connected to Google Calendar
         </div>
 
         <div class="controls">
@@ -516,6 +495,7 @@
                 <div class="calendar-filter">
                     <select id="calendarFilter" onchange="filterLibrary()">
                         <option value="all">All Calendars</option>
+                        <option value="primary">My Personal Calendar (Test)</option>
                         <option value="events">TSL Events</option>
                         <option value="non-public">TSL Events (NON-PUBLIC)</option>
                         <option value="tbd">TSL TBD</option>
@@ -561,8 +541,9 @@
         const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
 
-        // Your TSL Calendar IDs
+        // Test with personal calendar first, then TSL calendars
         const CALENDAR_IDS = {
+            'primary': 'primary', // Your personal Google Calendar - this should work
             'events': '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
             'non-public': '6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700@group.calendar.google.com',
             'tbd': '7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306@group.calendar.google.com',
@@ -572,6 +553,7 @@
 
         // Calendar configuration
         const calendarConfig = {
+            'primary': { color: '#4285f4', name: 'My Personal Calendar' },
             'events': { color: '#ec407a', name: 'TSL Events' },
             'non-public': { color: '#ff9800', name: 'TSL Events (NON-PUBLIC)' },
             'tbd': { color: '#42a5f5', name: 'TSL TBD' },
@@ -579,8 +561,14 @@
             'theater-2': { color: '#66bb6a', name: 'TSL Theater 2' }
         };
 
+        function updateDebugInfo(message) {
+            document.getElementById('debugInfo').textContent = `Debug: ${message}`;
+        }
+
         // Initialize Google API with new Identity Services
         function initGoogleAPI() {
+            updateDebugInfo('Loading Google API...');
+            
             // Initialize the Google API client
             gapi.load('client', async () => {
                 try {
@@ -589,8 +577,10 @@
                         discoveryDocs: DISCOVERY_DOCS
                     });
                     console.log('Google API client initialized');
+                    updateDebugInfo('Google API loaded successfully');
                 } catch (error) {
                     console.error('Error initializing Google API client:', error);
+                    updateDebugInfo(`API Error: ${error.message || error}`);
                     document.getElementById('syncStatus').innerHTML = '<span>⚠</span><span>API Error</span>';
                     showToast('Failed to initialize Google Calendar API');
                 }
@@ -608,25 +598,31 @@
         // Handle the credential response from Google Sign-In
         function handleCredentialResponse(response) {
             console.log('Credential response received');
-            // The response contains the JWT token, but we need an access token for API calls
-            // So we'll use the OAuth2 flow instead
+            updateDebugInfo('Received Google credential response');
         }
 
         // Initialize OAuth2 flow for getting access token
         function initOAuth() {
+            updateDebugInfo('Setting up OAuth...');
+            
             const tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: SCOPES,
                 callback: (response) => {
                     if (response.access_token) {
                         accessToken = response.access_token;
+                        updateDebugInfo(`Access token received: ${response.access_token.substring(0, 20)}...`);
                         updateSigninStatus(true);
-                        importFromGoogle();
+                        // Start with just personal calendar for testing
+                        importSingleCalendar('primary');
+                    } else {
+                        updateDebugInfo(`OAuth error: ${response.error || 'Unknown error'}`);
                     }
                 },
             });
             
             window.tokenClient = tokenClient;
+            updateDebugInfo('OAuth ready');
         }
 
         function updateSigninStatus(isSignedIn) {
@@ -646,6 +642,7 @@
                 accessToken = null;
                 libraryEvents = [];
                 renderLibrary();
+                updateDebugInfo('Not connected to Google Calendar');
             }
         }
 
@@ -660,11 +657,106 @@
             } else {
                 // Sign in
                 if (window.tokenClient) {
+                    updateDebugInfo('Requesting access token...');
                     window.tokenClient.requestAccessToken();
                 } else {
+                    updateDebugInfo('TokenClient not ready');
                     showToast('Authentication not ready. Please refresh the page.');
                 }
             }
+        }
+
+        // Test with just one calendar first
+        async function importSingleCalendar(calendarKey) {
+            const calendarId = CALENDAR_IDS[calendarKey];
+            updateDebugInfo(`Testing calendar: ${calendarKey} (${calendarId})`);
+            
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.classList.add('syncing');
+            syncStatus.innerHTML = '<span>↻</span><span>Testing calendar access...</span>';
+            
+            try {
+                const startOfWeek = new Date(currentWeekStart);
+                const endOfWeek = new Date(currentWeekStart);
+                endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+                const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
+                    `timeMin=${startOfWeek.toISOString()}&` +
+                    `timeMax=${endOfWeek.toISOString()}&` +
+                    `showDeleted=false&` +
+                    `singleEvents=true&` +
+                    `orderBy=startTime&` +
+                    `key=${API_KEY}`;
+
+                updateDebugInfo(`Making request to: ${url.substring(0, 100)}...`);
+
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                updateDebugInfo(`Response status: ${response.status} ${response.statusText}`);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const events = data.items || [];
+                    
+                    updateDebugInfo(`Success! Found ${events.length} events in ${calendarKey}`);
+                    
+                    libraryEvents = [];
+                    events.forEach(event => {
+                        // Calculate duration in minutes
+                        let duration = 120; // Default 2 hours
+                        if (event.start && event.end) {
+                            const start = new Date(event.start.dateTime || event.start.date);
+                            const end = new Date(event.end.dateTime || event.end.date);
+                            duration = Math.round((end - start) / 60000); // Convert to minutes
+                        }
+
+                        libraryEvents.push({
+                            id: event.id || Date.now() + Math.random(),
+                            title: event.summary || 'Untitled Event',
+                            duration: duration,
+                            calendar: calendarKey,
+                            description: event.description || '',
+                            location: event.location || '',
+                            googleEventId: event.id,
+                            startTime: event.start,
+                            endTime: event.end
+                        });
+                    });
+
+                    renderLibrary();
+                    syncStatus.classList.remove('syncing');
+                    syncStatus.classList.add('connected');
+                    syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
+                    showToast(`Success! Found ${events.length} events in your ${calendarConfig[calendarKey].name}`);
+                    
+                } else {
+                    const errorText = await response.text();
+                    updateDebugInfo(`Error ${response.status}: ${errorText.substring(0, 200)}`);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+            } catch (error) {
+                console.error('Error fetching calendar events:', error);
+                updateDebugInfo(`Error: ${error.message}`);
+                syncStatus.classList.remove('syncing');
+                syncStatus.innerHTML = '<span>⚠</span><span>Test failed</span>';
+                showToast(`Test failed: ${error.message}`);
+            }
+        }
+
+        // Import from Google Calendar (Test with personal calendar first)
+        async function importFromGoogle() {
+            if (!accessToken) {
+                showToast('Please connect to Google Calendar first');
+                return;
+            }
+
+            // Start with personal calendar test
+            await importSingleCalendar('primary');
         }
 
         // Initialize the app
@@ -768,8 +860,8 @@
                 container.innerHTML = `
                     <div style="padding: 20px; text-align: center; color: #86868b;">
                         <p style="margin-bottom: 10px;">📅</p>
-                        <p style="font-size: 14px;">Connect to Google Calendar to import your movies and events</p>
-                        <p style="font-size: 12px; margin-top: 10px;">Click "Connect Google Calendar" above to get started</p>
+                        <p style="font-size: 14px;">Connect to Google Calendar to test calendar access</p>
+                        <p style="font-size: 12px; margin-top: 10px;">We'll start by testing your personal calendar</p>
                     </div>
                 `;
                 document.getElementById('libraryCount').textContent = '(0)';
@@ -783,7 +875,7 @@
             if (filteredEvents.length === 0) {
                 container.innerHTML = `
                     <div style="padding: 20px; text-align: center; color: #86868b; font-size: 14px;">
-                        No events found. Click "Import from Google Calendar" to sync.
+                        No events found. Click "Import from Google Calendar" to test.
                     </div>
                 `;
             } else {
@@ -808,138 +900,7 @@
             document.getElementById('libraryCount').textContent = `(${filteredEvents.length})`;
         }
 
-        // Import from Google Calendar (Real Implementation)
-        async function importFromGoogle() {
-            if (!accessToken) {
-                showToast('Please connect to Google Calendar first');
-                return;
-            }
-
-            const syncStatus = document.getElementById('syncStatus');
-            syncStatus.classList.add('syncing');
-            syncStatus.innerHTML = '<span>↻</span><span>Syncing with Google Calendar...</span>';
-            
-            try {
-                libraryEvents = [];
-                const startOfWeek = new Date(currentWeekStart);
-                const endOfWeek = new Date(currentWeekStart);
-                endOfWeek.setDate(endOfWeek.getDate() + 7);
-
-                // Fetch events from all calendars
-                for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
-                    try {
-                        const response = await fetch(
-                            `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
-                            `timeMin=${startOfWeek.toISOString()}&` +
-                            `timeMax=${endOfWeek.toISOString()}&` +
-                            `showDeleted=false&` +
-                            `singleEvents=true&` +
-                            `orderBy=startTime&` +
-                            `key=${API_KEY}`,
-                            {
-                                headers: {
-                                    'Authorization': `Bearer ${accessToken}`
-                                }
-                            }
-                        );
-
-                        if (response.ok) {
-                            const data = await response.json();
-                            const events = data.items || [];
-                            
-                            events.forEach(event => {
-                                // Calculate duration in minutes
-                                let duration = 120; // Default 2 hours
-                                if (event.start && event.end) {
-                                    const start = new Date(event.start.dateTime || event.start.date);
-                                    const end = new Date(event.end.dateTime || event.end.date);
-                                    duration = Math.round((end - start) / 60000); // Convert to minutes
-                                }
-
-                                libraryEvents.push({
-                                    id: event.id || Date.now() + Math.random(),
-                                    title: event.summary || 'Untitled Event',
-                                    duration: duration,
-                                    calendar: calendarKey,
-                                    description: event.description || '',
-                                    location: event.location || '',
-                                    googleEventId: event.id,
-                                    startTime: event.start,
-                                    endTime: event.end
-                                });
-                            });
-                        }
-                    } catch (err) {
-                        console.warn(`Failed to fetch from calendar ${calendarKey}:`, err);
-                    }
-                }
-
-                renderLibrary();
-                syncStatus.classList.remove('syncing');
-                syncStatus.classList.add('connected');
-                syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
-                showToast(`Successfully imported ${libraryEvents.length} events from Google Calendar`);
-                
-            } catch (error) {
-                console.error('Error fetching calendar events:', error);
-                syncStatus.classList.remove('syncing');
-                syncStatus.innerHTML = '<span>⚠</span><span>Sync failed</span>';
-                showToast('Failed to sync with Google Calendar');
-            }
-        }
-
-        // Push event back to Google Calendar
-        async function pushEventToCalendar(scheduledEvent) {
-            if (!accessToken) {
-                return;
-            }
-
-            try {
-                const calendarId = CALENDAR_IDS[scheduledEvent.calendar];
-                const date = new Date(currentWeekStart);
-                date.setDate(date.getDate() + scheduledEvent.day);
-                
-                const startDateTime = new Date(date);
-                startDateTime.setHours(scheduledEvent.startHour, scheduledEvent.startMinute, 0);
-                
-                const endDateTime = new Date(startDateTime);
-                endDateTime.setMinutes(endDateTime.getMinutes() + scheduledEvent.duration);
-
-                const event = {
-                    'summary': scheduledEvent.title,
-                    'start': {
-                        'dateTime': startDateTime.toISOString(),
-                        'timeZone': 'America/New_York'
-                    },
-                    'end': {
-                        'dateTime': endDateTime.toISOString(),
-                        'timeZone': 'America/New_York'
-                    },
-                    'description': `Scheduled via TSL Theater Scheduler\nTheater: ${scheduledEvent.theater === 0 ? '1' : '2'}`
-                };
-
-                const response = await fetch(
-                    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(event)
-                    }
-                );
-
-                if (response.ok) {
-                    const result = await response.json();
-                    showToast(`Event "${scheduledEvent.title}" added to Google Calendar`);
-                }
-            } catch (error) {
-                console.error('Error pushing event to calendar:', error);
-            }
-        }
-
-        // Drag and Drop handlers
+        // Simplified drag and drop for testing (rest of the functions remain the same)
         function handleDragStart(e) {
             draggedItem = this;
             this.classList.add('dragging');
@@ -969,7 +930,7 @@
             
             const rect = this.getBoundingClientRect();
             const y = e.clientY - rect.top;
-            const snapY = Math.floor(y / 10) * 10; // Snap to 15-min grid (40px = 1 hour, 10px = 15 min)
+            const snapY = Math.floor(y / 10) * 10;
             
             showGhost(this, snapY);
         }
@@ -1013,9 +974,6 @@
             renderScheduledEvent(scheduledEvent);
             updateWeekStats();
             removeGhost();
-            
-            // Push to Google Calendar if connected
-            pushEventToCalendar(scheduledEvent);
             
             showToast('Event scheduled successfully!');
         }
@@ -1115,7 +1073,7 @@
 
         // Collapse Tuesday-Thursday
         function toggleCollapse() {
-            const days = [1, 2, 3]; // Tuesday, Wednesday, Thursday
+            const days = [1, 2, 3];
             days.forEach(day => {
                 const dayColumn = document.getElementById(`day-${day}`);
                 dayColumn.classList.toggle('collapsed');
