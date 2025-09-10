@@ -15,12 +15,70 @@
         .header {
             text-align: center;
             margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
         }
         
         h1 {
             color: #333;
             margin: 0;
             font-size: 24px;
+        }
+        
+        .week-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            border-radius: 24px;
+            transition: .4s;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: .4s;
+        }
+        
+        input:checked + .slider {
+            background-color: #4285f4;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
         }
         
         .calendar-container {
@@ -79,40 +137,48 @@
 <body>
     <div class="header">
         <h1>TSL Calendar</h1>
+        <div class="week-toggle">
+            <span>Sunday</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="weekStartToggle">
+                <span class="slider"></span>
+            </label>
+            <span>Monday</span>
+        </div>
     </div>
     
     <div class="calendar-container">
-        <iframe src="https://calendar.google.com/calendar/embed?height=600&wkst=1&bgcolor=%23ffffff&ctz=America%2FNew_York&src=1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255%40group.calendar.google.com&src=6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700%40group.calendar.google.com&src=7b77eba3ce9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306%40group.calendar.google.com&src=007f10222d5f7076d02816fa4cda7108e75444c18ef7ac0d79aee420313d1a7b%40group.calendar.google.com&src=ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4%40group.calendar.google.com&color=%23D50000&color=%23FF6F00&color=%232196F3&color=%23757575&color=%234CAF50&mode=MONTH&showTabs=1&showPrint=0&showDate=1&showNav=1&showTitle=0&showCalendars=1"></iframe>
+        <iframe src="https://calendar.google.com/calendar/embed?height=600&wkst=1&bgcolor=%23ffffff&ctz=America%2FNew_York&src=1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255%40group.calendar.google.com&color=%23D50000&src=6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700%40group.calendar.google.com&color=%23FF6F00&src=7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306%40group.calendar.google.com&color=%232196F3&src=007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b%40group.calendar.google.com&color=%23757575&src=ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4%40group.calendar.google.com&color=%234CAF50&mode=MONTH&showTabs=1&showPrint=0&showDate=1&showNav=1&showTitle=0&showCalendars=1"></iframe>
         
         <div class="legend">
             <div class="legend-item">
                 <span class="color-dot" style="background-color: #D50000;"></span>
-                Main Events
+                TSL Events
             </div>
             <div class="legend-item">
                 <span class="color-dot" style="background-color: #FF6F00;"></span>
-                Non-Public
+                TSL Events (NON-PUBLIC)
             </div>
             <div class="legend-item">
                 <span class="color-dot" style="background-color: #2196F3;"></span>
-                TBD
+                TSL TBD
             </div>
             <div class="legend-item">
                 <span class="color-dot" style="background-color: #757575;"></span>
-                Theater 1
+                TSL Theater 1
             </div>
             <div class="legend-item">
                 <span class="color-dot" style="background-color: #4CAF50;"></span>
-                Theater 2
+                TSL Theater 2
             </div>
         </div>
     </div>
     
     <script>
-        // Calendar embed URLs for different week starts
-        const sundayStartUrl = "https://calendar.google.com/calendar/embed?height=600&wkst=1&bgcolor=%23ffffff&ctz=America%2FNew_York&src=1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255%40group.calendar.google.com&src=6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700%40group.calendar.google.com&src=7b77eba3ce9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306%40group.calendar.google.com&src=007f10222d5f7076d02816fa4cda7108e75444c18ef7ac0d79aee420313d1a7b%40group.calendar.google.com&src=ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4%40group.calendar.google.com&color=%23D50000&color=%23FF6F00&color=%232196F3&color=%23757575&color=%234CAF50&mode=MONTH&showTabs=1&showPrint=0&showDate=1&showNav=1&showTitle=0&showCalendars=1";
+        // Calendar embed URLs with all 5 correct TSL calendar IDs
+        const sundayStartUrl = "https://calendar.google.com/calendar/embed?height=600&wkst=1&bgcolor=%23ffffff&ctz=America%2FNew_York&src=1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255%40group.calendar.google.com&color=%23D50000&src=6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700%40group.calendar.google.com&color=%23FF6F00&src=7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306%40group.calendar.google.com&color=%232196F3&src=007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b%40group.calendar.google.com&color=%23757575&src=ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4%40group.calendar.google.com&color=%234CAF50&mode=MONTH&showTabs=1&showPrint=0&showDate=1&showNav=1&showTitle=0&showCalendars=1";
         
-        const mondayStartUrl = "https://calendar.google.com/calendar/embed?height=600&wkst=2&bgcolor=%23ffffff&ctz=America%2FNew_York&src=1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255%40group.calendar.google.com&src=6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700%40group.calendar.google.com&src=7b77eba3ce9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306%40group.calendar.google.com&src=007f10222d5f7076d02816fa4cda7108e75444c18ef7ac0d79aee420313d1a7b%40group.calendar.google.com&src=ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4%40group.calendar.google.com&color=%23D50000&color=%23FF6F00&color=%232196F3&color=%23757575&color=%234CAF50&mode=MONTH&showTabs=1&showPrint=0&showDate=1&showNav=1&showTitle=0&showCalendars=1";
+        const mondayStartUrl = "https://calendar.google.com/calendar/embed?height=600&wkst=2&bgcolor=%23ffffff&ctz=America%2FNew_York&src=1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255%40group.calendar.google.com&color=%23D50000&src=6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700%40group.calendar.google.com&color=%23FF6F00&src=7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306%40group.calendar.google.com&color=%232196F3&src=007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b%40group.calendar.google.com&color=%23757575&src=ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4%40group.calendar.google.com&color=%234CAF50&mode=MONTH&showTabs=1&showPrint=0&showDate=1&showNav=1&showTitle=0&showCalendars=1";
         
         const calendarFrame = document.querySelector('iframe');
         const weekToggle = document.getElementById('weekStartToggle');
