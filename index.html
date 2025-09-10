@@ -1858,9 +1858,10 @@
             // Add back to library (database behavior) - only if it's not already there
             const existsInLibrary = libraryEvents.some(existing => {
                 // Check both by googleEventId and by id
-                return (eventToDelete.googleEventId && existing.googleEventId === eventToDelete.googleEventId) ||
-                       existing.id == eventToDelete.id ||
-                       existing.id == eventToDelete.googleEventId;
+                if (eventToDelete.googleEventId) {
+                    return existing.googleEventId === eventToDelete.googleEventId;
+                }
+                return existing.id == eventToDelete.id;
             });
             
             console.log('Exists in library:', existsInLibrary);
