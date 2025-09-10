@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSL Schedule - This Week</title>
+    <meta name="description" content="Current week schedule for Time & Space Limited staff">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: #2c3e50;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .week-info {
+            font-size: 18px;
+            color: #7f8c8d;
+            margin-bottom: 15px;
+        }
+
+        .last-updated {
+            font-size: 14px;
+            color: #95a5a6;
+            font-style: italic;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #7f8c8d;
+        }
+
+        .day-section {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .day-header {
+            background: #3498db;
+            color: white;
+            padding: 15px 20px;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .day-header.today {
+            background: #e74c3c;
+        }
+
+        .day-header.weekend {
+            background: #9b59b6;
+        }
+
+        .events-list {
+            padding: 0;
+        }
+
+        .event-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #ecf0f1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .event-item:last-child {
+            border-bottom: none;
+        }
+
+        .event-time {
+            font-weight: 600;
+            color: #2c3e50;
+            min-width: 120px;
+            font-size: 16px;
+        }
+
+        .event-details {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .event-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .event-info {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        .theater-badge {
+            background: #34495e;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .theater-badge.theater-1 {
+            background: #95a5a6;
+        }
+
+        .theater-badge.theater-2 {
+            background: #27ae60;
+        }
+
+        .no-events {
+            padding: 30px 20px;
+            text-align: center;
+            color: #95a5a6;
+            font-style: italic;
+        }
+
+        .refresh-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 20px;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+            transition: background 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: #2980b9;
+        }
+
+        .error-message {
+            background: #e74c3c;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .event-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .event-time {
+                min-width: auto;
+                font-size: 14px;
+            }
+            
+            .event-title {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>TSL Schedule</h1>
+            <div class="week-info" id="weekInfo">Loading current week...</div>
+            <div class="last-updated" id="lastUpdated"></div>
+        </div>
+
+        <div id="errorContainer"></div>
+        <div id="loadingMessage" class="loading">Loading schedule...</div>
+        <div id="scheduleContainer"></div>
+    </div>
+
+    <button class="refresh-btn" onclick="loadSchedule()">Refresh</button>
+
+    <script>
+        // Configuration - same API key as main app, read-only access
+        const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
+        
+        // Only public calendars for staff view
+        const PUBLIC_CALENDARS = {
+            'events': '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
+            'theater-1': '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com',
+            'theater-2': 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
+        };
+
+        let allEvents = [];
+
+        function getCurrentWeekRange() {
+            const now = new Date();
+            const dayOfWeek = now.getDay();
+            
+            // Calculate start of week (Tuesday)
+            const daysFromTuesday = (dayOfWeek + 5) % 7;
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - daysFromTuesday);
+            weekStart.setHours(0, 0, 0, 0);
+            
+            // Calculate end of week (Monday)
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            weekEnd.setHours(23, 59, 59, 999);
+            
+            return { start: weekStart, end: weekEnd };
+        }
+
+        function formatDate(date) {
+            const options = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            };
+            return date.toLocaleDateString('en-US', options);
+        }
+
+        function formatTime(date) {
+            const options = { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+            };
+            return date.toLocaleDateString('en-US', options);
+        }
+
+        function formatDuration(start, end) {
+            const duration = Math.round((end - start) / 60000); // minutes
+            const hours = Math.floor(duration / 60);
+            const minutes = duration % 60;
+            
+            if (hours === 0) {
+                return `${minutes}min`;
+            } else if (minutes === 0) {
+                return `${hours}h`;
+            } else {
+                return `${hours}h ${minutes}m`;
+            }
+        }
+
+        function getTheaterFromCalendar(calendarType) {
+            switch(calendarType) {
+                case 'theater-1': return 'Theater 1';
+                case 'theater-2': return 'Theater 2';
+                default: return 'Main';
+            }
+        }
+
+        function isToday(date) {
+            const today = new Date();
+            return date.toDateString() === today.toDateString();
+        }
+
+        function isWeekend(date) {
+            const day = date.getDay();
+            return day === 0 || day === 6; // Sunday or Saturday
+        }
+
+        async function fetchCalendarEvents() {
+            const { start, end } = getCurrentWeekRange();
+            allEvents = [];
+            
+            try {
+                for (const [calendarType, calendarId] of Object.entries(PUBLIC_CALENDARS)) {
+                    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
+                        `timeMin=${start.toISOString()}&` +
+                        `timeMax=${end.toISOString()}&` +
+                        `showDeleted=false&` +
+                        `singleEvents=true&` +
+                        `orderBy=startTime&` +
+                        `key=${API_KEY}`;
+
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch ${calendarType} calendar`);
+                    }
+
+                    const data = await response.json();
+                    const events = data.items || [];
+
+                    events.forEach(event => {
+                        if (event.start && event.start.dateTime) {
+                            const startTime = new Date(event.start.dateTime);
+                            const endTime = new Date(event.end.dateTime);
+                            
+                            allEvents.push({
+                                title: event.summary || 'Untitled Event',
+                                start: startTime,
+                                end: endTime,
+                                calendar: calendarType,
+                                theater: getTheaterFromCalendar(calendarType),
+                                description: event.description || ''
+                            });
+                        }
+                    });
+                }
+
+                // Sort all events by start time
+                allEvents.sort((a, b) => a.start - b.start);
+                
+            } catch (error) {
+                console.error('Error fetching events:', error);
+                throw error;
+            }
+        }
+
+        function groupEventsByDay() {
+            const { start } = getCurrentWeekRange();
+            const days = [];
+            
+            // Create array for each day of the week (Tue-Mon)
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(start);
+                date.setDate(start.getDate() + i);
+                
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                
+                days.push({
+                    date: date,
+                    name: dayName,
+                    dateStr: dateStr,
+                    events: []
+                });
+            }
+            
+            // Group events by day
+            allEvents.forEach(event => {
+                const eventDate = new Date(event.start);
+                eventDate.setHours(0, 0, 0, 0);
+                
+                const dayIndex = Math.floor((eventDate - start) / (24 * 60 * 60 * 1000));
+                if (dayIndex >= 0 && dayIndex < 7) {
+                    days[dayIndex].events.push(event);
+                }
+            });
+            
+            return days;
+        }
+
+        function renderSchedule() {
+            const container = document.getElementById('scheduleContainer');
+            const days = groupEventsByDay();
+            
+            container.innerHTML = '';
+            
+            days.forEach(day => {
+                const daySection = document.createElement('div');
+                daySection.className = 'day-section';
+                
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'day-header';
+                if (isToday(day.date)) {
+                    dayHeader.classList.add('today');
+                } else if (isWeekend(day.date)) {
+                    dayHeader.classList.add('weekend');
+                }
+                dayHeader.textContent = `${day.name}, ${day.dateStr}`;
+                
+                const eventsList = document.createElement('div');
+                eventsList.className = 'events-list';
+                
+                if (day.events.length === 0) {
+                    const noEvents = document.createElement('div');
+                    noEvents.className = 'no-events';
+                    noEvents.textContent = 'No events scheduled';
+                    eventsList.appendChild(noEvents);
+                } else {
+                    day.events.forEach(event => {
+                        const eventItem = document.createElement('div');
+                        eventItem.className = 'event-item';
+                        
+                        const timeStr = `${formatTime(event.start)} - ${formatTime(event.end)}`;
+                        const duration = formatDuration(event.start, event.end);
+                        
+                        eventItem.innerHTML = `
+                            <div class="event-time">${timeStr}</div>
+                            <div class="event-details">
+                                <div class="event-title">${event.title}</div>
+                                <div class="event-info">${duration}</div>
+                            </div>
+                            <div class="theater-badge ${event.calendar}">${event.theater}</div>
+                        `;
+                        
+                        eventsList.appendChild(eventItem);
+                    });
+                }
+                
+                daySection.appendChild(dayHeader);
+                daySection.appendChild(eventsList);
+                container.appendChild(daySection);
+            });
+        }
+
+        function updateWeekInfo() {
+            const { start, end } = getCurrentWeekRange();
+            const weekInfo = document.getElementById('weekInfo');
+            const lastUpdated = document.getElementById('lastUpdated');
+            
+            const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            
+            weekInfo.textContent = `Week of ${startStr} - ${endStr}`;
+            lastUpdated.textContent = `Last updated: ${new Date().toLocaleString()}`;
+        }
+
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.innerHTML = `
+                <div class="error-message">
+                    ${message}<br>
+                    <small>Please check your internet connection or try refreshing the page.</small>
+                </div>
+            `;
+        }
+
+        async function loadSchedule() {
+            const loadingMessage = document.getElementById('loadingMessage');
+            const errorContainer = document.getElementById('errorContainer');
+            
+            // Clear previous error messages
+            errorContainer.innerHTML = '';
+            loadingMessage.style.display = 'block';
+            
+            try {
+                await fetchCalendarEvents();
+                renderSchedule();
+                updateWeekInfo();
+                loadingMessage.style.display = 'none';
+            } catch (error) {
+                console.error('Failed to load schedule:', error);
+                loadingMessage.style.display = 'none';
+                showError('Unable to load schedule data.');
+            }
+        }
+
+        // Auto-refresh every 10 minutes
+        setInterval(loadSchedule, 10 * 60 * 1000);
+
+        // Load schedule when page loads
+        window.addEventListener('load', loadSchedule);
+    </script>
+</body>
+</html>
