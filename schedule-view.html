@@ -38,9 +38,52 @@
             gap: 15px;
         }
 
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
         .header h1 {
             font-size: 28px;
             color: #2c3e50;
+        }
+
+        .week-start-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background: #bdc3c7;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #3498db;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(26px);
         }
 
         .month-nav {
@@ -165,6 +208,14 @@
             background: #e74c3c;
         }
 
+        .event-item.non-public {
+            background: #f39c12;
+        }
+
+        .event-item.tbd {
+            background: #3498db;
+        }
+
         .more-events {
             font-size: 9px;
             color: #7f8c8d;
@@ -229,7 +280,6 @@
             background: #2980b9;
         }
 
-        /* Modal for event details */
         .modal {
             display: none;
             position: fixed;
@@ -294,7 +344,16 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>TSL Calendar</h1>
+            <div class="header-left">
+                <h1>TSL Calendar</h1>
+                <div class="week-start-toggle">
+                    <span>Week starts:</span>
+                    <span id="weekStartLabel">Sunday</span>
+                    <div class="toggle-switch" id="weekStartToggle" onclick="toggleWeekStart()">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+            </div>
             <div class="month-nav">
                 <button class="nav-btn" onclick="changeMonth(-1)">‹ Previous</button>
                 <div class="current-month" id="currentMonth">Loading...</div>
@@ -307,15 +366,8 @@
         <div id="loadingMessage" class="loading">Loading calendar...</div>
         
         <div class="calendar-container" id="calendarContainer" style="display: none;">
-            <div class="calendar-grid">
-                <div class="calendar-header">Sunday</div>
-                <div class="calendar-header">Monday</div>
-                <div class="calendar-header">Tuesday</div>
-                <div class="calendar-header">Wednesday</div>
-                <div class="calendar-header">Thursday</div>
-                <div class="calendar-header">Friday</div>
-                <div class="calendar-header">Saturday</div>
-                <div id="calendarGrid"></div>
+            <div class="calendar-grid" id="calendarGrid">
+                <!-- Headers and days will be dynamically generated -->
             </div>
         </div>
 
@@ -323,6 +375,14 @@
             <div class="legend-item">
                 <div class="legend-color" style="background: #e74c3c;"></div>
                 <span>Main Events</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #f39c12;"></div>
+                <span>Non-Public</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #3498db;"></div>
+                <span>TBD</span>
             </div>
             <div class="legend-item">
                 <div class="legend-color" style="background: #95a5a6;"></div>
@@ -346,29 +406,48 @@
     </div>
 
     <script>
-        // Configuration
+        // Configuration - All 5 TSL calendars for staff view
         const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
         
-        const PUBLIC_CALENDARS = {
+        const ALL_CALENDARS = {
             'events': '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
+            'non-public': '6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700@group.calendar.google.com',
+            'tbd': '7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306@group.calendar.google.com',
             'theater-1': '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com',
             'theater-2': 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
         };
 
         let currentDate = new Date();
         let allEvents = [];
+        let weekStartsMonday = localStorage.getItem('weekStartsMonday') === 'true';
 
         function getMonthRange(year, month) {
             const firstDay = new Date(year, month, 1);
             const lastDay = new Date(year, month + 1, 0);
             
-            // Get the Sunday before the first day of the month
+            // Calculate start date based on week start preference
             const startDate = new Date(firstDay);
-            startDate.setDate(firstDay.getDate() - firstDay.getDay());
+            if (weekStartsMonday) {
+                // For Monday start: get the Monday before or on the first day
+                const dayOfWeek = firstDay.getDay();
+                const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                startDate.setDate(firstDay.getDate() - daysFromMonday);
+            } else {
+                // For Sunday start: get the Sunday before or on the first day
+                startDate.setDate(firstDay.getDate() - firstDay.getDay());
+            }
             
-            // Get the Saturday after the last day of the month
+            // Calculate end date
             const endDate = new Date(lastDay);
-            endDate.setDate(lastDay.getDate() + (6 - lastDay.getDay()));
+            if (weekStartsMonday) {
+                // Get the Sunday after the last day
+                const dayOfWeek = lastDay.getDay();
+                const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+                endDate.setDate(lastDay.getDate() + daysToSunday);
+            } else {
+                // Get the Saturday after the last day
+                endDate.setDate(lastDay.getDate() + (6 - lastDay.getDay()));
+            }
             
             return { start: startDate, end: endDate };
         }
@@ -390,6 +469,37 @@
             return date.getMonth() === month && date.getFullYear() === year;
         }
 
+        function toggleWeekStart() {
+            weekStartsMonday = !weekStartsMonday;
+            localStorage.setItem('weekStartsMonday', weekStartsMonday.toString());
+            
+            const toggle = document.getElementById('weekStartToggle');
+            const label = document.getElementById('weekStartLabel');
+            
+            if (weekStartsMonday) {
+                toggle.classList.add('active');
+                label.textContent = 'Monday';
+            } else {
+                toggle.classList.remove('active');
+                label.textContent = 'Sunday';
+            }
+            
+            renderCalendar();
+        }
+
+        function initializeWeekStartToggle() {
+            const toggle = document.getElementById('weekStartToggle');
+            const label = document.getElementById('weekStartLabel');
+            
+            if (weekStartsMonday) {
+                toggle.classList.add('active');
+                label.textContent = 'Monday';
+            } else {
+                toggle.classList.remove('active');
+                label.textContent = 'Sunday';
+            }
+        }
+
         async function fetchCalendarEvents() {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
@@ -398,7 +508,7 @@
             allEvents = [];
             
             try {
-                for (const [calendarType, calendarId] of Object.entries(PUBLIC_CALENDARS)) {
+                for (const [calendarType, calendarId] of Object.entries(ALL_CALENDARS)) {
                     const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
                         `timeMin=${start.toISOString()}&` +
                         `timeMax=${end.toISOString()}&` +
@@ -455,10 +565,19 @@
             document.getElementById('currentMonth').textContent = `${monthNames[month]} ${year}`;
             
             const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
             
-            // Clear existing day cells but keep headers
-            const existingDayCells = grid.querySelectorAll('.calendar-day');
-            existingDayCells.forEach(cell => cell.remove());
+            // Generate day headers based on week start preference
+            const dayHeaders = weekStartsMonday 
+                ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            
+            dayHeaders.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'calendar-header';
+                header.textContent = day;
+                grid.appendChild(header);
+            });
             
             // Generate 42 day cells (6 weeks)
             for (let i = 0; i < 42; i++) {
@@ -526,11 +645,11 @@
                 (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`) : 
                 `${minutes}m`;
             
-            const theater = event.calendar === 'theater-1' ? 'Theater 1' : 
-                           event.calendar === 'theater-2' ? 'Theater 2' : 
-                           event.calendar === 'non-public' ? 'Non-Public Event' :
-                           event.calendar === 'tbd' ? 'TBD (Tentative)' :
-                           'Main Events';
+            const calendarName = event.calendar === 'theater-1' ? 'Theater 1' : 
+                                 event.calendar === 'theater-2' ? 'Theater 2' : 
+                                 event.calendar === 'non-public' ? 'Non-Public Event' :
+                                 event.calendar === 'tbd' ? 'TBD (Tentative)' :
+                                 'Main Events';
             
             content.innerHTML = `
                 <h3>${event.title}</h3>
@@ -542,7 +661,7 @@
                 })}</p>
                 <p><strong>Time:</strong> ${formatTime(event.start)} - ${formatTime(event.end)}</p>
                 <p><strong>Duration:</strong> ${durationStr}</p>
-                <p><strong>Location:</strong> ${theater}</p>
+                <p><strong>Calendar:</strong> ${calendarName}</p>
                 ${event.description ? `<p><strong>Description:</strong> ${event.description}</p>` : ''}
             `;
             
