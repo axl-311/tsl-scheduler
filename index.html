@@ -639,6 +639,16 @@
             justify-content: flex-end;
             margin-top: 24px;
         }
+
+        /* Debug Panel */
+        .debug-panel {
+            background: #f0f0f2;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -700,6 +710,10 @@
                 <button class="import-button" onclick="importFromGoogle()" style="width: 100%; margin-top: 15px;">
                     Import from Google Calendar
                 </button>
+                <div class="debug-panel">
+                    <div>Library Events: <span id="debugLibraryCount">0</span></div>
+                    <div>Scheduled Events: <span id="debugScheduledCount">0</span></div>
+                </div>
             </div>
 
             <div class="schedule-container">
@@ -839,7 +853,7 @@
                 authButton.textContent = 'Sign Out';
                 authButton.classList.add('sign-out');
                 syncStatus.classList.add('connected');
-                syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
+                syncStatus.innerHTML = '<span>✔</span><span>Connected to Google Calendar</span>';
             } else {
                 authButton.textContent = 'Connect Google Calendar';
                 authButton.classList.remove('sign-out');
@@ -849,6 +863,7 @@
                 libraryEvents = [];
                 scheduledEvents = [];
                 renderLibrary();
+                updateDebugCounts();
             }
         }
 
@@ -937,11 +952,12 @@
             renderLibrary();
             renderEventsForCurrentWeek();
             updateWeekStats();
+            updateDebugCounts();
             syncStatus.classList.remove('syncing');
             
             if (totalEvents > 0) {
                 syncStatus.classList.add('connected');
-                syncStatus.innerHTML = '<span>✓</span><span>Connected</span>';
+                syncStatus.innerHTML = '<span>✔</span><span>Connected</span>';
                 showToast(`Imported ${totalEvents} events`);
             } else {
                 syncStatus.innerHTML = '<span>⚠</span><span>No events found</span>';
@@ -978,9 +994,12 @@
             const events = data.items || [];
             let addedCount = 0;
             
+            console.log(`Processing ${events.length} events from ${calendarKey}`);
+            
             events.forEach(event => {
                 // Skip if we've already seen this event ID
                 if (seenEventIds.has(event.id)) {
+                    console.log(`Skipping duplicate event: ${event.summary}`);
                     return;
                 }
                 seenEventIds.add(event.id);
@@ -1005,35 +1024,27 @@
                     isAllDay: !event.start.dateTime
                 };
 
-                // Add to scheduled events if it has a specific time
+                // Add to scheduled events if it has a specific time in the current week
                 if (event.start.dateTime) {
                     const scheduledEvent = convertToScheduledEvent(eventData);
-                    if (scheduledEvent) {
+                    if (scheduledEvent && calculateDayOfWeek(scheduledEvent.actualDate) >= 0) {
+                        console.log(`Adding to schedule: ${eventData.title}`);
                         scheduledEvents.push(scheduledEvent);
-                        // Don't add scheduled events to library - they're already placed
                         addedCount++;
-                        return;
+                        return; // Don't add to library if scheduled
                     }
                 }
 
                 // Only add to library if not already scheduled
-                // Check if this event already exists in library by googleEventId or title
-                const existsInLibrary = libraryEvents.some(existing => 
-                    existing.googleEventId === event.id || 
-                    (existing.title === eventData.title && existing.calendar === eventData.calendar)
-                );
-                
-                if (!existsInLibrary) {
-                    // For all-day events, set a reasonable default duration
-                    if (!event.start.dateTime) {
-                        eventData.duration = 120; // 2 hours default
-                    }
-                    libraryEvents.push(eventData);
+                console.log(`Adding to library: ${eventData.title}`);
+                if (!event.start.dateTime) {
+                    eventData.duration = 120; // 2 hours default for all-day events
                 }
-                
+                libraryEvents.push(eventData);
                 addedCount++;
             });
 
+            console.log(`Added ${addedCount} events from ${calendarKey}`);
             return events;
         }
 
@@ -1244,7 +1255,7 @@
 
             syncStatus.classList.remove('syncing');
             syncStatus.classList.add('connected');
-            syncStatus.innerHTML = '<span>✓</span><span>Connected</span>';
+            syncStatus.innerHTML = '<span>✔</span><span>Connected</span>';
             
             let message = '';
             if (successCount > 0) {
@@ -1325,6 +1336,7 @@
                 renderLibrary();
                 renderEventsForCurrentWeek();
                 updateWeekStats();
+                updateDebugCounts();
                 
                 showToast('Schedule loaded');
             } catch (error) {
@@ -1549,6 +1561,12 @@
             document.getElementById('libraryCount').textContent = `(${filteredEvents.length})`;
         }
 
+        // Update debug counts
+        function updateDebugCounts() {
+            document.getElementById('debugLibraryCount').textContent = libraryEvents.length;
+            document.getElementById('debugScheduledCount').textContent = scheduledEvents.length;
+        }
+
         // Drag and Drop handlers
         function handleDragStart(e) {
             draggedItem = this;
@@ -1633,7 +1651,7 @@
             }
         }
 
-        // DATABASE BEHAVIOR: Remove from library when scheduling
+        // FIXED DATABASE BEHAVIOR: Remove from library when scheduling
         function handleDrop(e) {
             e.preventDefault();
             this.classList.remove('drop-active');
@@ -1690,13 +1708,20 @@
                 scheduledEvent.calendar = event.calendar;
             }
             
-            // Handle library database logic
+            // FIXED: Handle library database logic with proper OR condition
             if (source === 'library') {
-                // Remove from library when scheduling (library acts as database)
-                libraryEvents = libraryEvents.filter(e => 
-                    e.id != event.id && e.googleEventId != event.googleEventId
-                );
+                console.log('Removing from library:', event.title, 'ID:', event.id, 'GoogleID:', event.googleEventId);
+                // Remove from library when scheduling - use OR not AND
+                libraryEvents = libraryEvents.filter(e => {
+                    // Keep the event if neither ID matches
+                    const keepEvent = e.id != event.id && (!event.googleEventId || e.googleEventId != event.googleEventId);
+                    if (!keepEvent) {
+                        console.log('Removing library event:', e.title);
+                    }
+                    return keepEvent;
+                });
                 renderLibrary(); // Update library display
+                updateDebugCounts();
             } else if (source === 'grid' && draggedItem) {
                 // Moving existing scheduled event
                 const originalId = draggedItem.dataset.eventId;
@@ -1707,6 +1732,7 @@
             scheduledEvents.push(scheduledEvent);
             renderScheduledEvent(scheduledEvent);
             updateWeekStats();
+            updateDebugCounts();
             
             const action = source === 'library' ? 'scheduled' : 'moved';
             showToast(`Event ${action} successfully!`);
@@ -1776,12 +1802,19 @@
             }, 3000);
         }
 
-        // DATABASE BEHAVIOR: Add back to library when deleted
+        // FIXED DATABASE BEHAVIOR: Add back to library when deleted
         function deleteEvent(eventId) {
             if (!confirm('Delete this event?')) return;
             
             // Find the event before deleting it
             const eventToDelete = scheduledEvents.find(e => e.id == eventId);
+            
+            if (!eventToDelete) {
+                console.log('Event not found:', eventId);
+                return;
+            }
+            
+            console.log('Deleting event:', eventToDelete.title);
             
             // Remove from scheduled events
             scheduledEvents = scheduledEvents.filter(e => e.id != eventId);
@@ -1792,35 +1825,38 @@
                 eventBlock.remove();
             }
             
-            // Add back to library (database behavior)
-            if (eventToDelete) {
-                // Check if it already exists in library (prevent duplicates)
-                const existsInLibrary = libraryEvents.some(existing => 
-                    existing.googleEventId === eventToDelete.googleEventId ||
-                    (existing.title === eventToDelete.title && existing.calendar === eventToDelete.calendar)
-                );
+            // Add back to library (database behavior) - only if it's not already there
+            const existsInLibrary = libraryEvents.some(existing => {
+                // Check both by googleEventId and by id
+                return (eventToDelete.googleEventId && existing.googleEventId === eventToDelete.googleEventId) ||
+                       existing.id == eventToDelete.id ||
+                       existing.id == eventToDelete.googleEventId;
+            });
+            
+            console.log('Exists in library:', existsInLibrary);
+            
+            if (!existsInLibrary) {
+                // Create library version (remove scheduling-specific properties)
+                const libraryEvent = {
+                    id: eventToDelete.googleEventId || eventToDelete.id,
+                    title: eventToDelete.title,
+                    duration: eventToDelete.duration,
+                    calendar: eventToDelete.calendar,
+                    description: eventToDelete.description || '',
+                    location: eventToDelete.location || '',
+                    googleEventId: eventToDelete.googleEventId,
+                    startTime: eventToDelete.startTime,
+                    endTime: eventToDelete.endTime,
+                    isAllDay: eventToDelete.isAllDay || false
+                };
                 
-                if (!existsInLibrary) {
-                    // Create library version (remove scheduling-specific properties)
-                    const libraryEvent = {
-                        id: eventToDelete.googleEventId || eventToDelete.id,
-                        title: eventToDelete.title,
-                        duration: eventToDelete.duration,
-                        calendar: eventToDelete.calendar,
-                        description: eventToDelete.description,
-                        location: eventToDelete.location,
-                        googleEventId: eventToDelete.googleEventId,
-                        startTime: eventToDelete.startTime,
-                        endTime: eventToDelete.endTime,
-                        isAllDay: eventToDelete.isAllDay
-                    };
-                    
-                    libraryEvents.push(libraryEvent);
-                    renderLibrary(); // Update library display
-                }
+                console.log('Adding back to library:', libraryEvent.title);
+                libraryEvents.push(libraryEvent);
+                renderLibrary(); // Update library display
             }
             
             updateWeekStats();
+            updateDebugCounts();
             showToast('Event deleted and returned to library');
         }
 
@@ -1900,6 +1936,7 @@
             generateDaysColumns();
             updateWeekDisplay();
             updateWeekStats();
+            updateDebugCounts();
             
             const authButton = document.getElementById('authButton');
             authButton.onclick = handleAuthClick;
