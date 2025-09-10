@@ -752,7 +752,7 @@
                             <span>hrs</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 5px;">
-                            <input type="number" id="editMinutes" class="form-input" min="0" max="59" step="15" style="width: 80px;" placeholder="0">
+                            <input type="number" id="editMinutes" class="form-input" min="0" max="59" style="width: 80px;" placeholder="0">
                             <span>min</span>
                         </div>
                     </div>
@@ -1562,7 +1562,7 @@
             }
         }
 
-        // FIXED: Render library - show unique movies/events only (no duplicates by title)
+        // FIXED: Render library - treat theater-1 and theater-2 as same movie, deduplicate by title only
         function renderLibrary() {
             const container = document.getElementById('libraryItems');
             const filter = document.getElementById('calendarFilter').value;
@@ -1590,11 +1590,18 @@
                     const dayOfWeek = calculateDayOfWeek(event.actualDate);
                     // Only show events from OTHER weeks in the library
                     if (dayOfWeek < 0 || dayOfWeek > 6) {
+                        // Normalize theater calendars to generic "theater" for library display
+                        let normalizedCalendar = event.calendar;
+                        if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
+                            normalizedCalendar = 'theater';
+                        }
+                        
                         allLibraryEvents.push({
                             id: event.googleEventId || event.id,
                             title: event.title,
                             duration: event.duration,
-                            calendar: event.calendar,
+                            calendar: normalizedCalendar,
+                            originalCalendar: event.calendar, // Keep original for reference
                             description: event.description || '',
                             location: event.location || '',
                             googleEventId: event.googleEventId,
@@ -1607,31 +1614,47 @@
             
             // Add all-day/TBD events from libraryEvents
             libraryEvents.forEach(event => {
-                allLibraryEvents.push(event);
+                // Normalize theater calendars for library display
+                let normalizedCalendar = event.calendar;
+                if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
+                    normalizedCalendar = 'theater';
+                }
+                
+                allLibraryEvents.push({
+                    ...event,
+                    calendar: normalizedCalendar,
+                    originalCalendar: event.calendar
+                });
             });
             
             console.log(`Total library candidates: ${allLibraryEvents.length}`);
             
-            // DEDUPLICATE BY TITLE + CALENDAR - keep only one instance of each unique movie/event
+            // DEDUPLICATE BY TITLE ONLY - ignore calendar source for movies
             const uniqueByTitle = new Map();
             allLibraryEvents.forEach(event => {
-                const key = `${event.title.toLowerCase().trim()}-${event.calendar}`;
+                const key = event.title.toLowerCase().trim();
                 
                 if (!uniqueByTitle.has(key)) {
                     uniqueByTitle.set(key, event);
-                    console.log(`Adding unique library item: ${event.title} (${event.calendar})`);
+                    console.log(`Adding unique library item: ${event.title} (normalized from ${event.originalCalendar || event.calendar})`);
                 } else {
-                    console.log(`Skipping duplicate: ${event.title} (${event.calendar})`);
+                    console.log(`Skipping duplicate: ${event.title} (from ${event.originalCalendar || event.calendar})`);
                 }
             });
             
             const uniqueLibraryEvents = Array.from(uniqueByTitle.values());
             console.log(`Unique library events after deduplication: ${uniqueLibraryEvents.length}`);
             
-            // Apply calendar filter
-            const filteredEvents = filter === 'all' 
-                ? uniqueLibraryEvents 
-                : uniqueLibraryEvents.filter(e => e.calendar === filter);
+            // Apply calendar filter (with theater normalization)
+            let filteredEvents;
+            if (filter === 'all') {
+                filteredEvents = uniqueLibraryEvents;
+            } else if (filter === 'theater-1' || filter === 'theater-2') {
+                // Show all theater events for either theater filter
+                filteredEvents = uniqueLibraryEvents.filter(e => e.calendar === 'theater');
+            } else {
+                filteredEvents = uniqueLibraryEvents.filter(e => e.calendar === filter);
+            }
             
             console.log(`After filter '${filter}': ${filteredEvents.length} events`);
             
@@ -1644,7 +1667,9 @@
             } else {
                 filteredEvents.forEach(event => {
                     const item = document.createElement('div');
-                    item.className = `library-item calendar-${event.calendar}`;
+                    // Use normalized calendar for styling (theater events get theater-1 styling)
+                    const styleCalendar = event.calendar === 'theater' ? 'theater-1' : event.calendar;
+                    item.className = `library-item calendar-${styleCalendar}`;
                     item.draggable = true;
                     item.dataset.eventId = event.id || event.googleEventId;
                     
@@ -2029,8 +2054,13 @@
             // Convert hours and minutes to total minutes
             const newDuration = (hours * 60) + minutes;
             
-            if (!newTitle || newDuration < 15) {
-                showToast('Invalid input - title required and duration must be at least 15 minutes');
+            if (!newTitle) {
+                showToast('Title is required');
+                return;
+            }
+            
+            if (newDuration <= 0) {
+                showToast('Duration must be greater than 0');
                 return;
             }
             
