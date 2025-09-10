@@ -1812,7 +1812,7 @@
             }
         }
 
-        // FIXED DATABASE BEHAVIOR: Remove from library when scheduling
+        // FIXED DATABASE BEHAVIOR: Library items can be scheduled multiple times
         function handleDrop(e) {
             e.preventDefault();
             this.classList.remove('drop-active');
@@ -1849,16 +1849,48 @@
             scheduledDate.setDate(scheduledDate.getDate() + parseInt(this.dataset.day));
             scheduledDate.setHours(0, 0, 0, 0);
             
-            const scheduledEvent = {
-                ...event,
-                day: parseInt(this.dataset.day),
-                theater: parseInt(this.dataset.theater),
-                startHour: convertFromTheaterHour(theaterHour),
-                startMinute: minute,
-                actualDate: scheduledDate,
-                id: source === 'library' ? Date.now() : event.id
-            };
+            let scheduledEvent;
             
+            if (source === 'library') {
+                // Create a NEW instance of this library event
+                // Each scheduled instance gets a unique ID but keeps the googleEventId for reference
+                scheduledEvent = {
+                    ...event,
+                    day: parseInt(this.dataset.day),
+                    theater: parseInt(this.dataset.theater),
+                    startHour: convertFromTheaterHour(theaterHour),
+                    startMinute: minute,
+                    actualDate: scheduledDate,
+                    id: `scheduled-${Date.now()}-${Math.random()}`, // Always create unique ID for each instance
+                    googleEventId: event.googleEventId, // Keep original reference
+                    instanceOf: event.googleEventId || event.id // Track what library item this came from
+                };
+                
+                scheduledEvents.push(scheduledEvent);
+                console.log('Created new instance of:', event.title);
+                
+            } else if (source === 'grid') {
+                // Moving existing scheduled event
+                scheduledEvent = {
+                    ...event,
+                    day: parseInt(this.dataset.day),
+                    theater: parseInt(this.dataset.theater),
+                    startHour: convertFromTheaterHour(theaterHour),
+                    startMinute: minute,
+                    actualDate: scheduledDate,
+                    id: event.id
+                };
+                
+                if (draggedItem) {
+                    const originalId = draggedItem.dataset.eventId;
+                    scheduledEvents = scheduledEvents.filter(e => e.id != originalId);
+                    draggedItem.remove();
+                }
+                
+                scheduledEvents.push(scheduledEvent);
+            }
+            
+            // Handle theater-specific calendar assignments
             if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
                 if (this.dataset.theater === '0') {
                     scheduledEvent.calendar = 'theater-1';
@@ -1869,21 +1901,8 @@
                 scheduledEvent.calendar = event.calendar;
             }
             
-            // FIXED: Handle library database logic with proper removal
-            if (source === 'library') {
-                console.log('Dragging from library:', event.title, 'ID:', event.id, 'GoogleID:', event.googleEventId);
-                // Just refresh library after adding (will automatically hide current week events)
-                renderLibrary(); // Update library display
-                updateDebugCounts();
-            } else if (source === 'grid' && draggedItem) {
-                // Moving existing scheduled event
-                const originalId = draggedItem.dataset.eventId;
-                scheduledEvents = scheduledEvents.filter(e => e.id != originalId);
-                draggedItem.remove();
-            }
-            
-            scheduledEvents.push(scheduledEvent);
             renderScheduledEvent(scheduledEvent);
+            renderLibrary(); // Library always shows same items
             updateWeekStats();
             updateDebugCounts();
             
