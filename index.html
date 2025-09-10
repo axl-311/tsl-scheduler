@@ -1023,23 +1023,35 @@
             
             // Process each unique event
             for (const eventData of allEventsMap.values()) {
-                // If event has a specific time, add to scheduled events
+                // If event has a specific time
                 if (eventData.startTime && eventData.startTime.dateTime) {
                     const scheduledEvent = convertToScheduledEvent(eventData);
                     if (scheduledEvent) {
+                        // Always add to scheduledEvents for persistence
                         scheduledEvents.push(scheduledEvent);
-                        totalScheduledEvents++;
-                        console.log(`Added to scheduled: ${eventData.title} on ${new Date(eventData.startTime.dateTime).toLocaleDateString()}`);
+                        
+                        // Check if this event is in the current week
+                        const dayOfWeek = calculateDayOfWeek(scheduledEvent.actualDate);
+                        
+                        if (dayOfWeek >= 0 && dayOfWeek <= 6) {
+                            // Event is in current week - already scheduled, don't add to library
+                            totalScheduledEvents++;
+                            console.log(`Added to current week schedule: ${eventData.title} on ${new Date(eventData.startTime.dateTime).toLocaleDateString()}`);
+                        } else {
+                            // Event is in a different week - add to library as available to schedule
+                            libraryEvents.push(eventData);
+                            totalLibraryEvents++;
+                            console.log(`Added to library (future/past week): ${eventData.title} on ${new Date(eventData.startTime.dateTime).toLocaleDateString()}`);
+                        }
                     }
                 } else {
-                    // Only add to library if it's an all-day event or TBD event
-                    // Set a reasonable default duration for all-day events
+                    // All-day or TBD event - always add to library
                     if (!eventData.startTime.dateTime) {
                         eventData.duration = 120; // 2 hours default
                     }
                     libraryEvents.push(eventData);
                     totalLibraryEvents++;
-                    console.log(`Added to library: ${eventData.title}`);
+                    console.log(`Added to library (all-day/TBD): ${eventData.title}`);
                 }
             }
 
