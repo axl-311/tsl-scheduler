@@ -1562,7 +1562,7 @@
             }
         }
 
-        // Render library - show all available events (can schedule multiple times)
+        // FIXED: Render library - show unique movies/events only (no duplicates by title)
         function renderLibrary() {
             const container = document.getElementById('libraryItems');
             const filter = document.getElementById('calendarFilter').value;
@@ -1579,8 +1579,10 @@
                 return;
             }
             
+            console.log('Rendering library...');
+            
             // Get ALL events from other weeks as potential library items
-            const libraryItemsToShow = [];
+            const allLibraryEvents = [];
             
             // Add events from other weeks that can be scheduled
             scheduledEvents.forEach(event => {
@@ -1588,8 +1590,7 @@
                     const dayOfWeek = calculateDayOfWeek(event.actualDate);
                     // Only show events from OTHER weeks in the library
                     if (dayOfWeek < 0 || dayOfWeek > 6) {
-                        // Convert to library format
-                        const libraryEvent = {
+                        allLibraryEvents.push({
                             id: event.googleEventId || event.id,
                             title: event.title,
                             duration: event.duration,
@@ -1599,31 +1600,40 @@
                             googleEventId: event.googleEventId,
                             startTime: event.startTime,
                             endTime: event.endTime
-                        };
-                        libraryItemsToShow.push(libraryEvent);
+                        });
                     }
                 }
             });
             
             // Add all-day/TBD events from libraryEvents
             libraryEvents.forEach(event => {
-                libraryItemsToShow.push(event);
+                allLibraryEvents.push(event);
             });
             
-            // Remove duplicates based on googleEventId (keep one of each for the library)
-            const uniqueLibraryMap = new Map();
-            libraryItemsToShow.forEach(event => {
-                const key = event.googleEventId || `${event.title}-${event.calendar}`;
-                if (!uniqueLibraryMap.has(key)) {
-                    uniqueLibraryMap.set(key, event);
+            console.log(`Total library candidates: ${allLibraryEvents.length}`);
+            
+            // DEDUPLICATE BY TITLE + CALENDAR - keep only one instance of each unique movie/event
+            const uniqueByTitle = new Map();
+            allLibraryEvents.forEach(event => {
+                const key = `${event.title.toLowerCase().trim()}-${event.calendar}`;
+                
+                if (!uniqueByTitle.has(key)) {
+                    uniqueByTitle.set(key, event);
+                    console.log(`Adding unique library item: ${event.title} (${event.calendar})`);
+                } else {
+                    console.log(`Skipping duplicate: ${event.title} (${event.calendar})`);
                 }
             });
             
-            const uniqueLibraryEvents = Array.from(uniqueLibraryMap.values());
+            const uniqueLibraryEvents = Array.from(uniqueByTitle.values());
+            console.log(`Unique library events after deduplication: ${uniqueLibraryEvents.length}`);
             
+            // Apply calendar filter
             const filteredEvents = filter === 'all' 
                 ? uniqueLibraryEvents 
                 : uniqueLibraryEvents.filter(e => e.calendar === filter);
+            
+            console.log(`After filter '${filter}': ${filteredEvents.length} events`);
             
             if (filteredEvents.length === 0) {
                 container.innerHTML = `
@@ -1636,7 +1646,7 @@
                     const item = document.createElement('div');
                     item.className = `library-item calendar-${event.calendar}`;
                     item.draggable = true;
-                    item.dataset.eventId = event.id;
+                    item.dataset.eventId = event.id || event.googleEventId;
                     
                     const hours = Math.floor(event.duration / 60);
                     const minutes = event.duration % 60;
