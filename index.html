@@ -1485,7 +1485,7 @@
             button.textContent = collapsedDays ? 'Show Tues-Thurs' : 'Hide Tues-Thurs';
         }
 
-        // Generate day columns
+        // Generate day columns with direct drop handlers
         function generateDaysColumns() {
             const daysContainer = document.getElementById('daysContainer');
             const days = ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday'];
@@ -1538,6 +1538,22 @@
                     laneHeader.textContent = theater;
                     lane.appendChild(laneHeader);
                     
+                    // DIRECT drop event listeners for theater lanes
+                    lane.addEventListener('dragover', function(e) {
+                        console.log('DRAGOVER detected on lane:', this.dataset.day, this.dataset.theater);
+                        handleDragOver.call(this, e);
+                    });
+                    
+                    lane.addEventListener('drop', function(e) {
+                        console.log('DROP detected on lane:', this.dataset.day, this.dataset.theater);
+                        handleDrop.call(this, e);
+                    });
+                    
+                    lane.addEventListener('dragleave', function(e) {
+                        console.log('DRAGLEAVE detected on lane');
+                        handleDragLeave.call(this, e);
+                    });
+                    
                     theaterLanes.appendChild(lane);
                 });
                 
@@ -1547,14 +1563,17 @@
             });
         }
 
-        // Drag and drop handlers
+        // Drag and drop handlers - FIXED event data transfer
         function handleDragStart(e) {
-            console.log('Drag started:', this.querySelector('.event-title')?.textContent || 'Unknown');
+            console.log('Drag started:', this.querySelector('.event-title')?.textContent || this.querySelector('.library-item-title')?.textContent || 'Unknown');
+            
             draggedItem = this;
             this.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
             
+            // Determine source
             dragSource = this.closest('.library-panel') ? 'library' : 'grid';
+            console.log('Drag source:', dragSource);
             
             if (dragSource === 'grid') {
                 const rect = this.getBoundingClientRect();
@@ -1564,13 +1583,17 @@
             }
             
             const eventId = this.dataset.eventId;
+            console.log('Looking for event ID:', eventId);
+            
             let event = null;
             
+            // Search in scheduledEvents first
             event = scheduledEvents.find(e => {
                 const id = e.googleEventId || e.id;
                 return id == eventId;
             });
             
+            // If not found, search in libraryEvents
             if (!event) {
                 event = libraryEvents.find(e => {
                     const id = e.googleEventId || e.id;
@@ -1578,9 +1601,28 @@
                 });
             }
             
+            // ENHANCED: Also search by title as fallback
+            if (!event && dragSource === 'library') {
+                const title = this.querySelector('.library-item-title')?.textContent;
+                if (title) {
+                    console.log('Searching by title fallback:', title);
+                    // Search in scheduled events from other weeks
+                    event = scheduledEvents.find(e => e.title === title);
+                    if (!event) {
+                        event = libraryEvents.find(e => e.title === title);
+                    }
+                }
+            }
+            
             if (event) {
+                console.log('Found event for drag:', event.title, 'Duration:', event.duration);
                 e.dataTransfer.setData('event', JSON.stringify(event));
                 e.dataTransfer.setData('source', dragSource);
+                console.log('Event data set successfully');
+            } else {
+                console.error('ERROR: Could not find event for drag! EventId:', eventId);
+                console.log('Available scheduled events:', scheduledEvents.map(e => ({id: e.id, googleId: e.googleEventId, title: e.title})));
+                console.log('Available library events:', libraryEvents.map(e => ({id: e.id, googleId: e.googleEventId, title: e.title})));
             }
         }
 
