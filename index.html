@@ -928,141 +928,177 @@
             return -1;
         }
 
-        // FIXED: Import from Google Calendar - REBUILD DATABASE FROM GOOGLE CALENDAR
+        // PREVENT MULTIPLE IMPORT CALLS
+        let isImporting = false;
+
+        // FIXED: Import from Google Calendar - REBUILD DATABASE FROM GOOGLE CALENDAR (NO DUPLICATES)
         async function importFromGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
                 return;
             }
 
+            // PREVENT MULTIPLE SIMULTANEOUS IMPORTS
+            if (isImporting) {
+                console.log('Import already in progress, skipping...');
+                showToast('Import already in progress...');
+                return;
+            }
+
+            isImporting = true;
+            console.log('=== STARTING FRESH DATABASE REBUILD ===');
+
             const syncStatus = document.getElementById('syncStatus');
             syncStatus.classList.add('syncing');
-            syncStatus.innerHTML = '<span>↻</span><span>Building database from Google Calendar...</span>';
+            syncStatus.innerHTML = '<span>↻</span><span>Rebuilding database...</span>';
             
-            // WIPE EXISTING DATA - Google Calendar is the single source of truth
-            console.log('Clearing existing database...');
-            libraryEvents = [];
-            scheduledEvents = [];
-            
-            // Clear the UI
-            document.querySelectorAll('.event-block').forEach(block => block.remove());
-            
-            // Import range: 2 weeks before to 12 weeks after current week
-            const startOfRange = new Date(currentWeekStart);
-            startOfRange.setDate(startOfRange.getDate() - 14);
-            const endOfRange = new Date(currentWeekStart);
-            endOfRange.setDate(endOfRange.getDate() + 84);
-            
-            // Update debug display
-            document.getElementById('debugImportRange').textContent = 
-                `${startOfRange.toLocaleDateString()} - ${endOfRange.toLocaleDateString()}`;
-            
-            console.log(`Rebuilding database from Google Calendar...`);
-            console.log(`Import range: ${startOfRange.toISOString()} to ${endOfRange.toISOString()}`);
+            try {
+                // STEP 1: COMPLETELY WIPE EXISTING DATA
+                console.log(`Before clear: libraryEvents=${libraryEvents.length}, scheduledEvents=${scheduledEvents.length}`);
+                libraryEvents.length = 0; // Force clear the array
+                scheduledEvents.length = 0; // Force clear the array
+                console.log(`After clear: libraryEvents=${libraryEvents.length}, scheduledEvents=${scheduledEvents.length}`);
+                
+                // Clear UI immediately
+                document.querySelectorAll('.event-block').forEach(block => block.remove());
+                
+                // Import range: 2 weeks before to 12 weeks after current week
+                const startOfRange = new Date(currentWeekStart);
+                startOfRange.setDate(startOfRange.getDate() - 14);
+                const endOfRange = new Date(currentWeekStart);
+                endOfRange.setDate(endOfRange.getDate() + 84);
+                
+                document.getElementById('debugImportRange').textContent = 
+                    `${startOfRange.toLocaleDateString()} - ${endOfRange.toLocaleDateString()}`;
+                
+                console.log(`Import range: ${startOfRange.toISOString()} to ${endOfRange.toISOString()}`);
 
-            let totalLibraryEvents = 0;
-            let totalScheduledEvents = 0;
-            let totalErrors = 0;
+                let totalLibraryEvents = 0;
+                let totalScheduledEvents = 0;
+                let totalErrors = 0;
+                const processedEventIds = new Set(); // Track processed IDs to prevent internal duplicates
 
-            // Fetch ALL events from ALL calendars and rebuild database
-            for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
-                try {
-                    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
-                        `timeMin=${startOfRange.toISOString()}&` +
-                        `timeMax=${endOfRange.toISOString()}&` +
-                        `showDeleted=false&` +
-                        `singleEvents=true&` +
-                        `orderBy=startTime&` +
-                        `key=${API_KEY}`;
-
-                    const response = await fetch(url, {
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`
-                        }
-                    });
-
-                    if (!response.ok) {
-                        console.error(`Failed to fetch ${calendarKey}:`, response.status);
-                        totalErrors++;
-                        continue;
-                    }
-
-                    const data = await response.json();
-                    const events = data.items || [];
-                    
-                    console.log(`Processing ${events.length} events from ${calendarKey} calendar`);
-                    
-                    // Process each event from this calendar
-                    events.forEach(event => {
-                        if (!event.id) return;
+                // STEP 2: FETCH ALL EVENTS FROM ALL CALENDARS
+                for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
+                    try {
+                        console.log(`Fetching events from ${calendarKey} calendar...`);
                         
-                        // Calculate duration
-                        let duration = 120; // Default 2 hours
-                        if (event.start && event.end) {
-                            const start = new Date(event.start.dateTime || event.start.date);
-                            const end = new Date(event.end.dateTime || event.end.date);
-                            duration = Math.round((end - start) / 60000);
-                        }
+                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
+                            `timeMin=${startOfRange.toISOString()}&` +
+                            `timeMax=${endOfRange.toISOString()}&` +
+                            `showDeleted=false&` +
+                            `singleEvents=true&` +
+                            `orderBy=startTime&` +
+                            `key=${API_KEY}`;
 
-                        const eventData = {
-                            id: event.id,
-                            title: event.summary || 'Untitled Event',
-                            duration: duration,
-                            calendar: calendarKey,
-                            description: event.description || '',
-                            location: event.location || '',
-                            googleEventId: event.id,
-                            startTime: event.start,
-                            endTime: event.end,
-                            isAllDay: !event.start.dateTime
-                        };
-                        
-                        // Decide where to put this event
-                        if (event.start && event.start.dateTime) {
-                            // TIMED EVENT - add to scheduledEvents with position data
-                            const scheduledEvent = convertToScheduledEvent(eventData);
-                            if (scheduledEvent) {
-                                scheduledEvents.push(scheduledEvent);
-                                totalScheduledEvents++;
-                                console.log(`Added scheduled: ${eventData.title} on ${scheduledEvent.actualDate?.toLocaleDateString()}`);
+                        const response = await fetch(url, {
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`
                             }
-                        } else {
-                            // ALL-DAY or TBD EVENT - add to library
-                            libraryEvents.push(eventData);
-                            totalLibraryEvents++;
-                            console.log(`Added to library: ${eventData.title} (${calendarKey})`);
+                        });
+
+                        if (!response.ok) {
+                            console.error(`Failed to fetch ${calendarKey}:`, response.status);
+                            totalErrors++;
+                            continue;
                         }
-                    });
-                    
-                } catch (error) {
-                    console.error(`Failed to process ${calendarKey} calendar:`, error);
-                    totalErrors++;
+
+                        const data = await response.json();
+                        const events = data.items || [];
+                        
+                        console.log(`Found ${events.length} events in ${calendarKey} calendar`);
+                        
+                        // Process each event from this calendar
+                        events.forEach(event => {
+                            if (!event.id) {
+                                console.log(`Skipping event without ID: ${event.summary}`);
+                                return;
+                            }
+                            
+                            // Prevent processing the same event twice (even from different calendar queries)
+                            if (processedEventIds.has(event.id)) {
+                                console.log(`Skipping already processed event: ${event.id} - ${event.summary}`);
+                                return;
+                            }
+                            processedEventIds.add(event.id);
+                            
+                            // Calculate duration
+                            let duration = 120; // Default 2 hours
+                            if (event.start && event.end) {
+                                const start = new Date(event.start.dateTime || event.start.date);
+                                const end = new Date(event.end.dateTime || event.end.date);
+                                duration = Math.round((end - start) / 60000);
+                            }
+
+                            const eventData = {
+                                id: event.id,
+                                title: event.summary || 'Untitled Event',
+                                duration: duration,
+                                calendar: calendarKey,
+                                description: event.description || '',
+                                location: event.location || '',
+                                googleEventId: event.id,
+                                startTime: event.start,
+                                endTime: event.end,
+                                isAllDay: !event.start.dateTime
+                            };
+                            
+                            // Decide where to put this event
+                            if (event.start && event.start.dateTime) {
+                                // TIMED EVENT - add to scheduledEvents
+                                const scheduledEvent = convertToScheduledEvent(eventData);
+                                if (scheduledEvent) {
+                                    scheduledEvents.push(scheduledEvent);
+                                    totalScheduledEvents++;
+                                    console.log(`→ Added to scheduled: ${eventData.title} (${scheduledEvent.actualDate?.toLocaleDateString()})`);
+                                }
+                            } else {
+                                // ALL-DAY or TBD EVENT - add to library
+                                libraryEvents.push(eventData);
+                                totalLibraryEvents++;
+                                console.log(`→ Added to library: ${eventData.title} (${calendarKey})`);
+                            }
+                        });
+                        
+                    } catch (error) {
+                        console.error(`Failed to process ${calendarKey} calendar:`, error);
+                        totalErrors++;
+                    }
                 }
-            }
-            
-            console.log(`Database rebuild complete:`);
-            console.log(`- Library events: ${totalLibraryEvents}`);
-            console.log(`- Scheduled events: ${totalScheduledEvents}`);
-            console.log(`- Errors: ${totalErrors}`);
-            
-            // Update UI with fresh data
-            renderLibrary();
-            renderEventsForCurrentWeek();
-            updateWeekStats();
-            updateDebugCounts();
-            syncStatus.classList.remove('syncing');
-            syncStatus.classList.add('connected');
-            syncStatus.innerHTML = '<span>✔</span><span>Database rebuilt from Google Calendar</span>';
-            
-            const totalEvents = totalLibraryEvents + totalScheduledEvents;
-            if (totalEvents > 0) {
-                showToast(`Database rebuilt: ${totalLibraryEvents} library events, ${totalScheduledEvents} scheduled events`);
-            } else {
-                showToast('No events found in Google Calendar for the selected date range');
-            }
-            
-            if (totalErrors > 0) {
-                console.warn(`${totalErrors} calendar(s) had errors during import`);
+                
+                console.log(`=== DATABASE REBUILD COMPLETE ===`);
+                console.log(`Final counts: libraryEvents=${libraryEvents.length}, scheduledEvents=${scheduledEvents.length}`);
+                console.log(`Processed ${processedEventIds.size} unique event IDs`);
+                console.log(`Results: ${totalLibraryEvents} library + ${totalScheduledEvents} scheduled = ${totalLibraryEvents + totalScheduledEvents} total`);
+                
+                // STEP 3: UPDATE UI WITH CLEAN DATA
+                renderLibrary();
+                renderEventsForCurrentWeek();
+                updateWeekStats();
+                updateDebugCounts();
+                
+                syncStatus.classList.remove('syncing');
+                syncStatus.classList.add('connected');
+                syncStatus.innerHTML = '<span>✔</span><span>Database rebuilt (no duplicates)</span>';
+                
+                const totalEvents = totalLibraryEvents + totalScheduledEvents;
+                if (totalEvents > 0) {
+                    showToast(`Clean rebuild: ${totalLibraryEvents} library + ${totalScheduledEvents} scheduled = ${totalEvents} total events`);
+                } else {
+                    showToast('No events found in date range');
+                }
+                
+                if (totalErrors > 0) {
+                    console.warn(`${totalErrors} calendar(s) had errors`);
+                }
+                
+            } catch (error) {
+                console.error('Import failed:', error);
+                syncStatus.classList.remove('syncing');
+                syncStatus.innerHTML = '<span>✗</span><span>Import failed</span>';
+                showToast('Import failed - check console for details');
+            } finally {
+                isImporting = false;
             }
         }
 
