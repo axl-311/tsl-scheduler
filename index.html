@@ -324,8 +324,8 @@
         }
 
         .day-header {
-            height: 50px;
-            padding: 10px 10px 15px 10px;
+            height: 70px;
+            padding: 15px 10px 25px 10px;
             font-weight: 600;
             text-align: center;
             border-bottom: 2px solid #e0e0e0;
@@ -928,7 +928,7 @@
             return -1;
         }
 
-        // Import from Google Calendar - TRUE DATABASE BEHAVIOR with DUPLICATE PREVENTION
+        // FIXED: Import from Google Calendar - TRUE DATABASE BEHAVIOR with PROPER DUPLICATE PREVENTION
         async function importFromGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
@@ -938,19 +938,6 @@
             const syncStatus = document.getElementById('syncStatus');
             syncStatus.classList.add('syncing');
             syncStatus.innerHTML = '<span>↻</span><span>Importing...</span>';
-            
-            // DO NOT CLEAR - maintain database behavior
-            // Create maps of existing events for quick lookup
-            const existingLibraryMap = new Map();
-            libraryEvents.forEach(e => {
-                if (e.googleEventId) existingLibraryMap.set(e.googleEventId, e);
-            });
-            
-            const existingScheduledMap = new Map();
-            scheduledEvents.forEach(e => {
-                const googleId = e.googleEventId || (e.id.toString().startsWith('existing-') ? e.id.replace('existing-', '') : null);
-                if (googleId) existingScheduledMap.set(googleId, e);
-            });
             
             let totalUpdated = 0;
             let totalAdded = 0;
@@ -968,7 +955,7 @@
             
             console.log(`Import range: ${startOfRange.toISOString()} to ${endOfRange.toISOString()}`);
 
-            // Use a Map to collect all events from Google
+            // Step 1: Collect ALL Google events in a single map (prevents Google-side duplicates)
             const googleEventsMap = new Map();
 
             for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
@@ -998,7 +985,6 @@
                     console.log(`Processing ${events.length} events from ${calendarKey}`);
                     
                     events.forEach(event => {
-                        // Store all Google events in map (even duplicates will be overwritten)
                         if (event.id) {
                             let duration = 120;
                             if (event.start && event.end) {
@@ -1008,7 +994,7 @@
                             }
 
                             const eventData = {
-                                id: event.id || Date.now() + Math.random(),
+                                id: event.id,
                                 title: event.summary || 'Untitled Event',
                                 duration: duration,
                                 calendar: calendarKey,
@@ -1020,6 +1006,7 @@
                                 isAllDay: !event.start.dateTime
                             };
                             
+                            // Store in map - this automatically handles Google-side duplicates
                             googleEventsMap.set(event.id, eventData);
                         }
                     });
@@ -1029,67 +1016,67 @@
                 }
             }
 
-            // Process Google events - update existing or add new
-            console.log(`Total events from Google: ${googleEventsMap.size}`);
+            console.log(`Total unique events from Google: ${googleEventsMap.size}`);
+
+            // Step 2: Create unified database of ALL existing events with their Google IDs
+            const existingEventsMap = new Map();
             
-            // Track what we've already processed in this import to avoid duplicates
-            const processedInThisImport = new Set();
-            
-            // Process each Google event
-            for (const [googleId, eventData] of googleEventsMap.entries()) {
-                // Skip if we already processed this in the current import
-                if (processedInThisImport.has(googleId)) {
-                    console.log(`Skipping duplicate in import: ${eventData.title}`);
-                    continue;
+            // Add all scheduled events to the map
+            scheduledEvents.forEach(event => {
+                const googleId = event.googleEventId || 
+                    (event.id.toString().startsWith('existing-') ? event.id.replace('existing-', '') : null);
+                if (googleId) {
+                    existingEventsMap.set(googleId, {
+                        event: event,
+                        location: 'scheduled',
+                        index: scheduledEvents.indexOf(event)
+                    });
                 }
-                processedInThisImport.add(googleId);
+            });
+            
+            // Add all library events to the map
+            libraryEvents.forEach(event => {
+                if (event.googleEventId) {
+                    // Only add if not already in map (scheduled events take priority)
+                    if (!existingEventsMap.has(event.googleEventId)) {
+                        existingEventsMap.set(event.googleEventId, {
+                            event: event,
+                            location: 'library',
+                            index: libraryEvents.indexOf(event)
+                        });
+                    }
+                }
+            });
+
+            console.log(`Found ${existingEventsMap.size} existing events in database`);
+
+            // Step 3: Process each Google event - update existing or add new (NO DUPLICATES)
+            for (const [googleId, googleEventData] of googleEventsMap.entries()) {
                 
-                // Check if this event already exists in our database
-                let foundExisting = false;
-                
-                // Check and update in scheduledEvents
-                for (let i = 0; i < scheduledEvents.length; i++) {
-                    const existing = scheduledEvents[i];
-                    const existingGoogleId = existing.googleEventId || 
-                        (existing.id.toString().startsWith('existing-') ? existing.id.replace('existing-', '') : null);
+                if (existingEventsMap.has(googleId)) {
+                    // UPDATE EXISTING EVENT
+                    const existing = existingEventsMap.get(googleId);
+                    const existingEvent = existing.event;
                     
-                    if (existingGoogleId === googleId) {
-                        // Update existing scheduled event
-                        existing.title = eventData.title;
-                        existing.duration = eventData.duration;
-                        existing.description = eventData.description;
-                        existing.location = eventData.location;
-                        totalUpdated++;
-                        foundExisting = true;
-                        console.log(`Updated existing scheduled event: ${eventData.title}`);
-                        break;
-                    }
-                }
-                
-                // Check and update in library
-                if (!foundExisting) {
-                    for (let i = 0; i < libraryEvents.length; i++) {
-                        if (libraryEvents[i].googleEventId === googleId) {
-                            // Update existing library event
-                            libraryEvents[i].title = eventData.title;
-                            libraryEvents[i].duration = eventData.duration;
-                            libraryEvents[i].description = eventData.description;
-                            libraryEvents[i].location = eventData.location;
-                            totalUpdated++;
-                            foundExisting = true;
-                            console.log(`Updated existing library event: ${eventData.title}`);
-                            break;
-                        }
-                    }
-                }
-                
-                // If not found, add as new
-                if (!foundExisting) {
-                    if (eventData.startTime && eventData.startTime.dateTime) {
-                        const scheduledEvent = convertToScheduledEvent(eventData);
+                    // Update the event data
+                    existingEvent.title = googleEventData.title;
+                    existingEvent.duration = googleEventData.duration;
+                    existingEvent.description = googleEventData.description;
+                    existingEvent.location = googleEventData.location;
+                    existingEvent.startTime = googleEventData.startTime;
+                    existingEvent.endTime = googleEventData.endTime;
+                    
+                    totalUpdated++;
+                    console.log(`Updated existing event: ${googleEventData.title} (${existing.location})`);
+                    
+                } else {
+                    // ADD NEW EVENT - determine where it should go
+                    if (googleEventData.startTime && googleEventData.startTime.dateTime) {
+                        // TIMED EVENT - add to scheduledEvents
+                        const scheduledEvent = convertToScheduledEvent(googleEventData);
                         if (scheduledEvent) {
-                            // Check if we already have this exact event scheduled at this exact time
-                            const isDuplicate = scheduledEvents.some(existing => {
+                            // Final duplicate check by content (in case Google ID changed)
+                            const contentDuplicate = scheduledEvents.find(existing => {
                                 return existing.title === scheduledEvent.title &&
                                        existing.actualDate?.getTime() === scheduledEvent.actualDate?.getTime() &&
                                        existing.startHour === scheduledEvent.startHour &&
@@ -1097,40 +1084,29 @@
                                        existing.theater === scheduledEvent.theater;
                             });
                             
-                            if (isDuplicate) {
-                                console.log(`Skipping duplicate: ${eventData.title} at ${scheduledEvent.actualDate?.toLocaleDateString()} ${scheduledEvent.startHour}:${scheduledEvent.startMinute}`);
+                            if (contentDuplicate) {
+                                console.log(`Skipping content duplicate: ${googleEventData.title}`);
                                 totalSkipped++;
                             } else {
-                                // Add ALL timed events to scheduledEvents only
                                 scheduledEvents.push(scheduledEvent);
-                                const dayOfWeek = calculateDayOfWeek(scheduledEvent.actualDate);
-                                
-                                if (dayOfWeek >= 0 && dayOfWeek <= 6) {
-                                    console.log(`Added to current week schedule: ${eventData.title} on ${scheduledEvent.actualDate.toLocaleDateString()}`);
-                                } else {
-                                    console.log(`Added to scheduled (other week): ${eventData.title} on ${scheduledEvent.actualDate.toLocaleDateString()}`);
-                                }
                                 totalAdded++;
+                                console.log(`Added new scheduled event: ${googleEventData.title}`);
                             }
                         }
                     } else {
-                        // All-day or TBD event - add to library only
-                        if (!eventData.startTime.dateTime) {
-                            eventData.duration = 120; // 2 hours default
-                        }
-                        
-                        // Check for duplicates in library
-                        const isDuplicateInLibrary = libraryEvents.some(existing => 
-                            existing.title === eventData.title && 
-                            existing.calendar === eventData.calendar
+                        // ALL-DAY/TBD EVENT - add to library
+                        // Final duplicate check by content
+                        const contentDuplicate = libraryEvents.find(existing => 
+                            existing.title === googleEventData.title && 
+                            existing.calendar === googleEventData.calendar
                         );
                         
-                        if (!isDuplicateInLibrary) {
-                            libraryEvents.push(eventData);
+                        if (!contentDuplicate) {
+                            libraryEvents.push(googleEventData);
                             totalAdded++;
-                            console.log(`Added to library (all-day/TBD): ${eventData.title}`);
+                            console.log(`Added new library event: ${googleEventData.title}`);
                         } else {
-                            console.log(`Skipping library duplicate: ${eventData.title}`);
+                            console.log(`Skipping content duplicate in library: ${googleEventData.title}`);
                             totalSkipped++;
                         }
                     }
@@ -1139,6 +1115,7 @@
             
             console.log(`Import complete: ${totalAdded} added, ${totalUpdated} updated, ${totalSkipped} skipped`);
             
+            // Step 4: Update UI
             renderLibrary();
             renderEventsForCurrentWeek();
             updateWeekStats();
