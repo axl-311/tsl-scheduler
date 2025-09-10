@@ -107,5 +107,35 @@
             </div>
         </div>
     </div>
+    
+    <script>
+        // Calendar embed URLs for different week starts
+        const sundayStartUrl = "https://calendar.google.com/calendar/embed?height=600&wkst=1&bgcolor=%23ffffff&ctz=America%2FNew_York&src=1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255%40group.calendar.google.com&src=6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700%40group.calendar.google.com&src=7b77eba3ce9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306%40group.calendar.google.com&src=007f10222d5f7076d02816fa4cda7108e75444c18ef7ac0d79aee420313d1a7b%40group.calendar.google.com&src=ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4%40group.calendar.google.com&color=%23D50000&color=%23FF6F00&color=%232196F3&color=%23757575&color=%234CAF50&mode=MONTH&showTabs=1&showPrint=0&showDate=1&showNav=1&showTitle=0&showCalendars=1";
+        
+        const mondayStartUrl = "https://calendar.google.com/calendar/embed?height=600&wkst=2&bgcolor=%23ffffff&ctz=America%2FNew_York&src=1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255%40group.calendar.google.com&src=6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700%40group.calendar.google.com&src=7b77eba3ce9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306%40group.calendar.google.com&src=007f10222d5f7076d02816fa4cda7108e75444c18ef7ac0d79aee420313d1a7b%40group.calendar.google.com&src=ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4%40group.calendar.google.com&color=%23D50000&color=%23FF6F00&color=%232196F3&color=%23757575&color=%234CAF50&mode=MONTH&showTabs=1&showPrint=0&showDate=1&showNav=1&showTitle=0&showCalendars=1";
+        
+        const calendarFrame = document.querySelector('iframe');
+        const weekToggle = document.getElementById('weekStartToggle');
+        
+        // Load saved preference or default to Sunday
+        const savedPreference = localStorage.getItem('tsl-week-start');
+        if (savedPreference === 'monday') {
+            weekToggle.checked = true;
+            calendarFrame.src = mondayStartUrl;
+        }
+        
+        // Handle toggle change
+        weekToggle.addEventListener('change', function() {
+            if (this.checked) {
+                // Monday start
+                calendarFrame.src = mondayStartUrl;
+                localStorage.setItem('tsl-week-start', 'monday');
+            } else {
+                // Sunday start
+                calendarFrame.src = sundayStartUrl;
+                localStorage.setItem('tsl-week-start', 'sunday');
+            }
+        });
+    </script>
 </body>
 </html>
