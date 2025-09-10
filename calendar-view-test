@@ -112,7 +112,7 @@
 
     <div id="errorContainer"></div>
     <div id="loadingMessage" class="loading">Loading calendar...</div>
-    
+
     <div class="calendar-container" id="calendarContainer" style="display:none;">
       <div class="calendar-grid" id="calendarGrid" role="grid" aria-readonly="true">
         <!-- Headers and days will be dynamically generated -->
@@ -177,7 +177,7 @@
     (function applyDeepLinkMonth(){
       const params = new URLSearchParams(location.search);
       const m = params.get('month');
-      if (m && /^\\d{4}-\\d{2}$/.test(m)) {
+      if (m && /^\d{4}-\d{2}$/.test(m)) {
         const [y, mo] = m.split('-').map(Number);
         currentDate = new Date(y, mo - 1, 1);
       }
@@ -380,7 +380,7 @@
           const el = document.createElement('div');
           el.className = `event-item ${ev.calendar} ${ev.allDay ? 'all-day' : ''}`;
           el.textContent = ev.allDay ? `All day — ${ev.title}` : `${fmtTime(ev.start)} ${ev.title}`;
-          el.title = ev.allDay ? `${ev.title} (All day)` : `${ev.title}\\n${fmtTime(ev.start)} - ${fmtTime(ev.end)}`;
+          el.title = ev.allDay ? `${ev.title} (All day)` : `${ev.title}\n${fmtTime(ev.start)} - ${fmtTime(ev.end)}`;
           el.onclick = () => showEventDetails(ev);
           eventsContainer.appendChild(el);
         });
