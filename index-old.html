@@ -2096,6 +2096,7 @@
             document.getElementById('nextWeek').onclick = () => changeWeek(1);
             document.getElementById('collapseToggle').onclick = toggleCollapse;
             document.getElementById('importFromGoogle').onclick = importFromGoogle;
+            document.getElementById('addEventButton').onclick = openAddEventModal;
             document.getElementById('calendarFilter').onchange = renderLibrary;
             document.getElementById('pushToGoogle').onclick = pushToGoogle;
             document.getElementById('saveSchedule').onclick = saveSchedule;
@@ -2111,6 +2112,19 @@
             document.getElementById('editModal').onclick = (e) => {
                 if (e.target.id === 'editModal') {
                     closeEditModal();
+                }
+            };
+            
+            // Add Event Modal handlers
+            document.getElementById('addEventModalClose').onclick = closeAddEventModal;
+            document.getElementById('addEventModalCancel').onclick = closeAddEventModal;
+            document.getElementById('addEventForm').onsubmit = (e) => {
+                e.preventDefault();
+                addNewEvent();
+            };
+            document.getElementById('addEventModal').onclick = (e) => {
+                if (e.target.id === 'addEventModal') {
+                    closeAddEventModal();
                 }
             };
             
