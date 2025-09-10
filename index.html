@@ -713,6 +713,7 @@
                 <div class="debug-panel">
                     <div>Library Events: <span id="debugLibraryCount">0</span></div>
                     <div>Scheduled Events: <span id="debugScheduledCount">0</span></div>
+                    <div>Import Range: <span id="debugImportRange">--</span></div>
                 </div>
             </div>
 
@@ -921,7 +922,7 @@
             return -1;
         }
 
-        // Import from Google Calendar
+        // Import from Google Calendar - FIXED duplicate prevention and multi-week import
         async function importFromGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
@@ -937,115 +938,128 @@
             scheduledEvents = [];
             document.querySelectorAll('.event-block').forEach(block => block.remove());
             
-            let totalEvents = 0;
-            const seenEventIds = new Set();
+            let totalScheduledEvents = 0;
+            let totalLibraryEvents = 0;
+            
+            // Import range: 2 weeks before to 12 weeks after
+            const startOfRange = new Date(currentWeekStart);
+            startOfRange.setDate(startOfRange.getDate() - 14);
+            const endOfRange = new Date(currentWeekStart);
+            endOfRange.setDate(endOfRange.getDate() + 84);
+            
+            // Update debug display
+            document.getElementById('debugImportRange').textContent = 
+                `${startOfRange.toLocaleDateString()} - ${endOfRange.toLocaleDateString()}`;
+            
+            console.log(`Import range: ${startOfRange.toISOString()} to ${endOfRange.toISOString()}`);
+
+            // Use a Map to prevent duplicates by googleEventId
+            const allEventsMap = new Map();
 
             for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
                 try {
-                    const events = await importSingleCalendarData(calendarKey, calendarId, seenEventIds);
-                    totalEvents += events.length;
+                    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
+                        `timeMin=${startOfRange.toISOString()}&` +
+                        `timeMax=${endOfRange.toISOString()}&` +
+                        `showDeleted=false&` +
+                        `singleEvents=true&` +
+                        `orderBy=startTime&` +
+                        `key=${API_KEY}`;
+
+                    const response = await fetch(url, {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`
+                        }
+                    });
+
+                    if (!response.ok) {
+                        console.error(`Failed to fetch ${calendarKey}:`, response.status);
+                        continue;
+                    }
+
+                    const data = await response.json();
+                    const events = data.items || [];
+                    
+                    console.log(`Processing ${events.length} events from ${calendarKey}`);
+                    
+                    events.forEach(event => {
+                        // Skip if we've already processed this event ID
+                        if (allEventsMap.has(event.id)) {
+                            console.log(`Skipping duplicate: ${event.summary} (${event.id})`);
+                            return;
+                        }
+                        
+                        let duration = 120;
+                        if (event.start && event.end) {
+                            const start = new Date(event.start.dateTime || event.start.date);
+                            const end = new Date(event.end.dateTime || event.end.date);
+                            duration = Math.round((end - start) / 60000);
+                        }
+
+                        const eventData = {
+                            id: event.id || Date.now() + Math.random(),
+                            title: event.summary || 'Untitled Event',
+                            duration: duration,
+                            calendar: calendarKey,
+                            description: event.description || '',
+                            location: event.location || '',
+                            googleEventId: event.id,
+                            startTime: event.start,
+                            endTime: event.end,
+                            isAllDay: !event.start.dateTime
+                        };
+                        
+                        // Store in map to prevent duplicates
+                        allEventsMap.set(event.id, eventData);
+                    });
+                    
                 } catch (error) {
                     console.error(`Failed ${calendarKey}:`, error);
                 }
             }
 
+            // Now process all unique events
+            console.log(`Total unique events found: ${allEventsMap.size}`);
+            
+            // Process each unique event
+            for (const eventData of allEventsMap.values()) {
+                // If event has a specific time, add to scheduled events
+                if (eventData.startTime && eventData.startTime.dateTime) {
+                    const scheduledEvent = convertToScheduledEvent(eventData);
+                    if (scheduledEvent) {
+                        scheduledEvents.push(scheduledEvent);
+                        totalScheduledEvents++;
+                        console.log(`Added to scheduled: ${eventData.title} on ${new Date(eventData.startTime.dateTime).toLocaleDateString()}`);
+                    }
+                } else {
+                    // Only add to library if it's an all-day event or TBD event
+                    // Set a reasonable default duration for all-day events
+                    if (!eventData.startTime.dateTime) {
+                        eventData.duration = 120; // 2 hours default
+                    }
+                    libraryEvents.push(eventData);
+                    totalLibraryEvents++;
+                    console.log(`Added to library: ${eventData.title}`);
+                }
+            }
+
+            console.log(`Import complete: ${totalScheduledEvents} scheduled, ${totalLibraryEvents} library`);
+            
             renderLibrary();
             renderEventsForCurrentWeek();
             updateWeekStats();
             updateDebugCounts();
             syncStatus.classList.remove('syncing');
             
+            const totalEvents = totalScheduledEvents + totalLibraryEvents;
             if (totalEvents > 0) {
                 syncStatus.classList.add('connected');
                 syncStatus.innerHTML = '<span>✔</span><span>Connected</span>';
-                showToast(`Imported ${totalEvents} events`);
+                showToast(`Imported ${totalEvents} events (${totalScheduledEvents} scheduled, ${totalLibraryEvents} library)`);
             } else {
                 syncStatus.innerHTML = '<span>⚠</span><span>No events found</span>';
                 showToast('No events found');
             }
-        }
-
-        // Import single calendar - DATABASE BEHAVIOR: No duplicates
-        async function importSingleCalendarData(calendarKey, calendarId, seenEventIds) {
-            const startOfRange = new Date(currentWeekStart);
-            startOfRange.setDate(startOfRange.getDate() - 14);
-            const endOfRange = new Date(currentWeekStart);
-            endOfRange.setDate(endOfRange.getDate() + 84);
-
-            const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
-                `timeMin=${startOfRange.toISOString()}&` +
-                `timeMax=${endOfRange.toISOString()}&` +
-                `showDeleted=false&` +
-                `singleEvents=true&` +
-                `orderBy=startTime&` +
-                `key=${API_KEY}`;
-
-            const response = await fetch(url, {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-            const events = data.items || [];
-            let addedCount = 0;
-            
-            console.log(`Processing ${events.length} events from ${calendarKey}`);
-            
-            events.forEach(event => {
-                // Skip if we've already seen this event ID
-                if (seenEventIds.has(event.id)) {
-                    console.log(`Skipping duplicate event: ${event.summary}`);
-                    return;
-                }
-                seenEventIds.add(event.id);
-                
-                let duration = 120;
-                if (event.start && event.end) {
-                    const start = new Date(event.start.dateTime || event.start.date);
-                    const end = new Date(event.end.dateTime || event.end.date);
-                    duration = Math.round((end - start) / 60000);
-                }
-
-                const eventData = {
-                    id: event.id || Date.now() + Math.random(),
-                    title: event.summary || 'Untitled Event',
-                    duration: duration,
-                    calendar: calendarKey,
-                    description: event.description || '',
-                    location: event.location || '',
-                    googleEventId: event.id,
-                    startTime: event.start,
-                    endTime: event.end,
-                    isAllDay: !event.start.dateTime
-                };
-
-                // Add to scheduled events if it has a specific time in the current week
-                if (event.start.dateTime) {
-                    const scheduledEvent = convertToScheduledEvent(eventData);
-                    if (scheduledEvent && calculateDayOfWeek(scheduledEvent.actualDate) >= 0) {
-                        console.log(`Adding to schedule: ${eventData.title}`);
-                        scheduledEvents.push(scheduledEvent);
-                        addedCount++;
-                        return; // Don't add to library if scheduled
-                    }
-                }
-
-                // Only add to library if not already scheduled
-                console.log(`Adding to library: ${eventData.title}`);
-                if (!event.start.dateTime) {
-                    eventData.duration = 120; // 2 hours default for all-day events
-                }
-                libraryEvents.push(eventData);
-                addedCount++;
-            });
-
-            console.log(`Added ${addedCount} events from ${calendarKey}`);
-            return events;
         }
 
         // Push to Google Calendar with enhanced orphan cleanup
@@ -1708,17 +1722,21 @@
                 scheduledEvent.calendar = event.calendar;
             }
             
-            // FIXED: Handle library database logic with proper OR condition
+            // FIXED: Handle library database logic with proper removal
             if (source === 'library') {
                 console.log('Removing from library:', event.title, 'ID:', event.id, 'GoogleID:', event.googleEventId);
-                // Remove from library when scheduling - use OR not AND
+                // Remove from library when scheduling - properly handle both ID types
                 libraryEvents = libraryEvents.filter(e => {
-                    // Keep the event if neither ID matches
-                    const keepEvent = e.id != event.id && (!event.googleEventId || e.googleEventId != event.googleEventId);
-                    if (!keepEvent) {
-                        console.log('Removing library event:', e.title);
+                    // Remove if either the regular ID matches OR the googleEventId matches
+                    if (e.id == event.id) {
+                        console.log('Removing by ID match:', e.title);
+                        return false;
                     }
-                    return keepEvent;
+                    if (event.googleEventId && e.googleEventId === event.googleEventId) {
+                        console.log('Removing by googleEventId match:', e.title);
+                        return false;
+                    }
+                    return true;
                 });
                 renderLibrary(); // Update library display
                 updateDebugCounts();
