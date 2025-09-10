@@ -1,20 +1,3 @@
-# Create a revised version of the uploaded schedule-view.html with improvements:
-# - Handles Google Calendar pagination (nextPageToken)
-# - Adds ?timeZone=America/New_York to API requests and formats all times in ET explicitly
-# - Supports all-day events (date) in addition to timed events (dateTime)
-# - Adds a "Today" button and keyboard navigation (← → for months, T for today)
-# - Improves "more events" handling with a click to open a day modal listing all events
-# - Adds basic accessibility attributes and ARIA roles
-# - Adds graceful fallback when a calendar fetch fails (continues others)
-# - Adds optional query param ?month=YYYY-MM (deep link to a month)
-# - Keeps user's legend colors and categories, but centralizes mapping
-# - Minor CSS tweaks for readability on dense days
-#
-# The file will be saved as /mnt/data/schedule-view-fixed.html
-
-from textwrap import dedent
-
-html = dedent("""\
 <!DOCTYPE html>
 <html lang="en">
 <head>
