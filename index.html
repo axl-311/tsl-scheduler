@@ -263,7 +263,7 @@
         }
 
         .time-slot {
-            height: 40px;
+            height: 60px;
             padding: 5px 10px;
             font-size: 12px;
             color: #86868b;
@@ -281,20 +281,10 @@
             min-width: 140px;
             border-right: 1px solid #e0e0e0;
             position: relative;
+            transition: all 0.3s ease;
         }
 
         .day-column.collapsed {
-            min-width: 50px;
-            max-width: 50px;
-        }
-
-        .day-column.collapsed .day-header {
-            writing-mode: vertical-rl;
-            text-orientation: mixed;
-            padding: 10px 5px;
-        }
-
-        .day-column.collapsed .theater-lanes {
             display: none;
         }
 
@@ -313,7 +303,7 @@
 
         .theater-lanes {
             display: flex;
-            height: calc(40px * 11);
+            height: calc(60px * 11);
             position: relative;
         }
 
@@ -324,9 +314,21 @@
             background-image: repeating-linear-gradient(
                 to bottom,
                 transparent,
-                transparent 39px,
-                #f0f0f0 39px,
-                #f0f0f0 40px
+                transparent 14px,
+                #f0f0f0 14px,
+                #f0f0f0 15px,
+                transparent 15px,
+                transparent 29px,
+                #f0f0f0 29px,
+                #f0f0f0 30px,
+                transparent 30px,
+                transparent 44px,
+                #f0f0f0 44px,
+                #f0f0f0 45px,
+                transparent 45px,
+                transparent 59px,
+                #e2e2e2 59px,
+                #e2e2e2 60px
             );
         }
 
@@ -617,7 +619,7 @@
         <div class="controls">
             <div class="week-navigation">
                 <button onclick="changeWeek(-1)">← Previous Week</button>
-                <div class="week-display" id="weekDisplay">Week of Dec 9 - Dec 15, 2024</div>
+                <div class="week-display" id="weekDisplay">Loading...</div>
                 <button onclick="changeWeek(1)">Next Week →</button>
             </div>
             <div class="week-stats">
@@ -626,7 +628,7 @@
                     <span class="stat-value" id="weekTotal">0 events</span>
                 </div>
                 <button class="collapse-toggle" onclick="toggleCollapse()">
-                    Collapse Tues-Thurs
+                    Show Tues-Thurs
                 </button>
             </div>
         </div>
@@ -710,9 +712,9 @@
         let libraryEvents = [];
         let scheduledEvents = [];
         let draggedItem = null;
-        let dragSource = null; // Track if dragging from library or grid
+        let dragSource = null;
         let ghostElement = null;
-        let collapsedDays = new Set();
+        let collapsedDays = true; // Start collapsed by default
         let accessToken = null;
 
         // Google Calendar API Configuration
@@ -850,10 +852,10 @@
             
             // Store the actual date instead of relative day number
             const eventDate = new Date(startDate);
-            eventDate.setHours(0, 0, 0, 0); // Normalize to midnight for date comparison
+            eventDate.setHours(0, 0, 0, 0);
             
             // Determine theater based on calendar
-            let theater = 0; // Default to Theater 1
+            let theater = 0;
             if (eventData.calendar === 'theater-2') {
                 theater = 1;
             } else if (eventData.calendar === 'theater-1') {
@@ -862,9 +864,9 @@
             
             const result = {
                 ...eventData,
-                actualDate: eventDate, // Store the actual date
+                actualDate: eventDate,
                 theater: theater,
-                startHour: startDate.getHours(), // Keep actual hour for calculations
+                startHour: startDate.getHours(),
                 startMinute: startDate.getMinutes(),
                 id: `existing-${eventData.googleEventId || Date.now()}`
             };
@@ -950,9 +952,9 @@
         async function importSingleCalendarData(calendarKey, calendarId) {
             // Import broader date range - 3 months from now
             const startOfRange = new Date(currentWeekStart);
-            startOfRange.setDate(startOfRange.getDate() - 14); // Start 2 weeks before current week
+            startOfRange.setDate(startOfRange.getDate() - 14);
             const endOfRange = new Date(currentWeekStart);
-            endOfRange.setDate(endOfRange.getDate() + (7 * 12)); // End 12 weeks after current week
+            endOfRange.setDate(endOfRange.getDate() + (7 * 12));
 
             const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
                 `timeMin=${startOfRange.toISOString()}&` +
@@ -994,11 +996,11 @@
                 }
                 
                 // Calculate duration in minutes
-                let duration = 120; // Default 2 hours
+                let duration = 120;
                 if (event.start && event.end) {
                     const start = new Date(event.start.dateTime || event.start.date);
                     const end = new Date(event.end.dateTime || event.end.date);
-                    duration = Math.round((end - start) / 60000); // Convert to minutes
+                    duration = Math.round((end - start) / 60000);
                 }
 
                 const eventData = {
@@ -1030,7 +1032,7 @@
 
                 // Always add to library for potential rescheduling
                 if (!event.start.dateTime) {
-                    eventData.duration = 1440; // Mark as 24 hours for all-day events
+                    eventData.duration = 1440;
                 }
                 libraryEvents.push(eventData);
             });
@@ -1062,7 +1064,7 @@
 
         // Helper function to check if a manually scheduled event falls within current week
         function isEventInCurrentWeekByData(eventData) {
-            if (eventData.actualDate) return false; // Handle actual dates separately
+            if (eventData.actualDate) return false;
             
             const weekStart = new Date(currentWeekStart);
             const weekEnd = new Date(currentWeekStart);
@@ -1094,7 +1096,7 @@
             const timeColumn = document.getElementById('timeColumn');
             
             // Theater day: 2pm through midnight (11 hours)
-            for (let hour = 14; hour <= 24; hour++) { // 14 (2pm) to 24 (midnight)
+            for (let hour = 14; hour <= 24; hour++) {
                 const displayHour = hour % 24;
                 const timeSlot = document.createElement('div');
                 timeSlot.className = 'time-slot';
@@ -1106,13 +1108,17 @@
         // Generate day columns with theater lanes (Tuesday first, Monday last)
         function generateDaysColumns() {
             const daysContainer = document.getElementById('daysContainer');
-            // Tuesday = 0, Wednesday = 1, Thursday = 2, Friday = 3, Saturday = 4, Sunday = 5, Monday = 6
             const days = ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday'];
             
             days.forEach((day, index) => {
                 const dayColumn = document.createElement('div');
                 dayColumn.className = 'day-column';
                 dayColumn.id = `day-${index}`;
+                
+                // Apply collapsed state for Tues-Thurs (indices 0, 1, 2)
+                if (index <= 2 && collapsedDays) {
+                    dayColumn.classList.add('collapsed');
+                }
                 
                 const dayHeader = document.createElement('div');
                 dayHeader.className = 'day-header';
@@ -1156,28 +1162,25 @@
             return `${h}:${m} ${period}`;
         }
 
-        // Convert actual time to theater grid position (2pm = 0, 3pm = 1, etc.) - Updated for 2pm-midnight
+        // Convert actual time to theater grid position (2pm = 0, 3pm = 1, etc.)
         function convertToTheaterHour(actualHour) {
-            // 2pm = hour 0, 3pm = hour 1, etc.
-            // Only handle 2pm (14) through midnight (24/0)
             if (actualHour >= 14) {
-                return actualHour - 14; // 2pm-11pm = 0-9
+                return actualHour - 14;
             } else if (actualHour === 0) {
-                return 10; // midnight = hour 10
+                return 10;
             } else {
-                // Hours 1am-1pm are not on the grid
-                return -1; // Invalid for theater hours
+                return -1;
             }
         }
 
-        // Convert theater grid position back to actual hour - Updated for 2pm-midnight  
+        // Convert theater grid position back to actual hour
         function convertFromTheaterHour(theaterHour) {
             if (theaterHour >= 0 && theaterHour <= 9) {
-                return theaterHour + 14; // 0-9 = 2pm-11pm
+                return theaterHour + 14;
             } else if (theaterHour === 10) {
-                return 0; // hour 10 = midnight
+                return 0;
             } else {
-                return 14; // Default to 2pm if invalid
+                return 14;
             }
         }
 
@@ -1230,7 +1233,7 @@
             document.getElementById('libraryCount').textContent = `(${filteredEvents.length})`;
         }
 
-        // Enhanced Drag and Drop handlers - distinguish between library and grid
+        // Enhanced Drag and Drop handlers
         function handleDragStart(e) {
             draggedItem = this;
             this.classList.add('dragging');
@@ -1266,7 +1269,7 @@
             
             const rect = this.getBoundingClientRect();
             const y = e.clientY - rect.top;
-            const snapY = Math.floor(y / 10) * 10;
+            const snapY = Math.floor(y / 15) * 15;
             
             showGhost(this, snapY);
         }
@@ -1286,11 +1289,11 @@
             const event = JSON.parse(eventData);
             const rect = this.getBoundingClientRect();
             const y = e.clientY - rect.top;
-            const snapY = Math.floor(y / 10) * 10;
+            const snapY = Math.floor(y / 15) * 15;
             
             // Convert to theater hours (2pm = 0)
-            const theaterHour = Math.floor(snapY / 40);
-            const minute = ((snapY % 40) / 10) * 15;
+            const theaterHour = Math.floor(snapY / 60);
+            const minute = ((snapY % 60) / 15) * 15;
             
             // Create actual date for manually scheduled event
             const scheduledDate = new Date(currentWeekStart);
@@ -1302,13 +1305,13 @@
                 ...event,
                 day: parseInt(this.dataset.day),
                 theater: parseInt(this.dataset.theater),
-                startHour: convertFromTheaterHour(theaterHour), // Convert back to actual hour
+                startHour: convertFromTheaterHour(theaterHour),
                 startMinute: minute,
                 actualDate: scheduledDate,
-                id: source === 'library' ? Date.now() : event.id // New ID if from library, keep ID if moving
+                id: source === 'library' ? Date.now() : event.id
             };
             
-            // FIXED: Preserve calendar types for Google Calendar events, only allow theater swapping for movies
+            // Preserve calendar types for Google Calendar events, only allow theater swapping for movies
             if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
                 // Movies can swap between theater-1 and theater-2
                 if (this.dataset.theater === '0') {
@@ -1317,24 +1320,19 @@
                     scheduledEvent.calendar = 'theater-2';
                 }
             } else {
-                // Google Calendar events (events, non-public, tbd, primary) preserve their original calendar type
+                // Google Calendar events preserve their original calendar type
                 scheduledEvent.calendar = event.calendar;
             }
             
             // If moving from grid, remove original
             if (source === 'grid' && draggedItem) {
-                // Remove from scheduledEvents array
                 const originalId = draggedItem.dataset.eventId;
                 scheduledEvents = scheduledEvents.filter(e => e.id != originalId);
-                // Remove visual element
                 draggedItem.remove();
             }
             
             scheduledEvents.push(scheduledEvent);
-            
-            // Render the event (actual hour will be converted to theater hour in renderScheduledEvent)
             renderScheduledEvent(scheduledEvent);
-            
             updateWeekStats();
             removeGhost();
             
@@ -1356,7 +1354,7 @@
             ghostElement.className = 'ghost-event';
             ghostElement.style.top = `${y}px`;
             
-            const height = (event.duration / 60) * 40;
+            const height = (event.duration / 60) * 60;
             ghostElement.style.height = `${height}px`;
             
             lane.appendChild(ghostElement);
@@ -1393,8 +1391,8 @@
             
             // Convert actual hour to theater hour for positioning
             const theaterHour = convertToTheaterHour(event.startHour);
-            const top = theaterHour * 40 + (event.startMinute / 15) * 10;
-            const height = (event.duration / 60) * 40;
+            const top = theaterHour * 60 + (event.startMinute / 15) * 15;
+            const height = (event.duration / 60) * 60;
             
             eventBlock.style.top = `${top}px`;
             eventBlock.style.height = `${height}px`;
@@ -1463,8 +1461,9 @@
                 dayColumn.classList.toggle('collapsed');
             });
             
+            collapsedDays = !collapsedDays;
             const button = event.target;
-            button.textContent = button.textContent.includes('Collapse') ? 'Expand Tues-Thurs' : 'Collapse Tues-Thurs';
+            button.textContent = collapsedDays ? 'Show Tues-Thurs' : 'Hide Tues-Thurs';
         }
 
         // Filter library
