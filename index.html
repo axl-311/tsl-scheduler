@@ -1563,7 +1563,7 @@
             });
         }
 
-        // Drag and drop handlers - FIXED event data transfer
+        // Drag and drop handlers - FIXED ID matching
         function handleDragStart(e) {
             console.log('Drag started:', this.querySelector('.event-title')?.textContent || this.querySelector('.library-item-title')?.textContent || 'Unknown');
             
@@ -1587,29 +1587,47 @@
             
             let event = null;
             
-            // Search in scheduledEvents first
+            // FIXED: Better ID matching - try multiple comparison methods
             event = scheduledEvents.find(e => {
-                const id = e.googleEventId || e.id;
-                return id == eventId;
+                // Try exact ID match first
+                if (e.id == eventId) return true;
+                if (e.googleEventId == eventId) return true;
+                
+                // Try without 'existing-' prefix
+                if (eventId.startsWith('existing-') && e.googleEventId == eventId.replace('existing-', '')) return true;
+                if (eventId.startsWith('existing-') && e.id == eventId.replace('existing-', '')) return true;
+                
+                return false;
             });
             
-            // If not found, search in libraryEvents
+            // If not found in scheduled, try library
             if (!event) {
                 event = libraryEvents.find(e => {
-                    const id = e.googleEventId || e.id;
-                    return id == eventId;
+                    if (e.id == eventId) return true;
+                    if (e.googleEventId == eventId) return true;
+                    if (eventId.startsWith('existing-') && e.googleEventId == eventId.replace('existing-', '')) return true;
+                    if (eventId.startsWith('existing-') && e.id == eventId.replace('existing-', '')) return true;
+                    return false;
                 });
             }
             
-            // ENHANCED: Also search by title as fallback
-            if (!event && dragSource === 'library') {
-                const title = this.querySelector('.library-item-title')?.textContent;
-                if (title) {
-                    console.log('Searching by title fallback:', title);
-                    // Search in scheduled events from other weeks
-                    event = scheduledEvents.find(e => e.title === title);
-                    if (!event) {
-                        event = libraryEvents.find(e => e.title === title);
+            // DEBUG: Show what we're actually comparing
+            if (!event) {
+                console.log('DETAILED DEBUG - Event ID:', eventId);
+                console.log('First few scheduled events for comparison:');
+                scheduledEvents.slice(0, 3).forEach(e => {
+                    console.log(`  - ID: "${e.id}", GoogleID: "${e.googleEventId}", Title: "${e.title}"`);
+                });
+                
+                // Try title-based fallback for library items
+                if (dragSource === 'library') {
+                    const title = this.querySelector('.library-item-title')?.textContent;
+                    if (title) {
+                        console.log('Trying title-based search for:', title);
+                        event = scheduledEvents.find(e => e.title === title) || libraryEvents.find(e => e.title === title);
+                        if (event) {
+                            console.log('Found event by title:', event.title);
+                        }
                     }
                 }
             }
@@ -1621,8 +1639,7 @@
                 console.log('Event data set successfully');
             } else {
                 console.error('ERROR: Could not find event for drag! EventId:', eventId);
-                console.log('Available scheduled events:', scheduledEvents.map(e => ({id: e.id, googleId: e.googleEventId, title: e.title})));
-                console.log('Available library events:', libraryEvents.map(e => ({id: e.id, googleId: e.googleEventId, title: e.title})));
+                showToast('Could not find event data for drag');
             }
         }
 
