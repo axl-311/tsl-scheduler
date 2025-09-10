@@ -325,7 +325,7 @@
 
         .day-header {
             height: 50px;
-            padding: 10px;
+            padding: 10px 10px 15px 10px;
             font-weight: 600;
             text-align: center;
             border-bottom: 2px solid #e0e0e0;
@@ -724,8 +724,17 @@
                     <input type="text" id="editTitle" class="form-input" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Duration (minutes)</label>
-                    <input type="number" id="editDuration" class="form-input" min="15" step="15" required>
+                    <label class="form-label">Duration</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="number" id="editHours" class="form-input" min="0" max="23" style="width: 80px;" placeholder="0">
+                            <span>hrs</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="number" id="editMinutes" class="form-input" min="0" max="59" step="15" style="width: 80px;" placeholder="0">
+                            <span>min</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Calendar Type</label>
@@ -940,7 +949,7 @@
             }
         }
 
-        // Import single calendar
+        // Import single calendar - DATABASE BEHAVIOR: No duplicates
         async function importSingleCalendarData(calendarKey, calendarId, seenEventIds) {
             const startOfRange = new Date(currentWeekStart);
             startOfRange.setDate(startOfRange.getDate() - 14);
@@ -1001,14 +1010,26 @@
                     const scheduledEvent = convertToScheduledEvent(eventData);
                     if (scheduledEvent) {
                         scheduledEvents.push(scheduledEvent);
+                        // Don't add scheduled events to library - they're already placed
+                        addedCount++;
+                        return;
                     }
                 }
 
-                // Always add to library for dragging capability
-                if (!event.start.dateTime) {
-                    eventData.duration = 1440;
+                // Only add to library if not already scheduled
+                // Check if this event already exists in library by googleEventId or title
+                const existsInLibrary = libraryEvents.some(existing => 
+                    existing.googleEventId === event.id || 
+                    (existing.title === eventData.title && existing.calendar === eventData.calendar)
+                );
+                
+                if (!existsInLibrary) {
+                    // For all-day events, set a reasonable default duration
+                    if (!event.start.dateTime) {
+                        eventData.duration = 120; // 2 hours default
+                    }
+                    libraryEvents.push(eventData);
                 }
-                libraryEvents.push(eventData);
                 
                 addedCount++;
             });
@@ -1016,7 +1037,7 @@
             return events;
         }
 
-        // Push to Google Calendar with orphan cleanup
+        // Push to Google Calendar with enhanced orphan cleanup
         async function pushToGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
@@ -1040,10 +1061,14 @@
                 return false;
             });
 
+            console.log('Current week events to push:', currentWeekEvents.length);
+
             // First, get existing events from Google Calendar to check for deletions
             const weekStart = new Date(currentWeekStart);
             const weekEnd = new Date(currentWeekStart);
             weekEnd.setDate(weekEnd.getDate() + 7);
+            
+            console.log('Week range:', weekStart.toISOString(), 'to', weekEnd.toISOString());
             
             // Track which Google events we've processed (including ones we try to process)
             const processedGoogleIds = new Set();
@@ -1081,7 +1106,7 @@
                             dateTime: endDate.toISOString(),
                             timeZone: 'America/New_York'
                         },
-                        description: (event.description || '') + '\n\nScheduled via TSL Schedule Maker 2000'
+                        description: 'Scheduled via TSL Schedule Maker 2000' + (event.description ? '\n\n' + event.description : '')
                     };
 
                     let response;
@@ -1092,6 +1117,7 @@
                         // Update existing event
                         googleEventId = event.googleEventId;
                         processedGoogleIds.add(googleEventId); // Track before attempt
+                        console.log('Updating existing event:', event.title, googleEventId);
                         const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEventId}`;
                         response = await fetch(url, {
                             method: 'PUT',
@@ -1105,6 +1131,7 @@
                         // This is an imported event that was moved/edited - update it
                         googleEventId = event.googleEventId || event.id.replace('existing-', '');
                         processedGoogleIds.add(googleEventId); // Track before attempt
+                        console.log('Updating moved/edited event:', event.title, googleEventId);
                         const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEventId}`;
                         response = await fetch(url, {
                             method: 'PUT',
@@ -1116,6 +1143,7 @@
                         });
                     } else {
                         // Create new event
+                        console.log('Creating new event:', event.title);
                         const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
                         response = await fetch(url, {
                             method: 'POST',
@@ -1135,9 +1163,10 @@
                             event.googleEventId = googleEventId;
                         }
                         processedGoogleIds.add(googleEventId);
+                        console.log('Successfully processed event:', event.title, googleEventId);
                     } else {
                         failCount++;
-                        console.error('Failed to push event:', event.title, await response.text());
+                        console.error('Failed to push event:', event.title, response.status, await response.text());
                     }
                 } catch (error) {
                     failCount++;
@@ -1145,10 +1174,13 @@
                 }
             }
 
+            console.log('Processed Google IDs:', Array.from(processedGoogleIds));
+
             // Now delete events that are in Google Calendar but not on the scheduler
             // Only delete events that were created by the scheduler
             for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
                 try {
+                    console.log('Checking calendar for orphans:', calendarKey);
                     const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
                         `timeMin=${weekStart.toISOString()}&` +
                         `timeMax=${weekEnd.toISOString()}&` +
@@ -1165,16 +1197,25 @@
                     if (response.ok) {
                         const data = await response.json();
                         const events = data.items || [];
+                        console.log(`Found ${events.length} events in ${calendarKey} calendar`);
                         
                         for (const googleEvent of events) {
+                            console.log('Checking event:', googleEvent.summary, googleEvent.id, 'Description:', googleEvent.description);
+                            
                             // Check if this event was created by the scheduler and is not in our current list
-                            if (googleEvent.description && 
-                                (googleEvent.description.includes('Scheduled via TSL Schedule Maker 2000') ||
-                                 googleEvent.description.includes('Scheduled via TSL Event/Movie Scheduler') ||
-                                 googleEvent.description.includes('Scheduled via TSL Theater Scheduler')) &&
-                                !processedGoogleIds.has(googleEvent.id)) {
-                                
-                                console.log('Found orphaned event to delete:', googleEvent.summary, googleEvent.id);
+                            const isSchedulerEvent = googleEvent.description && (
+                                googleEvent.description.includes('Scheduled via TSL Schedule Maker 2000') ||
+                                googleEvent.description.includes('Scheduled via TSL Event/Movie Scheduler') ||
+                                googleEvent.description.includes('Scheduled via TSL Theater Scheduler')
+                            );
+                            
+                            const isNotProcessed = !processedGoogleIds.has(googleEvent.id);
+                            
+                            console.log('  - Is scheduler event:', isSchedulerEvent);
+                            console.log('  - Is not processed:', isNotProcessed);
+                            
+                            if (isSchedulerEvent && isNotProcessed) {
+                                console.log('DELETING orphaned event:', googleEvent.summary, googleEvent.id);
                                 
                                 // Delete this event from Google Calendar
                                 const deleteUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEvent.id}`;
@@ -1189,10 +1230,12 @@
                                     deleteCount++;
                                     console.log('Successfully deleted orphaned event:', googleEvent.summary);
                                 } else {
-                                    console.error('Failed to delete event:', googleEvent.summary, deleteResponse.status);
+                                    console.error('Failed to delete event:', googleEvent.summary, deleteResponse.status, await deleteResponse.text());
                                 }
                             }
                         }
+                    } else {
+                        console.error('Failed to fetch events from calendar:', calendarKey, response.status);
                     }
                 } catch (error) {
                     console.error('Error checking for orphaned events in', calendarKey, ':', error);
@@ -1219,6 +1262,8 @@
             } else {
                 showToast('No changes to sync');
             }
+            
+            console.log('Push complete:', { successCount, deleteCount, failCount });
         }
 
         // Save schedule
@@ -1539,6 +1584,7 @@
             dragOffset = 0;
         }
 
+        // FIXED: Preview line always shows where TOP of block will snap to
         function handleDragOver(e) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
@@ -1555,14 +1601,13 @@
             const rect = this.getBoundingClientRect();
             let y = e.clientY - rect.top;
             
-            // Apply offset if dragging from grid
-            const source = e.dataTransfer.types.includes('text/plain') ? 
-                (dragSource || 'library') : 'library';
+            // Apply the SAME offset logic as drop - get source from dataTransfer
+            const source = e.dataTransfer.getData('source') || dragSource || 'library';
             if (source === 'grid' && dragOffset > 0) {
                 y = y - dragOffset;
             }
             
-            // Snap to 15-minute grid
+            // Snap to 15-minute grid (same as drop)
             const snapY = Math.floor(y / 15) * 15;
             const finalY = Math.max(0, snapY);
             
@@ -1588,6 +1633,7 @@
             }
         }
 
+        // DATABASE BEHAVIOR: Remove from library when scheduling
         function handleDrop(e) {
             e.preventDefault();
             this.classList.remove('drop-active');
@@ -1644,7 +1690,15 @@
                 scheduledEvent.calendar = event.calendar;
             }
             
-            if (source === 'grid' && draggedItem) {
+            // Handle library database logic
+            if (source === 'library') {
+                // Remove from library when scheduling (library acts as database)
+                libraryEvents = libraryEvents.filter(e => 
+                    e.id != event.id && e.googleEventId != event.googleEventId
+                );
+                renderLibrary(); // Update library display
+            } else if (source === 'grid' && draggedItem) {
+                // Moving existing scheduled event
                 const originalId = draggedItem.dataset.eventId;
                 scheduledEvents = scheduledEvents.filter(e => e.id != originalId);
                 draggedItem.remove();
@@ -1722,20 +1776,55 @@
             }, 3000);
         }
 
+        // DATABASE BEHAVIOR: Add back to library when deleted
         function deleteEvent(eventId) {
             if (!confirm('Delete this event?')) return;
             
+            // Find the event before deleting it
+            const eventToDelete = scheduledEvents.find(e => e.id == eventId);
+            
+            // Remove from scheduled events
             scheduledEvents = scheduledEvents.filter(e => e.id != eventId);
             
+            // Remove from grid
             const eventBlock = document.querySelector(`[data-event-id="${eventId}"]`);
             if (eventBlock) {
                 eventBlock.remove();
             }
             
+            // Add back to library (database behavior)
+            if (eventToDelete) {
+                // Check if it already exists in library (prevent duplicates)
+                const existsInLibrary = libraryEvents.some(existing => 
+                    existing.googleEventId === eventToDelete.googleEventId ||
+                    (existing.title === eventToDelete.title && existing.calendar === eventToDelete.calendar)
+                );
+                
+                if (!existsInLibrary) {
+                    // Create library version (remove scheduling-specific properties)
+                    const libraryEvent = {
+                        id: eventToDelete.googleEventId || eventToDelete.id,
+                        title: eventToDelete.title,
+                        duration: eventToDelete.duration,
+                        calendar: eventToDelete.calendar,
+                        description: eventToDelete.description,
+                        location: eventToDelete.location,
+                        googleEventId: eventToDelete.googleEventId,
+                        startTime: eventToDelete.startTime,
+                        endTime: eventToDelete.endTime,
+                        isAllDay: eventToDelete.isAllDay
+                    };
+                    
+                    libraryEvents.push(libraryEvent);
+                    renderLibrary(); // Update library display
+                }
+            }
+            
             updateWeekStats();
-            showToast('Event deleted');
+            showToast('Event deleted and returned to library');
         }
 
+        // FIXED: Edit modal uses hrs/min format
         function editEvent(eventId) {
             const event = scheduledEvents.find(e => e.id == eventId) || 
                          libraryEvents.find(e => e.id == eventId);
@@ -1748,7 +1837,14 @@
             currentEditingEvent = event;
             
             document.getElementById('editTitle').value = event.title;
-            document.getElementById('editDuration').value = event.duration;
+            
+            // Convert minutes to hours and minutes
+            const totalMinutes = event.duration;
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            
+            document.getElementById('editHours').value = hours;
+            document.getElementById('editMinutes').value = minutes;
             document.getElementById('editCalendar').value = event.calendar;
             
             document.getElementById('editModal').style.display = 'flex';
@@ -1763,11 +1859,15 @@
             if (!currentEditingEvent) return;
             
             const newTitle = document.getElementById('editTitle').value.trim();
-            const newDuration = parseInt(document.getElementById('editDuration').value);
+            const hours = parseInt(document.getElementById('editHours').value) || 0;
+            const minutes = parseInt(document.getElementById('editMinutes').value) || 0;
             const newCalendar = document.getElementById('editCalendar').value;
             
-            if (!newTitle || !newDuration || newDuration < 15) {
-                showToast('Invalid input');
+            // Convert hours and minutes to total minutes
+            const newDuration = (hours * 60) + minutes;
+            
+            if (!newTitle || newDuration < 15) {
+                showToast('Invalid input - title required and duration must be at least 15 minutes');
                 return;
             }
             
