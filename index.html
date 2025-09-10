@@ -1799,123 +1799,114 @@
             }
         }
 
-        // FIXED: Drag and drop - ensure events drop where indicator shows
+        // FIXED: Simplified drag and drop with exact position matching
         function handleDrop(e) {
             e.preventDefault();
-            e.stopPropagation(); // Prevent event bubbling
+            e.stopPropagation();
             this.classList.remove('drop-active');
             
-            // Remove drag preview
+            // Remove drag preview to get exact position it was showing
             const preview = this.querySelector('.drag-preview');
+            let previewTop = 0;
             if (preview) {
+                previewTop = parseInt(preview.style.top) || 0;
                 preview.remove();
             }
             
             const eventData = e.dataTransfer.getData('event');
             const source = e.dataTransfer.getData('source');
+            
             if (!eventData) {
-                console.log('No event data in drop');
+                console.log('No event data found');
                 return;
             }
             
-            const event = JSON.parse(eventData);
-            const rect = this.getBoundingClientRect();
-            
-            // Calculate drop position - EXACT SAME LOGIC AS PREVIEW
-            let y = e.clientY - rect.top;
-            
-            // Apply the SAME offset logic as preview
-            if (source === 'grid' && dragOffset > 0) {
-                y = y - dragOffset;
-            }
-            
-            // Snap to 15-minute grid - EXACT SAME AS PREVIEW
-            const snapY = Math.floor(y / 15) * 15;
-            const finalY = Math.max(0, snapY);
-            
-            const theaterHour = Math.floor(finalY / 60);
-            const minute = ((finalY % 60) / 15) * 15;
-            
-            const scheduledDate = new Date(currentWeekStart);
-            scheduledDate.setDate(scheduledDate.getDate() + parseInt(this.dataset.day));
-            scheduledDate.setHours(0, 0, 0, 0);
-            
-            console.log(`Dropping event: ${event.title}`);
-            console.log(`Drop position: y=${y}, finalY=${finalY}, theaterHour=${theaterHour}, minute=${minute}`);
-            console.log(`Target: day=${this.dataset.day}, theater=${this.dataset.theater}`);
-            
-            let scheduledEvent;
-            
-            if (source === 'library') {
-                // Create a NEW instance of this library event
-                scheduledEvent = {
-                    ...event,
-                    day: parseInt(this.dataset.day),
-                    theater: parseInt(this.dataset.theater),
-                    startHour: convertFromTheaterHour(theaterHour),
-                    startMinute: minute,
-                    actualDate: scheduledDate,
-                    id: `scheduled-${Date.now()}-${Math.random()}`,
-                    googleEventId: event.googleEventId,
-                    instanceOf: event.googleEventId || event.id
-                };
+            try {
+                const event = JSON.parse(eventData);
+                console.log(`Dropping ${event.title} at preview position: ${previewTop}px`);
                 
-                scheduledEvents.push(scheduledEvent);
-                console.log('Created new instance from library:', event.title);
+                // Use the EXACT same calculation as the preview
+                const theaterHour = Math.floor(previewTop / 60);
+                const minute = ((previewTop % 60) / 15) * 15;
+                const actualHour = convertFromTheaterHour(theaterHour);
                 
-            } else if (source === 'grid') {
-                // Moving existing scheduled event
-                const originalId = draggedItem ? draggedItem.dataset.eventId : event.id;
+                console.log(`Calculated time: theater hour ${theaterHour} = actual ${actualHour}:${minute}`);
                 
-                // Remove from old position FIRST
-                const originalIndex = scheduledEvents.findIndex(e => e.id == originalId);
-                if (originalIndex !== -1) {
-                    const originalEvent = scheduledEvents[originalIndex];
-                    console.log(`Moving event from: day=${originalEvent.day}, theater=${originalEvent.theater}, time=${originalEvent.startHour}:${originalEvent.startMinute}`);
+                const scheduledDate = new Date(currentWeekStart);
+                scheduledDate.setDate(scheduledDate.getDate() + parseInt(this.dataset.day));
+                scheduledDate.setHours(0, 0, 0, 0);
+                
+                let scheduledEvent;
+                
+                if (source === 'library') {
+                    // Create new instance from library
+                    scheduledEvent = {
+                        ...event,
+                        day: parseInt(this.dataset.day),
+                        theater: parseInt(this.dataset.theater),
+                        startHour: actualHour,
+                        startMinute: minute,
+                        actualDate: scheduledDate,
+                        id: `scheduled-${Date.now()}-${Math.random()}`,
+                        googleEventId: event.googleEventId,
+                        instanceOf: event.googleEventId || event.id
+                    };
                     
-                    // Remove from array
-                    scheduledEvents.splice(originalIndex, 1);
+                    scheduledEvents.push(scheduledEvent);
+                    console.log('Created new library instance');
                     
-                    // Remove from DOM
-                    if (draggedItem) {
-                        draggedItem.remove();
+                } else if (source === 'grid') {
+                    // Move existing event
+                    const originalId = event.id;
+                    
+                    // Remove original event
+                    const originalIndex = scheduledEvents.findIndex(e => e.id == originalId);
+                    if (originalIndex !== -1) {
+                        scheduledEvents.splice(originalIndex, 1);
+                        console.log('Removed original event from array');
                     }
+                    
+                    // Remove original DOM element
+                    if (draggedItem && draggedItem.parentNode) {
+                        draggedItem.parentNode.removeChild(draggedItem);
+                        console.log('Removed original DOM element');
+                    }
+                    
+                    // Create moved event
+                    scheduledEvent = {
+                        ...event,
+                        day: parseInt(this.dataset.day),
+                        theater: parseInt(this.dataset.theater),
+                        startHour: actualHour,
+                        startMinute: minute,
+                        actualDate: scheduledDate,
+                        id: originalId
+                    };
+                    
+                    scheduledEvents.push(scheduledEvent);
+                    console.log('Added moved event to new position');
                 }
                 
-                // Create moved event with new position
-                scheduledEvent = {
-                    ...event,
-                    day: parseInt(this.dataset.day),
-                    theater: parseInt(this.dataset.theater),
-                    startHour: convertFromTheaterHour(theaterHour),
-                    startMinute: minute,
-                    actualDate: scheduledDate,
-                    id: originalId || event.id
-                };
-                
-                scheduledEvents.push(scheduledEvent);
-                console.log(`Moved to: day=${scheduledEvent.day}, theater=${scheduledEvent.theater}, time=${scheduledEvent.startHour}:${scheduledEvent.startMinute}`);
-            }
-            
-            // Handle theater-specific calendar assignments
-            if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
-                if (this.dataset.theater === '0') {
-                    scheduledEvent.calendar = 'theater-1';
+                // Set correct calendar based on theater
+                if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
+                    scheduledEvent.calendar = this.dataset.theater === '0' ? 'theater-1' : 'theater-2';
                 } else {
-                    scheduledEvent.calendar = 'theater-2';
+                    scheduledEvent.calendar = event.calendar;
                 }
-            } else {
-                scheduledEvent.calendar = event.calendar;
+                
+                // Render at new position
+                renderScheduledEvent(scheduledEvent);
+                renderLibrary();
+                updateWeekStats();
+                updateDebugCounts();
+                
+                const action = source === 'library' ? 'scheduled' : 'moved';
+                showToast(`${event.title} ${action} to ${actualHour}:${minute.toString().padStart(2, '0')}`);
+                
+            } catch (error) {
+                console.error('Drop error:', error);
+                showToast('Failed to drop event');
             }
-            
-            // Render the moved/created event
-            renderScheduledEvent(scheduledEvent);
-            renderLibrary();
-            updateWeekStats();
-            updateDebugCounts();
-            
-            const action = source === 'library' ? 'scheduled' : 'moved';
-            showToast(`Event ${action} successfully!`);
         }
 
         function formatTimeRange(startH, startM, endH, endM) {
