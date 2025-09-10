@@ -1799,9 +1799,10 @@
             }
         }
 
-        // FIXED DATABASE BEHAVIOR: Library items can be scheduled multiple times
+        // FIXED: Drag and drop - ensure events drop where indicator shows
         function handleDrop(e) {
             e.preventDefault();
+            e.stopPropagation(); // Prevent event bubbling
             this.classList.remove('drop-active');
             
             // Remove drag preview
@@ -1812,21 +1813,24 @@
             
             const eventData = e.dataTransfer.getData('event');
             const source = e.dataTransfer.getData('source');
-            if (!eventData) return;
+            if (!eventData) {
+                console.log('No event data in drop');
+                return;
+            }
             
             const event = JSON.parse(eventData);
             const rect = this.getBoundingClientRect();
             
-            // Calculate drop position - apply offset to make it snap from top
+            // Calculate drop position - EXACT SAME LOGIC AS PREVIEW
             let y = e.clientY - rect.top;
-            if (source === 'grid') {
+            
+            // Apply the SAME offset logic as preview
+            if (source === 'grid' && dragOffset > 0) {
                 y = y - dragOffset;
             }
             
-            // Snap to 15-minute grid
+            // Snap to 15-minute grid - EXACT SAME AS PREVIEW
             const snapY = Math.floor(y / 15) * 15;
-            
-            // Ensure the event doesn't go above the top of the lane
             const finalY = Math.max(0, snapY);
             
             const theaterHour = Math.floor(finalY / 60);
@@ -1836,11 +1840,14 @@
             scheduledDate.setDate(scheduledDate.getDate() + parseInt(this.dataset.day));
             scheduledDate.setHours(0, 0, 0, 0);
             
+            console.log(`Dropping event: ${event.title}`);
+            console.log(`Drop position: y=${y}, finalY=${finalY}, theaterHour=${theaterHour}, minute=${minute}`);
+            console.log(`Target: day=${this.dataset.day}, theater=${this.dataset.theater}`);
+            
             let scheduledEvent;
             
             if (source === 'library') {
                 // Create a NEW instance of this library event
-                // Each scheduled instance gets a unique ID but keeps the googleEventId for reference
                 scheduledEvent = {
                     ...event,
                     day: parseInt(this.dataset.day),
@@ -1848,16 +1855,34 @@
                     startHour: convertFromTheaterHour(theaterHour),
                     startMinute: minute,
                     actualDate: scheduledDate,
-                    id: `scheduled-${Date.now()}-${Math.random()}`, // Always create unique ID for each instance
-                    googleEventId: event.googleEventId, // Keep original reference
-                    instanceOf: event.googleEventId || event.id // Track what library item this came from
+                    id: `scheduled-${Date.now()}-${Math.random()}`,
+                    googleEventId: event.googleEventId,
+                    instanceOf: event.googleEventId || event.id
                 };
                 
                 scheduledEvents.push(scheduledEvent);
-                console.log('Created new instance of:', event.title);
+                console.log('Created new instance from library:', event.title);
                 
             } else if (source === 'grid') {
                 // Moving existing scheduled event
+                const originalId = draggedItem ? draggedItem.dataset.eventId : event.id;
+                
+                // Remove from old position FIRST
+                const originalIndex = scheduledEvents.findIndex(e => e.id == originalId);
+                if (originalIndex !== -1) {
+                    const originalEvent = scheduledEvents[originalIndex];
+                    console.log(`Moving event from: day=${originalEvent.day}, theater=${originalEvent.theater}, time=${originalEvent.startHour}:${originalEvent.startMinute}`);
+                    
+                    // Remove from array
+                    scheduledEvents.splice(originalIndex, 1);
+                    
+                    // Remove from DOM
+                    if (draggedItem) {
+                        draggedItem.remove();
+                    }
+                }
+                
+                // Create moved event with new position
                 scheduledEvent = {
                     ...event,
                     day: parseInt(this.dataset.day),
@@ -1865,16 +1890,11 @@
                     startHour: convertFromTheaterHour(theaterHour),
                     startMinute: minute,
                     actualDate: scheduledDate,
-                    id: event.id
+                    id: originalId || event.id
                 };
                 
-                if (draggedItem) {
-                    const originalId = draggedItem.dataset.eventId;
-                    scheduledEvents = scheduledEvents.filter(e => e.id != originalId);
-                    draggedItem.remove();
-                }
-                
                 scheduledEvents.push(scheduledEvent);
+                console.log(`Moved to: day=${scheduledEvent.day}, theater=${scheduledEvent.theater}, time=${scheduledEvent.startHour}:${scheduledEvent.startMinute}`);
             }
             
             // Handle theater-specific calendar assignments
@@ -1888,8 +1908,9 @@
                 scheduledEvent.calendar = event.calendar;
             }
             
+            // Render the moved/created event
             renderScheduledEvent(scheduledEvent);
-            renderLibrary(); // Library always shows same items
+            renderLibrary();
             updateWeekStats();
             updateDebugCounts();
             
