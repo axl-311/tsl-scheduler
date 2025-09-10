@@ -496,7 +496,7 @@
             height: 2px;
             background: #007aff;
             pointer-events: none;
-            z-index: 150;
+            z-index: 200;
         }
 
         .drag-preview::before {
@@ -511,6 +511,17 @@
             font-size: 11px;
             font-weight: 600;
             white-space: nowrap;
+            z-index: 201;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        /* Ensure time preview is visible on leftmost columns */
+        .day-column:first-child .drag-preview::before,
+        .day-column:nth-child(1):not(.collapsed) .drag-preview::before,
+        .day-column:nth-child(4) .drag-preview::before {
+            left: 5px;
+            top: -25px;
         }
 
         .import-button {
