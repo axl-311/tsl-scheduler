@@ -272,6 +272,7 @@
         .calendar-tbd { background: #42a5f5; }
         .calendar-theater-1 { background: #757575; }
         .calendar-theater-2 { background: #66bb6a; }
+        .calendar-theater { background: #757575; }
 
         .schedule-container {
             flex: 1;
@@ -284,22 +285,6 @@
         .schedule-grid {
             display: flex;
             min-width: 1000px;
-        }
-
-        .time-column {
-            width: 60px;
-            border-right: 1px solid #e0e0e0;
-            padding-top: 50px;
-            display: none;
-        }
-
-        .time-slot {
-            height: 60px;
-            padding: 5px 10px;
-            font-size: 12px;
-            color: #86868b;
-            text-align: right;
-            border-bottom: 1px solid #f0f0f0;
         }
 
         .days-container {
@@ -567,7 +552,6 @@
             }
         }
 
-        /* Edit Modal Styles */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -646,7 +630,6 @@
             margin-top: 24px;
         }
 
-        /* Debug Panel */
         .debug-panel {
             background: #f0f0f2;
             border-radius: 8px;
@@ -672,25 +655,25 @@
 
         <div class="controls">
             <div class="week-navigation">
-                <button onclick="changeWeek(-1)">← Previous Week</button>
+                <button id="prevWeek">← Previous Week</button>
                 <div class="week-display" id="weekDisplay">Loading...</div>
-                <button onclick="changeWeek(1)">Next Week →</button>
+                <button id="nextWeek">Next Week →</button>
             </div>
             <div class="week-actions">
                 <div class="stat-item">
                     <span>Week Total:</span>
                     <span class="stat-value" id="weekTotal">0 events</span>
                 </div>
-                <button class="collapse-toggle" onclick="toggleCollapse()">
+                <button class="collapse-toggle" id="collapseToggle">
                     Show Tues-Thurs
                 </button>
-                <button class="btn-primary" onclick="pushToGoogle()">
+                <button class="btn-primary" id="pushToGoogle">
                     Push to Google
                 </button>
-                <button class="btn-secondary" onclick="saveSchedule()">
+                <button class="btn-secondary" id="saveSchedule">
                     Save
                 </button>
-                <button class="btn-secondary" onclick="loadSchedule()">
+                <button class="btn-secondary" id="loadSchedule">
                     Load
                 </button>
             </div>
@@ -703,7 +686,7 @@
                     <span class="library-count" id="libraryCount">(0)</span>
                 </div>
                 <div class="calendar-filter">
-                    <select id="calendarFilter" onchange="filterLibrary()">
+                    <select id="calendarFilter">
                         <option value="all">All Calendars</option>
                         <option value="events">TSL Events</option>
                         <option value="non-public">TSL Events (NON-PUBLIC)</option>
@@ -713,7 +696,7 @@
                     </select>
                 </div>
                 <div id="libraryItems"></div>
-                <button class="import-button" onclick="importFromGoogle()" style="width: 100%; margin-top: 15px;">
+                <button class="import-button" id="importFromGoogle" style="width: 100%; margin-top: 15px;">
                     Import from Google Calendar
                 </button>
                 <div class="debug-panel">
@@ -723,9 +706,8 @@
                 </div>
             </div>
 
-            <div class="schedule-container">
+            <div class="schedule-container" id="scheduleContainer">
                 <div class="schedule-grid">
-                    <div class="time-column" id="timeColumn"></div>
                     <div class="days-container" id="daysContainer"></div>
                 </div>
             </div>
@@ -737,7 +719,7 @@
         <div class="modal">
             <div class="modal-header">
                 <span>Edit Event</span>
-                <button class="modal-close" onclick="closeEditModal()">×</button>
+                <button class="modal-close" id="modalClose">×</button>
             </div>
             <form id="editForm">
                 <div class="form-group">
@@ -768,7 +750,7 @@
                     </select>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                    <button type="button" class="btn btn-secondary" id="modalCancel">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
@@ -793,6 +775,7 @@
         let collapsedDays = true;
         let accessToken = null;
         let currentEditingEvent = null;
+        let isImporting = false;
 
         // Google Calendar API Configuration
         const CLIENT_ID = '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
@@ -928,17 +911,13 @@
             return -1;
         }
 
-        // PREVENT MULTIPLE IMPORT CALLS
-        let isImporting = false;
-
-        // FIXED: Import from Google Calendar - REBUILD DATABASE FROM GOOGLE CALENDAR (NO DUPLICATES)
+        // Clean database rebuild from Google Calendar
         async function importFromGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
                 return;
             }
 
-            // PREVENT MULTIPLE SIMULTANEOUS IMPORTS
             if (isImporting) {
                 console.log('Import already in progress, skipping...');
                 showToast('Import already in progress...');
@@ -955,12 +934,16 @@
             try {
                 // STEP 1: COMPLETELY WIPE EXISTING DATA
                 console.log(`Before clear: libraryEvents=${libraryEvents.length}, scheduledEvents=${scheduledEvents.length}`);
-                libraryEvents.length = 0; // Force clear the array
-                scheduledEvents.length = 0; // Force clear the array
+                libraryEvents.length = 0;
+                scheduledEvents.length = 0;
                 console.log(`After clear: libraryEvents=${libraryEvents.length}, scheduledEvents=${scheduledEvents.length}`);
                 
                 // Clear UI immediately
-                document.querySelectorAll('.event-block').forEach(block => block.remove());
+                document.querySelectorAll('.event-block').forEach(block => {
+                    if (block.parentNode) {
+                        block.parentNode.removeChild(block);
+                    }
+                });
                 
                 // Import range: 2 weeks before to 12 weeks after current week
                 const startOfRange = new Date(currentWeekStart);
@@ -976,7 +959,7 @@
                 let totalLibraryEvents = 0;
                 let totalScheduledEvents = 0;
                 let totalErrors = 0;
-                const processedEventIds = new Set(); // Track processed IDs to prevent internal duplicates
+                const processedEventIds = new Set();
 
                 // STEP 2: FETCH ALL EVENTS FROM ALL CALENDARS
                 for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
@@ -1008,22 +991,19 @@
                         
                         console.log(`Found ${events.length} events in ${calendarKey} calendar`);
                         
-                        // Process each event from this calendar
                         events.forEach(event => {
                             if (!event.id) {
                                 console.log(`Skipping event without ID: ${event.summary}`);
                                 return;
                             }
                             
-                            // Prevent processing the same event twice (even from different calendar queries)
                             if (processedEventIds.has(event.id)) {
                                 console.log(`Skipping already processed event: ${event.id} - ${event.summary}`);
                                 return;
                             }
                             processedEventIds.add(event.id);
                             
-                            // Calculate duration
-                            let duration = 120; // Default 2 hours
+                            let duration = 120;
                             if (event.start && event.end) {
                                 const start = new Date(event.start.dateTime || event.start.date);
                                 const end = new Date(event.end.dateTime || event.end.date);
@@ -1043,9 +1023,7 @@
                                 isAllDay: !event.start.dateTime
                             };
                             
-                            // Decide where to put this event
                             if (event.start && event.start.dateTime) {
-                                // TIMED EVENT - add to scheduledEvents
                                 const scheduledEvent = convertToScheduledEvent(eventData);
                                 if (scheduledEvent) {
                                     scheduledEvents.push(scheduledEvent);
@@ -1053,7 +1031,6 @@
                                     console.log(`→ Added to scheduled: ${eventData.title} (${scheduledEvent.actualDate?.toLocaleDateString()})`);
                                 }
                             } else {
-                                // ALL-DAY or TBD EVENT - add to library
                                 libraryEvents.push(eventData);
                                 totalLibraryEvents++;
                                 console.log(`→ Added to library: ${eventData.title} (${calendarKey})`);
@@ -1069,9 +1046,7 @@
                 console.log(`=== DATABASE REBUILD COMPLETE ===`);
                 console.log(`Final counts: libraryEvents=${libraryEvents.length}, scheduledEvents=${scheduledEvents.length}`);
                 console.log(`Processed ${processedEventIds.size} unique event IDs`);
-                console.log(`Results: ${totalLibraryEvents} library + ${totalScheduledEvents} scheduled = ${totalLibraryEvents + totalScheduledEvents} total`);
                 
-                // STEP 3: UPDATE UI WITH CLEAN DATA
                 renderLibrary();
                 renderEventsForCurrentWeek();
                 updateWeekStats();
@@ -1088,10 +1063,6 @@
                     showToast('No events found in date range');
                 }
                 
-                if (totalErrors > 0) {
-                    console.warn(`${totalErrors} calendar(s) had errors`);
-                }
-                
             } catch (error) {
                 console.error('Import failed:', error);
                 syncStatus.classList.remove('syncing');
@@ -1102,306 +1073,129 @@
             }
         }
 
-        // Push to Google Calendar with enhanced orphan cleanup
-        async function pushToGoogle() {
+        // Render library - deduplicate by title only (ignore theater source)
+        function renderLibrary() {
+            const container = document.getElementById('libraryItems');
+            const filter = document.getElementById('calendarFilter').value;
+            container.innerHTML = '';
+            
             if (!accessToken) {
-                showToast('Please connect to Google Calendar first');
+                container.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: #86868b;">
+                        <p style="margin-bottom: 10px;">📅</p>
+                        <p style="font-size: 14px;">Connect to Google Calendar to import events</p>
+                    </div>
+                `;
+                document.getElementById('libraryCount').textContent = '(0)';
                 return;
             }
-
-            const syncStatus = document.getElementById('syncStatus');
-            syncStatus.classList.add('syncing');
-            syncStatus.innerHTML = '<span>↻</span><span>Pushing to Google...</span>';
             
-            let successCount = 0;
-            let failCount = 0;
-            let deleteCount = 0;
+            console.log('Rendering library...');
             
-            // Get current week events from scheduler
-            const currentWeekEvents = scheduledEvents.filter(event => {
+            const allLibraryEvents = [];
+            
+            // Add events from other weeks that can be scheduled
+            scheduledEvents.forEach(event => {
                 if (event.actualDate) {
                     const dayOfWeek = calculateDayOfWeek(event.actualDate);
-                    return dayOfWeek >= 0 && dayOfWeek <= 6;
-                }
-                return false;
-            });
-
-            console.log('Current week events to push:', currentWeekEvents.length);
-
-            // First, get existing events from Google Calendar to check for deletions
-            const weekStart = new Date(currentWeekStart);
-            const weekEnd = new Date(currentWeekStart);
-            weekEnd.setDate(weekEnd.getDate() + 7);
-            
-            console.log('Week range:', weekStart.toISOString(), 'to', weekEnd.toISOString());
-            
-            // Track which Google events we've processed (including ones we try to process)
-            const processedGoogleIds = new Set();
-            
-            // Update or create events
-            for (const event of currentWeekEvents) {
-                try {
-                    // Use the actual date if available
-                    let eventDate;
-                    if (event.actualDate) {
-                        eventDate = new Date(event.actualDate);
-                    } else {
-                        eventDate = new Date(currentWeekStart);
-                        eventDate.setDate(eventDate.getDate() + (event.day || 0));
-                    }
-                    
-                    // Set the time
-                    eventDate.setHours(event.startHour);
-                    eventDate.setMinutes(event.startMinute);
-                    eventDate.setSeconds(0);
-                    
-                    const endDate = new Date(eventDate);
-                    endDate.setMinutes(endDate.getMinutes() + event.duration);
-                    
-                    let calendarId = CALENDAR_IDS[event.calendar] || CALENDAR_IDS['events'];
-                    
-                    // ALWAYS mark events as created by scheduler
-                    const eventBody = {
-                        summary: event.title,
-                        start: {
-                            dateTime: eventDate.toISOString(),
-                            timeZone: 'America/New_York'
-                        },
-                        end: {
-                            dateTime: endDate.toISOString(),
-                            timeZone: 'America/New_York'
-                        },
-                        description: 'Scheduled via TSL Schedule Maker 2000' + (event.description ? '\n\n' + event.description : '')
-                    };
-
-                    let response;
-                    let googleEventId;
-                    
-                    // Check if this is an existing Google Calendar event that needs updating
-                    if (event.googleEventId && !event.id.toString().startsWith('existing-')) {
-                        // Update existing event
-                        googleEventId = event.googleEventId;
-                        processedGoogleIds.add(googleEventId); // Track before attempt
-                        console.log('Updating existing event:', event.title, googleEventId);
-                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEventId}`;
-                        response = await fetch(url, {
-                            method: 'PUT',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(eventBody)
-                        });
-                    } else if (event.id.toString().startsWith('existing-')) {
-                        // This is an imported event that was moved/edited - update it
-                        googleEventId = event.googleEventId || event.id.replace('existing-', '');
-                        processedGoogleIds.add(googleEventId); // Track before attempt
-                        console.log('Updating moved/edited event:', event.title, googleEventId);
-                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEventId}`;
-                        response = await fetch(url, {
-                            method: 'PUT',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(eventBody)
-                        });
-                    } else {
-                        // Create new event
-                        console.log('Creating new event:', event.title);
-                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
-                        response = await fetch(url, {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(eventBody)
-                        });
-                    }
-
-                    if (response.ok) {
-                        successCount++;
-                        const responseData = await response.json();
-                        googleEventId = googleEventId || responseData.id;
-                        if (!event.googleEventId) {
-                            event.googleEventId = googleEventId;
+                    if (dayOfWeek < 0 || dayOfWeek > 6) {
+                        let normalizedCalendar = event.calendar;
+                        if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
+                            normalizedCalendar = 'theater';
                         }
-                        processedGoogleIds.add(googleEventId);
-                        console.log('Successfully processed event:', event.title, googleEventId);
-                    } else {
-                        failCount++;
-                        console.error('Failed to push event:', event.title, response.status, await response.text());
-                    }
-                } catch (error) {
-                    failCount++;
-                    console.error('Error pushing event:', event.title, error);
-                }
-            }
-
-            console.log('Processed Google IDs:', Array.from(processedGoogleIds));
-
-            // Now delete events that are in Google Calendar but not on the scheduler
-            // Only delete events that were created by the scheduler
-            for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
-                try {
-                    console.log('Checking calendar for orphans:', calendarKey);
-                    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
-                        `timeMin=${weekStart.toISOString()}&` +
-                        `timeMax=${weekEnd.toISOString()}&` +
-                        `showDeleted=false&` +
-                        `singleEvents=true&` +
-                        `key=${API_KEY}`;
-
-                    const response = await fetch(url, {
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`
-                        }
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        const events = data.items || [];
-                        console.log(`Found ${events.length} events in ${calendarKey} calendar`);
                         
-                        for (const googleEvent of events) {
-                            console.log('Checking event:', googleEvent.summary, googleEvent.id, 'Description:', googleEvent.description);
-                            
-                            // Check if this event was created by the scheduler and is not in our current list
-                            const isSchedulerEvent = googleEvent.description && (
-                                googleEvent.description.includes('Scheduled via TSL Schedule Maker 2000') ||
-                                googleEvent.description.includes('Scheduled via TSL Event/Movie Scheduler') ||
-                                googleEvent.description.includes('Scheduled via TSL Theater Scheduler')
-                            );
-                            
-                            const isNotProcessed = !processedGoogleIds.has(googleEvent.id);
-                            
-                            console.log('  - Is scheduler event:', isSchedulerEvent);
-                            console.log('  - Is not processed:', isNotProcessed);
-                            
-                            if (isSchedulerEvent && isNotProcessed) {
-                                console.log('DELETING orphaned event:', googleEvent.summary, googleEvent.id);
-                                
-                                // Delete this event from Google Calendar
-                                const deleteUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEvent.id}`;
-                                const deleteResponse = await fetch(deleteUrl, {
-                                    method: 'DELETE',
-                                    headers: {
-                                        'Authorization': `Bearer ${accessToken}`
-                                    }
-                                });
-                                
-                                if (deleteResponse.ok || deleteResponse.status === 204) {
-                                    deleteCount++;
-                                    console.log('Successfully deleted orphaned event:', googleEvent.summary);
-                                } else {
-                                    console.error('Failed to delete event:', googleEvent.summary, deleteResponse.status, await deleteResponse.text());
-                                }
-                            }
-                        }
-                    } else {
-                        console.error('Failed to fetch events from calendar:', calendarKey, response.status);
+                        allLibraryEvents.push({
+                            id: event.googleEventId || event.id,
+                            title: event.title,
+                            duration: event.duration,
+                            calendar: normalizedCalendar,
+                            originalCalendar: event.calendar,
+                            description: event.description || '',
+                            location: event.location || '',
+                            googleEventId: event.googleEventId,
+                            startTime: event.startTime,
+                            endTime: event.endTime
+                        });
                     }
-                } catch (error) {
-                    console.error('Error checking for orphaned events in', calendarKey, ':', error);
                 }
-            }
-
-            syncStatus.classList.remove('syncing');
-            syncStatus.classList.add('connected');
-            syncStatus.innerHTML = '<span>✔</span><span>Connected</span>';
+            });
             
-            let message = '';
-            if (successCount > 0) {
-                message = `Pushed ${successCount} events`;
-            }
-            if (deleteCount > 0) {
-                message += message ? `, deleted ${deleteCount} orphaned events` : `Deleted ${deleteCount} orphaned events`;
-            }
-            if (failCount > 0) {
-                message += `. ${failCount} failed`;
-            }
-            
-            if (message) {
-                showToast(message);
-            } else {
-                showToast('No changes to sync');
-            }
-            
-            console.log('Push complete:', { successCount, deleteCount, failCount });
-        }
-
-        // Save schedule
-        function saveSchedule() {
-            try {
-                const scheduleData = {
-                    version: '1.0',
-                    savedAt: new Date().toISOString(),
-                    currentWeekStart: currentWeekStart.toISOString(),
-                    libraryEvents: libraryEvents,
-                    scheduledEvents: scheduledEvents
-                };
-                
-                localStorage.setItem('tsl_schedule', JSON.stringify(scheduleData));
-                
-                const dataStr = JSON.stringify(scheduleData, null, 2);
-                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-                
-                const exportLink = document.createElement('a');
-                exportLink.setAttribute('href', dataUri);
-                exportLink.setAttribute('download', `tsl_schedule_${new Date().toISOString().split('T')[0]}.json`);
-                exportLink.style.display = 'none';
-                document.body.appendChild(exportLink);
-                exportLink.click();
-                document.body.removeChild(exportLink);
-                
-                showToast('Schedule saved');
-            } catch (error) {
-                console.error('Error saving schedule:', error);
-                showToast('Failed to save schedule');
-            }
-        }
-
-        // Load schedule
-        function loadSchedule() {
-            try {
-                const savedData = localStorage.getItem('tsl_schedule');
-                if (!savedData) {
-                    showToast('No saved schedule found');
-                    return;
+            libraryEvents.forEach(event => {
+                let normalizedCalendar = event.calendar;
+                if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
+                    normalizedCalendar = 'theater';
                 }
                 
-                const scheduleData = JSON.parse(savedData);
-                
-                if (!confirm(`Load schedule from ${new Date(scheduleData.savedAt).toLocaleString()}?`)) {
-                    return;
-                }
-                
-                libraryEvents = scheduleData.libraryEvents || [];
-                scheduledEvents = scheduleData.scheduledEvents || [];
-                
-                scheduledEvents.forEach(event => {
-                    if (event.actualDate) {
-                        event.actualDate = new Date(event.actualDate);
-                    }
+                allLibraryEvents.push({
+                    ...event,
+                    calendar: normalizedCalendar,
+                    originalCalendar: event.calendar
                 });
+            });
+            
+            console.log(`Total library candidates: ${allLibraryEvents.length}`);
+            
+            // DEDUPLICATE BY TITLE ONLY
+            const uniqueByTitle = new Map();
+            allLibraryEvents.forEach(event => {
+                const key = event.title.toLowerCase().trim();
                 
-                document.querySelectorAll('.event-block').forEach(block => block.remove());
-                renderLibrary();
-                renderEventsForCurrentWeek();
-                updateWeekStats();
-                updateDebugCounts();
-                
-                showToast('Schedule loaded');
-            } catch (error) {
-                console.error('Error loading schedule:', error);
-                showToast('Failed to load schedule');
+                if (!uniqueByTitle.has(key)) {
+                    uniqueByTitle.set(key, event);
+                    console.log(`Adding unique library item: ${event.title} (normalized from ${event.originalCalendar || event.calendar})`);
+                } else {
+                    console.log(`Skipping duplicate: ${event.title} (from ${event.originalCalendar || event.calendar})`);
+                }
+            });
+            
+            const uniqueLibraryEvents = Array.from(uniqueByTitle.values());
+            console.log(`Unique library events after deduplication: ${uniqueLibraryEvents.length}`);
+            
+            let filteredEvents;
+            if (filter === 'all') {
+                filteredEvents = uniqueLibraryEvents;
+            } else if (filter === 'theater-1' || filter === 'theater-2') {
+                filteredEvents = uniqueLibraryEvents.filter(e => e.calendar === 'theater');
+            } else {
+                filteredEvents = uniqueLibraryEvents.filter(e => e.calendar === filter);
             }
+            
+            console.log(`After filter '${filter}': ${filteredEvents.length} events`);
+            
+            if (filteredEvents.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: #86868b; font-size: 14px;">
+                        No events found. Click "Import from Google Calendar".
+                    </div>
+                `;
+            } else {
+                filteredEvents.forEach(event => {
+                    const item = document.createElement('div');
+                    const styleCalendar = event.calendar === 'theater' ? 'theater-1' : event.calendar;
+                    item.className = `library-item calendar-${styleCalendar}`;
+                    item.draggable = true;
+                    item.dataset.eventId = event.id || event.googleEventId;
+                    
+                    const hours = Math.floor(event.duration / 60);
+                    const minutes = event.duration % 60;
+                    const runtime = hours > 0 ? 
+                        (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`) : 
+                        `${minutes}m`;
+                    
+                    item.innerHTML = `
+                        <div class="library-item-title">${event.title}</div>
+                        <div class="library-item-duration">${runtime}</div>
+                    `;
+                    
+                    container.appendChild(item);
+                });
+            }
+            
+            document.getElementById('libraryCount').textContent = `(${filteredEvents.length})`;
         }
 
-        // Render events for current week with proper cleanup
+        // Render events for current week
         function renderEventsForCurrentWeek() {
-            // COMPLETELY clear all existing event blocks first
             document.querySelectorAll('.event-block').forEach(block => {
                 if (block.parentNode) {
                     block.parentNode.removeChild(block);
@@ -1423,7 +1217,7 @@
             console.log('Event rendering complete');
         }
 
-        // Render scheduled event
+        // Render scheduled event (clean version)
         function renderScheduledEvent(event) {
             const dayColumn = document.getElementById(`day-${event.day}`);
             if (!dayColumn) return;
@@ -1448,31 +1242,225 @@
             const actualEndHour = event.startHour + Math.floor(endMinutes / 60);
             const endMinute = endMinutes % 60;
             
-            // Format runtime
             const hours = Math.floor(event.duration / 60);
             const minutes = event.duration % 60;
             const runtime = hours > 0 ? 
                 (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`) : 
                 `${minutes}m`;
             
+            const tbdText = event.calendar === 'tbd' ? '↺' : 'TBD';
+            const tbdTitle = event.calendar === 'tbd' ? 'Restore original calendar' : 'Convert to TBD';
+            
             eventBlock.innerHTML = `
                 <div class="event-controls">
-                    <button class="event-control-btn tbd-btn" onclick="convertToTBD('${event.id}')" title="Convert to TBD">TBD</button>
-                    <button class="event-control-btn edit-btn" onclick="editEvent('${event.id}')" title="Edit">✎</button>
-                    <button class="event-control-btn delete-btn" onclick="deleteEvent('${event.id}')" title="Delete">×</button>
+                    <button class="event-control-btn tbd-btn" title="${tbdTitle}">${tbdText}</button>
+                    <button class="event-control-btn edit-btn" title="Edit">✎</button>
+                    <button class="event-control-btn delete-btn" title="Delete">×</button>
                 </div>
                 <div class="event-title">${event.title}</div>
                 <div class="event-time">${formatTimeRange(event.startHour, event.startMinute, actualEndHour, endMinute)}</div>
                 <div class="event-runtime">${runtime}</div>
             `;
             
-            eventBlock.addEventListener('dragstart', handleDragStart);
-            eventBlock.addEventListener('dragend', handleDragEnd);
-            
             lane.appendChild(eventBlock);
         }
 
-        // Change week
+        // TBD Toggle with proper state management
+        function convertToTBD(eventId) {
+            const event = scheduledEvents.find(e => e.id == eventId);
+            
+            if (!event) {
+                showToast('Event not found');
+                return;
+            }
+            
+            if (event.calendar === 'tbd') {
+                const originalCalendar = event.originalCalendar || 'events';
+                event.calendar = originalCalendar;
+                delete event.originalCalendar;
+                showToast(`Restored "${event.title}" to ${originalCalendar}`);
+            } else {
+                event.originalCalendar = event.calendar;
+                event.calendar = 'tbd';
+                showToast(`Changed "${event.title}" to TBD`);
+            }
+            
+            renderEventsForCurrentWeek();
+        }
+
+        // Edit event
+        function editEvent(eventId) {
+            const event = scheduledEvents.find(e => e.id == eventId) || 
+                         libraryEvents.find(e => e.id == eventId);
+            
+            if (!event) {
+                showToast('Event not found');
+                return;
+            }
+            
+            currentEditingEvent = event;
+            
+            document.getElementById('editTitle').value = event.title;
+            
+            const totalMinutes = event.duration;
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            
+            document.getElementById('editHours').value = hours;
+            document.getElementById('editMinutes').value = minutes;
+            document.getElementById('editCalendar').value = event.calendar;
+            
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+            currentEditingEvent = null;
+        }
+
+        function saveEventChanges() {
+            if (!currentEditingEvent) return;
+            
+            const newTitle = document.getElementById('editTitle').value.trim();
+            const hours = parseInt(document.getElementById('editHours').value) || 0;
+            const minutes = parseInt(document.getElementById('editMinutes').value) || 0;
+            const newCalendar = document.getElementById('editCalendar').value;
+            
+            const newDuration = (hours * 60) + minutes;
+            
+            if (!newTitle) {
+                showToast('Title is required');
+                return;
+            }
+            
+            if (newDuration <= 0) {
+                showToast('Duration must be greater than 0');
+                return;
+            }
+            
+            const scheduledIndex = scheduledEvents.findIndex(e => e.id == currentEditingEvent.id);
+            if (scheduledIndex !== -1) {
+                scheduledEvents[scheduledIndex].title = newTitle;
+                scheduledEvents[scheduledIndex].duration = newDuration;
+                scheduledEvents[scheduledIndex].calendar = newCalendar;
+            }
+            
+            const libraryIndex = libraryEvents.findIndex(e => e.id == currentEditingEvent.id || e.googleEventId == currentEditingEvent.googleEventId);
+            if (libraryIndex !== -1) {
+                libraryEvents[libraryIndex].title = newTitle;
+                libraryEvents[libraryIndex].duration = newDuration;
+                libraryEvents[libraryIndex].calendar = newCalendar;
+            }
+            
+            if (scheduledIndex !== -1) {
+                renderEventsForCurrentWeek();
+            }
+            
+            renderLibrary();
+            closeEditModal();
+            showToast('Event updated');
+        }
+
+        // Delete event
+        function deleteEvent(eventId) {
+            if (!confirm('Delete this event?')) return;
+            
+            const eventToDelete = scheduledEvents.find(e => e.id == eventId);
+            
+            if (!eventToDelete) {
+                console.log('Event not found:', eventId);
+                return;
+            }
+            
+            console.log('Deleting event:', eventToDelete.title);
+            
+            scheduledEvents = scheduledEvents.filter(e => e.id != eventId);
+            
+            const eventBlock = document.querySelector(`[data-event-id="${eventId}"]`);
+            if (eventBlock) {
+                eventBlock.remove();
+            }
+            
+            renderLibrary();
+            updateWeekStats();
+            updateDebugCounts();
+            showToast('Event deleted');
+        }
+
+        // Utility functions
+        function convertToTheaterHour(actualHour) {
+            if (actualHour >= 14) {
+                return actualHour - 14;
+            } else if (actualHour === 0) {
+                return 10;
+            } else {
+                return -1;
+            }
+        }
+
+        function convertFromTheaterHour(theaterHour) {
+            if (theaterHour >= 0 && theaterHour <= 9) {
+                return theaterHour + 14;
+            } else if (theaterHour === 10) {
+                return 0;
+            } else {
+                return 14;
+            }
+        }
+
+        function formatTimeRange(startH, startM, endH, endM) {
+            const formatSingleTime = (h, m) => {
+                const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                const min = m.toString().padStart(2, '0');
+                return `${hour}:${min}`;
+            };
+            
+            return `${formatSingleTime(startH, startM)} - ${formatSingleTime(endH, endM)}`;
+        }
+
+        function updateWeekDisplay() {
+            const endDate = new Date(currentWeekStart);
+            endDate.setDate(endDate.getDate() + 6);
+            
+            const options = { month: 'short', day: 'numeric', year: 'numeric' };
+            const startStr = currentWeekStart.toLocaleDateString('en-US', options);
+            const endStr = endDate.toLocaleDateString('en-US', options);
+            
+            document.getElementById('weekDisplay').textContent = `${startStr} - ${endStr}`;
+        }
+
+        function updateWeekStats() {
+            const currentWeekEvents = scheduledEvents.filter(event => {
+                if (event.actualDate) {
+                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
+                    return dayOfWeek >= 0 && dayOfWeek <= 6;
+                }
+                return false;
+            });
+            
+            const total = currentWeekEvents.length;
+            document.getElementById('weekTotal').textContent = `${total} event${total !== 1 ? 's' : ''}`;
+        }
+
+        function updateDebugCounts() {
+            document.getElementById('debugLibraryCount').textContent = libraryEvents.length;
+            document.getElementById('debugScheduledCount').textContent = scheduledEvents.length;
+        }
+
+        function showToast(message) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
         function changeWeek(direction) {
             currentWeekStart.setDate(currentWeekStart.getDate() + (direction * 7));
             document.getElementById('daysContainer').innerHTML = '';
@@ -1480,7 +1468,21 @@
             updateWeekDisplay();
             renderEventsForCurrentWeek();
             updateWeekStats();
-            renderLibrary(); // Re-render library for new week
+            renderLibrary();
+        }
+
+        function toggleCollapse() {
+            const days = [0, 1, 2];
+            days.forEach(day => {
+                const dayColumn = document.getElementById(`day-${day}`);
+                if (dayColumn) {
+                    dayColumn.classList.toggle('collapsed');
+                }
+            });
+            
+            collapsedDays = !collapsedDays;
+            const button = document.getElementById('collapseToggle');
+            button.textContent = collapsedDays ? 'Show Tues-Thurs' : 'Hide Tues-Thurs';
         }
 
         // Generate day columns
@@ -1536,10 +1538,6 @@
                     laneHeader.textContent = theater;
                     lane.appendChild(laneHeader);
                     
-                    lane.addEventListener('dragover', handleDragOver);
-                    lane.addEventListener('drop', handleDrop);
-                    lane.addEventListener('dragleave', handleDragLeave);
-                    
                     theaterLanes.appendChild(lane);
                 });
                 
@@ -1549,175 +1547,15 @@
             });
         }
 
-        // Convert to theater hour
-        function convertToTheaterHour(actualHour) {
-            if (actualHour >= 14) {
-                return actualHour - 14;
-            } else if (actualHour === 0) {
-                return 10;
-            } else {
-                return -1;
-            }
-        }
-
-        // Convert from theater hour
-        function convertFromTheaterHour(theaterHour) {
-            if (theaterHour >= 0 && theaterHour <= 9) {
-                return theaterHour + 14;
-            } else if (theaterHour === 10) {
-                return 0;
-            } else {
-                return 14;
-            }
-        }
-
-        // FIXED: Render library - treat theater-1 and theater-2 as same movie, deduplicate by title only
-        function renderLibrary() {
-            const container = document.getElementById('libraryItems');
-            const filter = document.getElementById('calendarFilter').value;
-            container.innerHTML = '';
-            
-            if (!accessToken) {
-                container.innerHTML = `
-                    <div style="padding: 20px; text-align: center; color: #86868b;">
-                        <p style="margin-bottom: 10px;">📅</p>
-                        <p style="font-size: 14px;">Connect to Google Calendar to import events</p>
-                    </div>
-                `;
-                document.getElementById('libraryCount').textContent = '(0)';
-                return;
-            }
-            
-            console.log('Rendering library...');
-            
-            // Get ALL events from other weeks as potential library items
-            const allLibraryEvents = [];
-            
-            // Add events from other weeks that can be scheduled
-            scheduledEvents.forEach(event => {
-                if (event.actualDate) {
-                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
-                    // Only show events from OTHER weeks in the library
-                    if (dayOfWeek < 0 || dayOfWeek > 6) {
-                        // Normalize theater calendars to generic "theater" for library display
-                        let normalizedCalendar = event.calendar;
-                        if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
-                            normalizedCalendar = 'theater';
-                        }
-                        
-                        allLibraryEvents.push({
-                            id: event.googleEventId || event.id,
-                            title: event.title,
-                            duration: event.duration,
-                            calendar: normalizedCalendar,
-                            originalCalendar: event.calendar, // Keep original for reference
-                            description: event.description || '',
-                            location: event.location || '',
-                            googleEventId: event.googleEventId,
-                            startTime: event.startTime,
-                            endTime: event.endTime
-                        });
-                    }
-                }
-            });
-            
-            // Add all-day/TBD events from libraryEvents
-            libraryEvents.forEach(event => {
-                // Normalize theater calendars for library display
-                let normalizedCalendar = event.calendar;
-                if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
-                    normalizedCalendar = 'theater';
-                }
-                
-                allLibraryEvents.push({
-                    ...event,
-                    calendar: normalizedCalendar,
-                    originalCalendar: event.calendar
-                });
-            });
-            
-            console.log(`Total library candidates: ${allLibraryEvents.length}`);
-            
-            // DEDUPLICATE BY TITLE ONLY - ignore calendar source for movies
-            const uniqueByTitle = new Map();
-            allLibraryEvents.forEach(event => {
-                const key = event.title.toLowerCase().trim();
-                
-                if (!uniqueByTitle.has(key)) {
-                    uniqueByTitle.set(key, event);
-                    console.log(`Adding unique library item: ${event.title} (normalized from ${event.originalCalendar || event.calendar})`);
-                } else {
-                    console.log(`Skipping duplicate: ${event.title} (from ${event.originalCalendar || event.calendar})`);
-                }
-            });
-            
-            const uniqueLibraryEvents = Array.from(uniqueByTitle.values());
-            console.log(`Unique library events after deduplication: ${uniqueLibraryEvents.length}`);
-            
-            // Apply calendar filter (with theater normalization)
-            let filteredEvents;
-            if (filter === 'all') {
-                filteredEvents = uniqueLibraryEvents;
-            } else if (filter === 'theater-1' || filter === 'theater-2') {
-                // Show all theater events for either theater filter
-                filteredEvents = uniqueLibraryEvents.filter(e => e.calendar === 'theater');
-            } else {
-                filteredEvents = uniqueLibraryEvents.filter(e => e.calendar === filter);
-            }
-            
-            console.log(`After filter '${filter}': ${filteredEvents.length} events`);
-            
-            if (filteredEvents.length === 0) {
-                container.innerHTML = `
-                    <div style="padding: 20px; text-align: center; color: #86868b; font-size: 14px;">
-                        No events found. Click "Import from Google Calendar".
-                    </div>
-                `;
-            } else {
-                filteredEvents.forEach(event => {
-                    const item = document.createElement('div');
-                    // Use normalized calendar for styling (theater events get theater-1 styling)
-                    const styleCalendar = event.calendar === 'theater' ? 'theater-1' : event.calendar;
-                    item.className = `library-item calendar-${styleCalendar}`;
-                    item.draggable = true;
-                    item.dataset.eventId = event.id || event.googleEventId;
-                    
-                    const hours = Math.floor(event.duration / 60);
-                    const minutes = event.duration % 60;
-                    const runtime = hours > 0 ? 
-                        (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`) : 
-                        `${minutes}m`;
-                    
-                    item.innerHTML = `
-                        <div class="library-item-title">${event.title}</div>
-                        <div class="library-item-duration">${runtime}</div>
-                    `;
-                    
-                    item.addEventListener('dragstart', handleDragStart);
-                    item.addEventListener('dragend', handleDragEnd);
-                    
-                    container.appendChild(item);
-                });
-            }
-            
-            document.getElementById('libraryCount').textContent = `(${filteredEvents.length})`;
-        }
-
-        // Update debug counts
-        function updateDebugCounts() {
-            document.getElementById('debugLibraryCount').textContent = libraryEvents.length;
-            document.getElementById('debugScheduledCount').textContent = scheduledEvents.length;
-        }
-
-        // Drag and Drop handlers
+        // Drag and drop handlers
         function handleDragStart(e) {
+            console.log('Drag started:', this.querySelector('.event-title')?.textContent || 'Unknown');
             draggedItem = this;
             this.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
             
             dragSource = this.closest('.library-panel') ? 'library' : 'grid';
             
-            // Calculate offset from top of the element for grid items
             if (dragSource === 'grid') {
                 const rect = this.getBoundingClientRect();
                 dragOffset = e.clientY - rect.top;
@@ -1726,17 +1564,13 @@
             }
             
             const eventId = this.dataset.eventId;
-            
-            // Find event in all possible locations
             let event = null;
             
-            // First check scheduled events
             event = scheduledEvents.find(e => {
                 const id = e.googleEventId || e.id;
                 return id == eventId;
             });
             
-            // If not found, check library events (for all-day/TBD)
             if (!event) {
                 event = libraryEvents.find(e => {
                     const id = e.googleEventId || e.id;
@@ -1751,6 +1585,7 @@
         }
 
         function handleDragEnd(e) {
+            console.log('Drag ended');
             if (draggedItem) {
                 draggedItem.classList.remove('dragging');
             }
@@ -1759,13 +1594,11 @@
             dragOffset = 0;
         }
 
-        // FIXED: Preview line always shows where TOP of block will snap to
         function handleDragOver(e) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             this.classList.add('drop-active');
             
-            // Create or update drag preview
             let preview = this.querySelector('.drag-preview');
             if (!preview) {
                 preview = document.createElement('div');
@@ -1776,17 +1609,14 @@
             const rect = this.getBoundingClientRect();
             let y = e.clientY - rect.top;
             
-            // Apply the SAME offset logic as drop - get source from dataTransfer
             const source = e.dataTransfer.getData('source') || dragSource || 'library';
             if (source === 'grid' && dragOffset > 0) {
                 y = y - dragOffset;
             }
             
-            // Snap to 15-minute grid (same as drop)
             const snapY = Math.floor(y / 15) * 15;
             const finalY = Math.max(0, snapY);
             
-            // Calculate time for preview
             const theaterHour = Math.floor(finalY / 60);
             const minute = ((finalY % 60) / 15) * 15;
             const actualHour = convertFromTheaterHour(theaterHour);
@@ -1801,20 +1631,17 @@
 
         function handleDragLeave(e) {
             this.classList.remove('drop-active');
-            // Remove drag preview
             const preview = this.querySelector('.drag-preview');
             if (preview) {
                 preview.remove();
             }
         }
 
-        // FIXED: Simplified drag and drop with exact position matching
         function handleDrop(e) {
             e.preventDefault();
             e.stopPropagation();
             this.classList.remove('drop-active');
             
-            // Remove drag preview to get exact position it was showing
             const preview = this.querySelector('.drag-preview');
             let previewTop = 0;
             if (preview) {
@@ -1834,7 +1661,6 @@
                 const event = JSON.parse(eventData);
                 console.log(`Dropping ${event.title} at preview position: ${previewTop}px`);
                 
-                // Use the EXACT same calculation as the preview
                 const theaterHour = Math.floor(previewTop / 60);
                 const minute = ((previewTop % 60) / 15) * 15;
                 const actualHour = convertFromTheaterHour(theaterHour);
@@ -1848,7 +1674,6 @@
                 let scheduledEvent;
                 
                 if (source === 'library') {
-                    // Create new instance from library
                     scheduledEvent = {
                         ...event,
                         day: parseInt(this.dataset.day),
@@ -1865,23 +1690,19 @@
                     console.log('Created new library instance');
                     
                 } else if (source === 'grid') {
-                    // Move existing event
                     const originalId = event.id;
                     
-                    // Remove original event
                     const originalIndex = scheduledEvents.findIndex(e => e.id == originalId);
                     if (originalIndex !== -1) {
                         scheduledEvents.splice(originalIndex, 1);
                         console.log('Removed original event from array');
                     }
                     
-                    // Remove original DOM element
                     if (draggedItem && draggedItem.parentNode) {
                         draggedItem.parentNode.removeChild(draggedItem);
                         console.log('Removed original DOM element');
                     }
                     
-                    // Create moved event
                     scheduledEvent = {
                         ...event,
                         day: parseInt(this.dataset.day),
@@ -1896,14 +1717,12 @@
                     console.log('Added moved event to new position');
                 }
                 
-                // Set correct calendar based on theater
                 if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
                     scheduledEvent.calendar = this.dataset.theater === '0' ? 'theater-1' : 'theater-2';
                 } else {
                     scheduledEvent.calendar = event.calendar;
                 }
                 
-                // Render at new position
                 renderScheduledEvent(scheduledEvent);
                 renderLibrary();
                 updateWeekStats();
@@ -1918,217 +1737,116 @@
             }
         }
 
-        function formatTimeRange(startH, startM, endH, endM) {
-            const formatSingleTime = (h, m) => {
-                const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
-                const min = m.toString().padStart(2, '0');
-                return `${hour}:${min}`;
-            };
-            
-            return `${formatSingleTime(startH, startM)} - ${formatSingleTime(endH, endM)}`;
-        }
-
-        function updateWeekDisplay() {
-            const endDate = new Date(currentWeekStart);
-            endDate.setDate(endDate.getDate() + 6);
-            
-            const options = { month: 'short', day: 'numeric', year: 'numeric' };
-            const startStr = currentWeekStart.toLocaleDateString('en-US', options);
-            const endStr = endDate.toLocaleDateString('en-US', options);
-            
-            document.getElementById('weekDisplay').textContent = `${startStr} - ${endStr}`;
-        }
-
-        function updateWeekStats() {
-            const currentWeekEvents = scheduledEvents.filter(event => {
-                if (event.actualDate) {
-                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
-                    return dayOfWeek >= 0 && dayOfWeek <= 6;
-                }
-                return false;
-            });
-            
-            const total = currentWeekEvents.length;
-            document.getElementById('weekTotal').textContent = `${total} event${total !== 1 ? 's' : ''}`;
-        }
-
-        function toggleCollapse() {
-            const days = [0, 1, 2];
-            days.forEach(day => {
-                const dayColumn = document.getElementById(`day-${day}`);
-                dayColumn.classList.toggle('collapsed');
-            });
-            
-            collapsedDays = !collapsedDays;
-            const button = event.target;
-            button.textContent = collapsedDays ? 'Show Tues-Thurs' : 'Hide Tues-Thurs';
-        }
-
-        function filterLibrary() {
-            renderLibrary();
-        }
-
-        function showToast(message) {
-            const existing = document.querySelector('.toast');
-            if (existing) existing.remove();
-            
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.remove();
-            }, 3000);
-        }
-
-        // Convert event to TBD
-        function convertToTBD(eventId) {
-            // Find the event in scheduledEvents
-            const event = scheduledEvents.find(e => e.id == eventId);
-            
-            if (!event) {
-                showToast('Event not found');
-                return;
-            }
-            
-            // Change calendar type to TBD
-            event.calendar = 'tbd';
-            
-            // Re-render the current week to show the color change
-            renderEventsForCurrentWeek();
-            
-            showToast(`Changed "${event.title}" to TBD`);
-        }
-
-        // FIXED DATABASE BEHAVIOR: Add back to library when deleted
-        function deleteEvent(eventId) {
-            if (!confirm('Delete this event?')) return;
-            
-            // Find the event before deleting it
-            const eventToDelete = scheduledEvents.find(e => e.id == eventId);
-            
-            if (!eventToDelete) {
-                console.log('Event not found:', eventId);
-                return;
-            }
-            
-            console.log('Deleting event:', eventToDelete.title);
-            
-            // Remove from scheduled events
-            scheduledEvents = scheduledEvents.filter(e => e.id != eventId);
-            
-            // Remove from grid
-            const eventBlock = document.querySelector(`[data-event-id="${eventId}"]`);
-            if (eventBlock) {
-                eventBlock.remove();
-            }
-            
-            // Note: We don't add back to library since library shows events from other weeks
-            // and this maintains the database behavior where library items can be scheduled multiple times
-            
-            renderLibrary(); // Update library display
-            updateWeekStats();
-            updateDebugCounts();
-            showToast('Event deleted');
-        }
-
-        // FIXED: Edit modal uses hrs/min format
-        function editEvent(eventId) {
-            const event = scheduledEvents.find(e => e.id == eventId) || 
-                         libraryEvents.find(e => e.id == eventId);
-            
-            if (!event) {
-                showToast('Event not found');
-                return;
-            }
-            
-            currentEditingEvent = event;
-            
-            document.getElementById('editTitle').value = event.title;
-            
-            // Convert minutes to hours and minutes
-            const totalMinutes = event.duration;
-            const hours = Math.floor(totalMinutes / 60);
-            const minutes = totalMinutes % 60;
-            
-            document.getElementById('editHours').value = hours;
-            document.getElementById('editMinutes').value = minutes;
-            document.getElementById('editCalendar').value = event.calendar;
-            
-            document.getElementById('editModal').style.display = 'flex';
-        }
-
-        function closeEditModal() {
-            document.getElementById('editModal').style.display = 'none';
-            currentEditingEvent = null;
-        }
-
-        function saveEventChanges() {
-            if (!currentEditingEvent) return;
-            
-            const newTitle = document.getElementById('editTitle').value.trim();
-            const hours = parseInt(document.getElementById('editHours').value) || 0;
-            const minutes = parseInt(document.getElementById('editMinutes').value) || 0;
-            const newCalendar = document.getElementById('editCalendar').value;
-            
-            // Convert hours and minutes to total minutes
-            const newDuration = (hours * 60) + minutes;
-            
-            if (!newTitle) {
-                showToast('Title is required');
-                return;
-            }
-            
-            if (newDuration <= 0) {
-                showToast('Duration must be greater than 0');
-                return;
-            }
-            
-            const scheduledIndex = scheduledEvents.findIndex(e => e.id == currentEditingEvent.id);
-            if (scheduledIndex !== -1) {
-                scheduledEvents[scheduledIndex].title = newTitle;
-                scheduledEvents[scheduledIndex].duration = newDuration;
-                scheduledEvents[scheduledIndex].calendar = newCalendar;
-            }
-            
-            const libraryIndex = libraryEvents.findIndex(e => e.id == currentEditingEvent.id || e.googleEventId == currentEditingEvent.googleEventId);
-            if (libraryIndex !== -1) {
-                libraryEvents[libraryIndex].title = newTitle;
-                libraryEvents[libraryIndex].duration = newDuration;
-                libraryEvents[libraryIndex].calendar = newCalendar;
-            }
-            
-            if (scheduledIndex !== -1) {
-                document.querySelectorAll('.event-block').forEach(block => block.remove());
-                renderEventsForCurrentWeek();
-            }
-            
-            renderLibrary();
-            closeEditModal();
-            showToast('Event updated');
-        }
-
-        // Initialize
+        // Initialize with clean event delegation
         function init() {
+            console.log('Initializing TSL Schedule Maker 2000...');
+            
             generateDaysColumns();
             updateWeekDisplay();
             updateWeekStats();
             updateDebugCounts();
             
-            const authButton = document.getElementById('authButton');
-            authButton.onclick = handleAuthClick;
+            // Button event handlers
+            document.getElementById('authButton').onclick = handleAuthClick;
+            document.getElementById('prevWeek').onclick = () => changeWeek(-1);
+            document.getElementById('nextWeek').onclick = () => changeWeek(1);
+            document.getElementById('collapseToggle').onclick = toggleCollapse;
+            document.getElementById('importFromGoogle').onclick = importFromGoogle;
+            document.getElementById('calendarFilter').onchange = renderLibrary;
             
-            document.getElementById('editForm').addEventListener('submit', (e) => {
+            // Modal handlers
+            document.getElementById('modalClose').onclick = closeEditModal;
+            document.getElementById('modalCancel').onclick = closeEditModal;
+            document.getElementById('editForm').onsubmit = (e) => {
                 e.preventDefault();
                 saveEventChanges();
-            });
-            
-            document.getElementById('editModal').addEventListener('click', (e) => {
+            };
+            document.getElementById('editModal').onclick = (e) => {
                 if (e.target.id === 'editModal') {
                     closeEditModal();
                 }
+            };
+            
+            // EVENT DELEGATION: Handle all event interactions
+            const scheduleContainer = document.getElementById('scheduleContainer');
+            
+            // Button clicks
+            scheduleContainer.addEventListener('click', function(e) {
+                console.log('Click detected on:', e.target.className, e.target.textContent);
+                
+                if (e.target.classList.contains('tbd-btn')) {
+                    e.stopPropagation();
+                    const eventBlock = e.target.closest('.event-block');
+                    const eventId = eventBlock.dataset.eventId;
+                    console.log('TBD button clicked for event ID:', eventId);
+                    convertToTBD(eventId);
+                } else if (e.target.classList.contains('edit-btn')) {
+                    e.stopPropagation();
+                    const eventBlock = e.target.closest('.event-block');
+                    const eventId = eventBlock.dataset.eventId;
+                    console.log('Edit button clicked for event ID:', eventId);
+                    editEvent(eventId);
+                } else if (e.target.classList.contains('delete-btn')) {
+                    e.stopPropagation();
+                    const eventBlock = e.target.closest('.event-block');
+                    const eventId = eventBlock.dataset.eventId;
+                    console.log('Delete button clicked for event ID:', eventId);
+                    deleteEvent(eventId);
+                }
             });
+            
+            // Drag events
+            scheduleContainer.addEventListener('dragstart', function(e) {
+                if (e.target.classList.contains('event-block')) {
+                    console.log('Drag started via delegation for:', e.target.querySelector('.event-title').textContent);
+                    handleDragStart.call(e.target, e);
+                }
+            });
+            
+            scheduleContainer.addEventListener('dragend', function(e) {
+                if (e.target.classList.contains('event-block')) {
+                    console.log('Drag ended via delegation');
+                    handleDragEnd.call(e.target, e);
+                }
+            });
+            
+            // Drop zone events
+            scheduleContainer.addEventListener('dragover', function(e) {
+                if (e.target.classList.contains('theater-lane') || e.target.closest('.theater-lane')) {
+                    const lane = e.target.classList.contains('theater-lane') ? e.target : e.target.closest('.theater-lane');
+                    handleDragOver.call(lane, e);
+                }
+            });
+            
+            scheduleContainer.addEventListener('dragleave', function(e) {
+                if (e.target.classList.contains('theater-lane')) {
+                    handleDragLeave.call(e.target, e);
+                }
+            });
+            
+            scheduleContainer.addEventListener('drop', function(e) {
+                if (e.target.classList.contains('theater-lane') || e.target.closest('.theater-lane')) {
+                    const lane = e.target.classList.contains('theater-lane') ? e.target : e.target.closest('.theater-lane');
+                    handleDrop.call(lane, e);
+                }
+            });
+            
+            // Library drag events
+            document.querySelector('.library-panel').addEventListener('dragstart', function(e) {
+                if (e.target.classList.contains('library-item')) {
+                    console.log('Library drag started for:', e.target.querySelector('.library-item-title').textContent);
+                    handleDragStart.call(e.target, e);
+                }
+            });
+            
+            document.querySelector('.library-panel').addEventListener('dragend', function(e) {
+                if (e.target.classList.contains('library-item')) {
+                    console.log('Library drag ended');
+                    handleDragEnd.call(e.target, e);
+                }
+            });
+            
+            console.log('Event delegation set up complete');
             
             initGoogleAPI();
             setTimeout(() => {
@@ -2136,6 +1854,7 @@
             }, 1000);
             
             renderLibrary();
+            console.log('Initialization complete');
         }
 
         init();
