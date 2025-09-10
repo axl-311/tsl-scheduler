@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Theater Scheduler</title>
+    <title>TSL Schedule Maker 2000</title>
     <style>
         * {
             margin: 0;
@@ -644,7 +644,7 @@
 <body>
     <div class="app-container">
         <div class="header">
-            <h1>TSL Theater Scheduler</h1>
+            <h1>TSL Schedule Maker 2000</h1>
             <button id="authButton" class="auth-button">
                 Connect Google Calendar
             </button>
@@ -1045,7 +1045,7 @@
             const weekEnd = new Date(currentWeekStart);
             weekEnd.setDate(weekEnd.getDate() + 7);
             
-            // Track which Google events we've processed
+            // Track which Google events we've processed (including ones we try to process)
             const processedGoogleIds = new Set();
             
             // Update or create events
@@ -1070,6 +1070,7 @@
                     
                     let calendarId = CALENDAR_IDS[event.calendar] || CALENDAR_IDS['events'];
                     
+                    // ALWAYS mark events as created by scheduler
                     const eventBody = {
                         summary: event.title,
                         start: {
@@ -1080,7 +1081,7 @@
                             dateTime: endDate.toISOString(),
                             timeZone: 'America/New_York'
                         },
-                        description: event.description || 'Scheduled via TSL Theater Scheduler'
+                        description: (event.description || '') + '\n\nScheduled via TSL Schedule Maker 2000'
                     };
 
                     let response;
@@ -1090,6 +1091,7 @@
                     if (event.googleEventId && !event.id.toString().startsWith('existing-')) {
                         // Update existing event
                         googleEventId = event.googleEventId;
+                        processedGoogleIds.add(googleEventId); // Track before attempt
                         const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEventId}`;
                         response = await fetch(url, {
                             method: 'PUT',
@@ -1102,6 +1104,7 @@
                     } else if (event.id.toString().startsWith('existing-')) {
                         // This is an imported event that was moved/edited - update it
                         googleEventId = event.googleEventId || event.id.replace('existing-', '');
+                        processedGoogleIds.add(googleEventId); // Track before attempt
                         const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEventId}`;
                         response = await fetch(url, {
                             method: 'PUT',
@@ -1112,7 +1115,7 @@
                             body: JSON.stringify(eventBody)
                         });
                     } else {
-                        // Create new event only if it doesn't have a googleEventId
+                        // Create new event
                         const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
                         response = await fetch(url, {
                             method: 'POST',
@@ -1143,7 +1146,7 @@
             }
 
             // Now delete events that are in Google Calendar but not on the scheduler
-            // Only delete events that were created by the scheduler (have our description)
+            // Only delete events that were created by the scheduler
             for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
                 try {
                     const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
@@ -1166,8 +1169,12 @@
                         for (const googleEvent of events) {
                             // Check if this event was created by the scheduler and is not in our current list
                             if (googleEvent.description && 
-                                googleEvent.description.includes('Scheduled via TSL Theater Scheduler') &&
+                                (googleEvent.description.includes('Scheduled via TSL Schedule Maker 2000') ||
+                                 googleEvent.description.includes('Scheduled via TSL Event/Movie Scheduler') ||
+                                 googleEvent.description.includes('Scheduled via TSL Theater Scheduler')) &&
                                 !processedGoogleIds.has(googleEvent.id)) {
+                                
+                                console.log('Found orphaned event to delete:', googleEvent.summary, googleEvent.id);
                                 
                                 // Delete this event from Google Calendar
                                 const deleteUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEvent.id}`;
@@ -1180,13 +1187,15 @@
                                 
                                 if (deleteResponse.ok || deleteResponse.status === 204) {
                                     deleteCount++;
-                                    console.log('Deleted orphaned event:', googleEvent.summary);
+                                    console.log('Successfully deleted orphaned event:', googleEvent.summary);
+                                } else {
+                                    console.error('Failed to delete event:', googleEvent.summary, deleteResponse.status);
                                 }
                             }
                         }
                     }
                 } catch (error) {
-                    console.error('Error checking for orphaned events:', error);
+                    console.error('Error checking for orphaned events in', calendarKey, ':', error);
                 }
             }
 
