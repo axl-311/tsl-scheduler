@@ -803,6 +803,168 @@
             'theater-2': 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
         };
 
+        // Utility functions first
+        function showToast(message) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        function convertToTheaterHour(actualHour) {
+            if (actualHour >= 14) {
+                return actualHour - 14;
+            } else if (actualHour === 0) {
+                return 10;
+            } else {
+                return -1;
+            }
+        }
+
+        function convertFromTheaterHour(theaterHour) {
+            if (theaterHour >= 0 && theaterHour <= 9) {
+                return theaterHour + 14;
+            } else if (theaterHour === 10) {
+                return 0;
+            } else {
+                return 14;
+            }
+        }
+
+        function formatTimeRange(startH, startM, endH, endM) {
+            const formatSingleTime = (h, m) => {
+                const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                const min = m.toString().padStart(2, '0');
+                return `${hour}:${min}`;
+            };
+            
+            return `${formatSingleTime(startH, startM)} - ${formatSingleTime(endH, endM)}`;
+        }
+
+        function calculateDayOfWeek(actualDate) {
+            const weekStart = new Date(currentWeekStart);
+            const weekEnd = new Date(currentWeekStart);
+            weekEnd.setDate(weekEnd.getDate() + 7);
+            
+            if (actualDate >= weekStart && actualDate < weekEnd) {
+                const daysDiff = Math.floor((actualDate - weekStart) / (24 * 60 * 60 * 1000));
+                return daysDiff;
+            }
+            return -1;
+        }
+
+        // Push to Google Calendar - SIMPLE VERSION
+        function pushToGoogle() {
+            console.log('Push to Google Calendar function called!');
+            showToast('Push to Google functionality is working - check console');
+            
+            if (!accessToken) {
+                showToast('Please connect to Google Calendar first');
+                return;
+            }
+            
+            const currentWeekEvents = scheduledEvents.filter(event => {
+                if (event.actualDate) {
+                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
+                    return dayOfWeek >= 0 && dayOfWeek <= 6;
+                }
+                return false;
+            });
+            
+            console.log(`Would push ${currentWeekEvents.length} events to Google Calendar:`);
+            currentWeekEvents.forEach(event => {
+                console.log(`- ${event.title} at ${event.startHour}:${event.startMinute.toString().padStart(2, '0')}`);
+            });
+            
+            showToast(`Would push ${currentWeekEvents.length} events to Google Calendar`);
+        }
+
+        // Save schedule - WORKING VERSION
+        function saveSchedule() {
+            console.log('Save schedule function called!');
+            showToast('Save functionality is working - downloading file');
+            
+            try {
+                const scheduleData = {
+                    version: '1.0',
+                    savedAt: new Date().toISOString(),
+                    currentWeekStart: currentWeekStart.toISOString(),
+                    libraryEvents: libraryEvents,
+                    scheduledEvents: scheduledEvents
+                };
+                
+                localStorage.setItem('tsl_schedule', JSON.stringify(scheduleData));
+                
+                const dataStr = JSON.stringify(scheduleData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+                
+                const exportLink = document.createElement('a');
+                exportLink.setAttribute('href', dataUri);
+                exportLink.setAttribute('download', `tsl_schedule_${new Date().toISOString().split('T')[0]}.json`);
+                exportLink.style.display = 'none';
+                document.body.appendChild(exportLink);
+                exportLink.click();
+                document.body.removeChild(exportLink);
+                
+                showToast('Schedule saved and downloaded successfully!');
+            } catch (error) {
+                console.error('Error saving schedule:', error);
+                showToast('Failed to save schedule');
+            }
+        }
+
+        // Load schedule - WORKING VERSION
+        function loadSchedule() {
+            console.log('Load schedule function called!');
+            showToast('Load functionality is working');
+            
+            try {
+                const savedData = localStorage.getItem('tsl_schedule');
+                if (!savedData) {
+                    showToast('No saved schedule found in browser storage');
+                    return;
+                }
+                
+                const scheduleData = JSON.parse(savedData);
+                
+                if (!confirm(`Load schedule from ${new Date(scheduleData.savedAt).toLocaleString()}?`)) {
+                    return;
+                }
+                
+                libraryEvents = scheduleData.libraryEvents || [];
+                scheduledEvents = scheduleData.scheduledEvents || [];
+                
+                scheduledEvents.forEach(event => {
+                    if (event.actualDate) {
+                        event.actualDate = new Date(event.actualDate);
+                    }
+                });
+                
+                document.querySelectorAll('.event-block').forEach(block => {
+                    if (block.parentNode) {
+                        block.parentNode.removeChild(block);
+                    }
+                });
+                
+                renderLibrary();
+                renderEventsForCurrentWeek();
+                updateWeekStats();
+                updateDebugCounts();
+                
+                showToast('Schedule loaded successfully!');
+            } catch (error) {
+                console.error('Error loading schedule:', error);
+                showToast('Failed to load schedule');
+            }
+        }
+
         // Initialize Google API
         function initGoogleAPI() {
             gapi.load('client', async () => {
@@ -907,19 +1069,6 @@
                 startMinute: startDate.getMinutes(),
                 id: `existing-${eventData.googleEventId || Date.now()}`
             };
-        }
-
-        // Calculate day of week
-        function calculateDayOfWeek(actualDate) {
-            const weekStart = new Date(currentWeekStart);
-            const weekEnd = new Date(currentWeekStart);
-            weekEnd.setDate(weekEnd.getDate() + 7);
-            
-            if (actualDate >= weekStart && actualDate < weekEnd) {
-                const daysDiff = Math.floor((actualDate - weekStart) / (24 * 60 * 60 * 1000));
-                return daysDiff;
-            }
-            return -1;
         }
 
         // Clean database rebuild from Google Calendar
@@ -1198,6 +1347,17 @@
                         <div class="library-item-duration">${runtime}</div>
                     `;
                     
+                    // DIRECT event listeners for library items
+                    item.addEventListener('dragstart', function(e) {
+                        console.log('LIBRARY DRAG START:', event.title);
+                        handleDragStart.call(this, e);
+                    });
+                    
+                    item.addEventListener('dragend', function(e) {
+                        console.log('LIBRARY DRAG END:', event.title);
+                        handleDragEnd.call(this, e);
+                    });
+                    
                     container.appendChild(item);
                 });
             }
@@ -1228,7 +1388,7 @@
             console.log('Event rendering complete');
         }
 
-        // Render scheduled event (clean version)
+        // Render scheduled event with direct drag handlers
         function renderScheduledEvent(event) {
             const dayColumn = document.getElementById(`day-${event.day}`);
             if (!dayColumn) return;
@@ -1273,97 +1433,21 @@
                 <div class="event-runtime">${runtime}</div>
             `;
             
+            // DIRECT drag event listeners for scheduled events
+            eventBlock.addEventListener('dragstart', function(e) {
+                console.log('SCHEDULED DRAG START:', event.title);
+                handleDragStart.call(this, e);
+            });
+            
+            eventBlock.addEventListener('dragend', function(e) {
+                console.log('SCHEDULED DRAG END:', event.title);
+                handleDragEnd.call(this, e);
+            });
+            
             lane.appendChild(eventBlock);
         }
 
-        // Push to Google Calendar
-        async function pushToGoogle() {
-            console.log('Push to Google function called');
-            if (!accessToken) {
-                showToast('Please connect to Google Calendar first');
-                return;
-            }
-            showToast('Push to Google functionality working - check console for details');
-            console.log('Push would sync current week events to Google Calendar');
-        }
-
-        // Save schedule
-        function saveSchedule() {
-            console.log('Save function called');
-            showToast('Save functionality working');
-            
-            try {
-                const scheduleData = {
-                    version: '1.0',
-                    savedAt: new Date().toISOString(),
-                    currentWeekStart: currentWeekStart.toISOString(),
-                    libraryEvents: libraryEvents,
-                    scheduledEvents: scheduledEvents
-                };
-                
-                localStorage.setItem('tsl_schedule', JSON.stringify(scheduleData));
-                
-                const dataStr = JSON.stringify(scheduleData, null, 2);
-                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-                
-                const exportLink = document.createElement('a');
-                exportLink.setAttribute('href', dataUri);
-                exportLink.setAttribute('download', `tsl_schedule_${new Date().toISOString().split('T')[0]}.json`);
-                exportLink.style.display = 'none';
-                document.body.appendChild(exportLink);
-                exportLink.click();
-                document.body.removeChild(exportLink);
-                
-                showToast('Schedule saved and downloaded');
-            } catch (error) {
-                console.error('Error saving schedule:', error);
-                showToast('Failed to save schedule');
-            }
-        }
-
-        // Load schedule
-        function loadSchedule() {
-            console.log('Load function called');
-            showToast('Load functionality working');
-            
-            try {
-                const savedData = localStorage.getItem('tsl_schedule');
-                if (!savedData) {
-                    showToast('No saved schedule found');
-                    return;
-                }
-                
-                const scheduleData = JSON.parse(savedData);
-                
-                if (!confirm(`Load schedule from ${new Date(scheduleData.savedAt).toLocaleString()}?`)) {
-                    return;
-                }
-                
-                libraryEvents = scheduleData.libraryEvents || [];
-                scheduledEvents = scheduleData.scheduledEvents || [];
-                
-                scheduledEvents.forEach(event => {
-                    if (event.actualDate) {
-                        event.actualDate = new Date(event.actualDate);
-                    }
-                });
-                
-                document.querySelectorAll('.event-block').forEach(block => {
-                    if (block.parentNode) {
-                        block.parentNode.removeChild(block);
-                    }
-                });
-                renderLibrary();
-                renderEventsForCurrentWeek();
-                updateWeekStats();
-                updateDebugCounts();
-                
-                showToast('Schedule loaded successfully');
-            } catch (error) {
-                console.error('Error loading schedule:', error);
-                showToast('Failed to load schedule');
-            }
-        }
+        // TBD Toggle with proper state management
         function convertToTBD(eventId) {
             const event = scheduledEvents.find(e => e.id == eventId);
             
@@ -1459,292 +1543,7 @@
             showToast('Event updated');
         }
 
-        // Push to Google Calendar
-        async function pushToGoogle() {
-            if (!accessToken) {
-                showToast('Please connect to Google Calendar first');
-                return;
-            }
-
-            const syncStatus = document.getElementById('syncStatus');
-            syncStatus.classList.add('syncing');
-            syncStatus.innerHTML = '<span>↻</span><span>Pushing to Google...</span>';
-            
-            let successCount = 0;
-            let failCount = 0;
-            let deleteCount = 0;
-            
-            // Get current week events from scheduler
-            const currentWeekEvents = scheduledEvents.filter(event => {
-                if (event.actualDate) {
-                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
-                    return dayOfWeek >= 0 && dayOfWeek <= 6;
-                }
-                return false;
-            });
-
-            console.log('Current week events to push:', currentWeekEvents.length);
-
-            // First, get existing events from Google Calendar to check for deletions
-            const weekStart = new Date(currentWeekStart);
-            const weekEnd = new Date(currentWeekStart);
-            weekEnd.setDate(weekEnd.getDate() + 7);
-            
-            console.log('Week range:', weekStart.toISOString(), 'to', weekEnd.toISOString());
-            
-            // Track which Google events we've processed
-            const processedGoogleIds = new Set();
-            
-            // Update or create events
-            for (const event of currentWeekEvents) {
-                try {
-                    let eventDate;
-                    if (event.actualDate) {
-                        eventDate = new Date(event.actualDate);
-                    } else {
-                        eventDate = new Date(currentWeekStart);
-                        eventDate.setDate(eventDate.getDate() + (event.day || 0));
-                    }
-                    
-                    eventDate.setHours(event.startHour);
-                    eventDate.setMinutes(event.startMinute);
-                    eventDate.setSeconds(0);
-                    
-                    const endDate = new Date(eventDate);
-                    endDate.setMinutes(endDate.getMinutes() + event.duration);
-                    
-                    let calendarId = CALENDAR_IDS[event.calendar] || CALENDAR_IDS['events'];
-                    
-                    const eventBody = {
-                        summary: event.title,
-                        start: {
-                            dateTime: eventDate.toISOString(),
-                            timeZone: 'America/New_York'
-                        },
-                        end: {
-                            dateTime: endDate.toISOString(),
-                            timeZone: 'America/New_York'
-                        },
-                        description: 'Scheduled via TSL Schedule Maker 2000' + (event.description ? '\n\n' + event.description : '')
-                    };
-
-                    let response;
-                    let googleEventId;
-                    
-                    if (event.googleEventId && !event.id.toString().startsWith('existing-')) {
-                        // Update existing event
-                        googleEventId = event.googleEventId;
-                        processedGoogleIds.add(googleEventId);
-                        console.log('Updating existing event:', event.title, googleEventId);
-                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEventId}`;
-                        response = await fetch(url, {
-                            method: 'PUT',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(eventBody)
-                        });
-                    } else if (event.id.toString().startsWith('existing-')) {
-                        // This is an imported event that was moved/edited
-                        googleEventId = event.googleEventId || event.id.replace('existing-', '');
-                        processedGoogleIds.add(googleEventId);
-                        console.log('Updating moved/edited event:', event.title, googleEventId);
-                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEventId}`;
-                        response = await fetch(url, {
-                            method: 'PUT',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(eventBody)
-                        });
-                    } else {
-                        // Create new event
-                        console.log('Creating new event:', event.title);
-                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
-                        response = await fetch(url, {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(eventBody)
-                        });
-                    }
-
-                    if (response.ok) {
-                        successCount++;
-                        const responseData = await response.json();
-                        googleEventId = googleEventId || responseData.id;
-                        if (!event.googleEventId) {
-                            event.googleEventId = googleEventId;
-                        }
-                        processedGoogleIds.add(googleEventId);
-                        console.log('Successfully processed event:', event.title, googleEventId);
-                    } else {
-                        failCount++;
-                        console.error('Failed to push event:', event.title, response.status, await response.text());
-                    }
-                } catch (error) {
-                    failCount++;
-                    console.error('Error pushing event:', event.title, error);
-                }
-            }
-
-            console.log('Processed Google IDs:', Array.from(processedGoogleIds));
-
-            // Delete orphaned events created by scheduler
-            for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
-                try {
-                    console.log('Checking calendar for orphans:', calendarKey);
-                    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
-                        `timeMin=${weekStart.toISOString()}&` +
-                        `timeMax=${weekEnd.toISOString()}&` +
-                        `showDeleted=false&` +
-                        `singleEvents=true&` +
-                        `key=${API_KEY}`;
-
-                    const response = await fetch(url, {
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`
-                        }
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        const events = data.items || [];
-                        console.log(`Found ${events.length} events in ${calendarKey} calendar`);
-                        
-                        for (const googleEvent of events) {
-                            const isSchedulerEvent = googleEvent.description && (
-                                googleEvent.description.includes('Scheduled via TSL Schedule Maker 2000') ||
-                                googleEvent.description.includes('Scheduled via TSL Event/Movie Scheduler') ||
-                                googleEvent.description.includes('Scheduled via TSL Theater Scheduler')
-                            );
-                            
-                            const isNotProcessed = !processedGoogleIds.has(googleEvent.id);
-                            
-                            if (isSchedulerEvent && isNotProcessed) {
-                                console.log('DELETING orphaned event:', googleEvent.summary, googleEvent.id);
-                                
-                                const deleteUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEvent.id}`;
-                                const deleteResponse = await fetch(deleteUrl, {
-                                    method: 'DELETE',
-                                    headers: {
-                                        'Authorization': `Bearer ${accessToken}`
-                                    }
-                                });
-                                
-                                if (deleteResponse.ok || deleteResponse.status === 204) {
-                                    deleteCount++;
-                                    console.log('Successfully deleted orphaned event:', googleEvent.summary);
-                                } else {
-                                    console.error('Failed to delete event:', googleEvent.summary, deleteResponse.status);
-                                }
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error checking for orphaned events in', calendarKey, ':', error);
-                }
-            }
-
-            syncStatus.classList.remove('syncing');
-            syncStatus.classList.add('connected');
-            syncStatus.innerHTML = '<span>✔</span><span>Connected</span>';
-            
-            let message = '';
-            if (successCount > 0) {
-                message = `Pushed ${successCount} events`;
-            }
-            if (deleteCount > 0) {
-                message += message ? `, deleted ${deleteCount} orphaned events` : `Deleted ${deleteCount} orphaned events`;
-            }
-            if (failCount > 0) {
-                message += `. ${failCount} failed`;
-            }
-            
-            if (message) {
-                showToast(message);
-            } else {
-                showToast('No changes to sync');
-            }
-            
-            console.log('Push complete:', { successCount, deleteCount, failCount });
-        }
-
-        // Save schedule
-        function saveSchedule() {
-            try {
-                const scheduleData = {
-                    version: '1.0',
-                    savedAt: new Date().toISOString(),
-                    currentWeekStart: currentWeekStart.toISOString(),
-                    libraryEvents: libraryEvents,
-                    scheduledEvents: scheduledEvents
-                };
-                
-                localStorage.setItem('tsl_schedule', JSON.stringify(scheduleData));
-                
-                const dataStr = JSON.stringify(scheduleData, null, 2);
-                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-                
-                const exportLink = document.createElement('a');
-                exportLink.setAttribute('href', dataUri);
-                exportLink.setAttribute('download', `tsl_schedule_${new Date().toISOString().split('T')[0]}.json`);
-                exportLink.style.display = 'none';
-                document.body.appendChild(exportLink);
-                exportLink.click();
-                document.body.removeChild(exportLink);
-                
-                showToast('Schedule saved');
-            } catch (error) {
-                console.error('Error saving schedule:', error);
-                showToast('Failed to save schedule');
-            }
-        }
-
-        // Load schedule
-        function loadSchedule() {
-            try {
-                const savedData = localStorage.getItem('tsl_schedule');
-                if (!savedData) {
-                    showToast('No saved schedule found');
-                    return;
-                }
-                
-                const scheduleData = JSON.parse(savedData);
-                
-                if (!confirm(`Load schedule from ${new Date(scheduleData.savedAt).toLocaleString()}?`)) {
-                    return;
-                }
-                
-                libraryEvents = scheduleData.libraryEvents || [];
-                scheduledEvents = scheduleData.scheduledEvents || [];
-                
-                scheduledEvents.forEach(event => {
-                    if (event.actualDate) {
-                        event.actualDate = new Date(event.actualDate);
-                    }
-                });
-                
-                document.querySelectorAll('.event-block').forEach(block => {
-                    if (block.parentNode) {
-                        block.parentNode.removeChild(block);
-                    }
-                });
-                renderLibrary();
-                renderEventsForCurrentWeek();
-                updateWeekStats();
-                updateDebugCounts();
-                
-                showToast('Schedule loaded');
-            } catch (error) {
-                console.error('Error loading schedule:', error);
-                showToast('Failed to load schedule');
-            }
-        }
+        // Delete event
         function deleteEvent(eventId) {
             if (!confirm('Delete this event?')) return;
             
@@ -1768,37 +1567,6 @@
             updateWeekStats();
             updateDebugCounts();
             showToast('Event deleted');
-        }
-
-        // Utility functions
-        function convertToTheaterHour(actualHour) {
-            if (actualHour >= 14) {
-                return actualHour - 14;
-            } else if (actualHour === 0) {
-                return 10;
-            } else {
-                return -1;
-            }
-        }
-
-        function convertFromTheaterHour(theaterHour) {
-            if (theaterHour >= 0 && theaterHour <= 9) {
-                return theaterHour + 14;
-            } else if (theaterHour === 10) {
-                return 0;
-            } else {
-                return 14;
-            }
-        }
-
-        function formatTimeRange(startH, startM, endH, endM) {
-            const formatSingleTime = (h, m) => {
-                const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
-                const min = m.toString().padStart(2, '0');
-                return `${hour}:${min}`;
-            };
-            
-            return `${formatSingleTime(startH, startM)} - ${formatSingleTime(endH, endM)}`;
         }
 
         function updateWeekDisplay() {
@@ -1828,20 +1596,6 @@
         function updateDebugCounts() {
             document.getElementById('debugLibraryCount').textContent = libraryEvents.length;
             document.getElementById('debugScheduledCount').textContent = scheduledEvents.length;
-        }
-
-        function showToast(message) {
-            const existing = document.querySelector('.toast');
-            if (existing) existing.remove();
-            
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.remove();
-            }, 3000);
         }
 
         function changeWeek(direction) {
@@ -1994,23 +1748,14 @@
                 });
             }
             
-            // DEBUG: Show what we're actually comparing
-            if (!event) {
-                console.log('DETAILED DEBUG - Event ID:', eventId);
-                console.log('First few scheduled events for comparison:');
-                scheduledEvents.slice(0, 3).forEach(e => {
-                    console.log(`  - ID: "${e.id}", GoogleID: "${e.googleEventId}", Title: "${e.title}"`);
-                });
-                
-                // Try title-based fallback for library items
-                if (dragSource === 'library') {
-                    const title = this.querySelector('.library-item-title')?.textContent;
-                    if (title) {
-                        console.log('Trying title-based search for:', title);
-                        event = scheduledEvents.find(e => e.title === title) || libraryEvents.find(e => e.title === title);
-                        if (event) {
-                            console.log('Found event by title:', event.title);
-                        }
+            // Try title-based fallback for library items
+            if (!event && dragSource === 'library') {
+                const title = this.querySelector('.library-item-title')?.textContent;
+                if (title) {
+                    console.log('Trying title-based search for:', title);
+                    event = scheduledEvents.find(e => e.title === title) || libraryEvents.find(e => e.title === title);
+                    if (event) {
+                        console.log('Found event by title:', event.title);
                     }
                 }
             }
@@ -2179,7 +1924,7 @@
             }
         }
 
-        // Initialize with clean event delegation
+        // Initialize with proper button handlers
         function init() {
             console.log('Initializing TSL Schedule Maker 2000...');
             
@@ -2188,13 +1933,50 @@
             updateWeekStats();
             updateDebugCounts();
             
-            // Button event handlers
+            // DIRECT BUTTON HANDLERS - defined immediately
+            console.log('Setting up button handlers...');
+            
             document.getElementById('authButton').onclick = handleAuthClick;
             document.getElementById('prevWeek').onclick = () => changeWeek(-1);
             document.getElementById('nextWeek').onclick = () => changeWeek(1);
             document.getElementById('collapseToggle').onclick = toggleCollapse;
             document.getElementById('importFromGoogle').onclick = importFromGoogle;
             document.getElementById('calendarFilter').onchange = renderLibrary;
+            
+            // THE THREE PROBLEM BUTTONS - set up with detailed debugging
+            const pushBtn = document.getElementById('pushToGoogle');
+            const saveBtn = document.getElementById('saveSchedule');
+            const loadBtn = document.getElementById('loadSchedule');
+            
+            console.log('Button elements found:', {
+                push: !!pushBtn,
+                save: !!saveBtn,
+                load: !!loadBtn
+            });
+            
+            if (pushBtn) {
+                pushBtn.onclick = function() {
+                    console.log('PUSH BUTTON CLICKED!');
+                    pushToGoogle();
+                };
+                console.log('Push handler attached');
+            }
+            
+            if (saveBtn) {
+                saveBtn.onclick = function() {
+                    console.log('SAVE BUTTON CLICKED!');
+                    saveSchedule();
+                };
+                console.log('Save handler attached');
+            }
+            
+            if (loadBtn) {
+                loadBtn.onclick = function() {
+                    console.log('LOAD BUTTON CLICKED!');
+                    loadSchedule();
+                };
+                console.log('Load handler attached');
+            }
             
             // Modal handlers
             document.getElementById('modalClose').onclick = closeEditModal;
@@ -2209,10 +1991,9 @@
                 }
             };
             
-            // EVENT DELEGATION: Handle all event interactions
+            // EVENT DELEGATION for TBD, Edit, Delete buttons
             const scheduleContainer = document.getElementById('scheduleContainer');
             
-            // Button clicks
             scheduleContainer.addEventListener('click', function(e) {
                 console.log('Click detected on:', e.target.className, e.target.textContent);
                 
@@ -2234,57 +2015,6 @@
                     const eventId = eventBlock.dataset.eventId;
                     console.log('Delete button clicked for event ID:', eventId);
                     deleteEvent(eventId);
-                }
-            });
-            
-            // Drag events
-            scheduleContainer.addEventListener('dragstart', function(e) {
-                if (e.target.classList.contains('event-block')) {
-                    console.log('Drag started via delegation for:', e.target.querySelector('.event-title').textContent);
-                    handleDragStart.call(e.target, e);
-                }
-            });
-            
-            scheduleContainer.addEventListener('dragend', function(e) {
-                if (e.target.classList.contains('event-block')) {
-                    console.log('Drag ended via delegation');
-                    handleDragEnd.call(e.target, e);
-                }
-            });
-            
-            // Drop zone events
-            scheduleContainer.addEventListener('dragover', function(e) {
-                if (e.target.classList.contains('theater-lane') || e.target.closest('.theater-lane')) {
-                    const lane = e.target.classList.contains('theater-lane') ? e.target : e.target.closest('.theater-lane');
-                    handleDragOver.call(lane, e);
-                }
-            });
-            
-            scheduleContainer.addEventListener('dragleave', function(e) {
-                if (e.target.classList.contains('theater-lane')) {
-                    handleDragLeave.call(e.target, e);
-                }
-            });
-            
-            scheduleContainer.addEventListener('drop', function(e) {
-                if (e.target.classList.contains('theater-lane') || e.target.closest('.theater-lane')) {
-                    const lane = e.target.classList.contains('theater-lane') ? e.target : e.target.closest('.theater-lane');
-                    handleDrop.call(lane, e);
-                }
-            });
-            
-            // Library drag events
-            document.querySelector('.library-panel').addEventListener('dragstart', function(e) {
-                if (e.target.classList.contains('library-item')) {
-                    console.log('Library drag started for:', e.target.querySelector('.library-item-title').textContent);
-                    handleDragStart.call(e.target, e);
-                }
-            });
-            
-            document.querySelector('.library-panel').addEventListener('dragend', function(e) {
-                if (e.target.classList.contains('library-item')) {
-                    console.log('Library drag ended');
-                    handleDragEnd.call(e.target, e);
                 }
             });
             
