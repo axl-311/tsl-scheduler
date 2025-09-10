@@ -420,6 +420,7 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             transition: transform 0.2s, box-shadow 0.2s;
             z-index: 10;
+            min-width: 40px;
         }
 
         .event-block:hover {
@@ -445,6 +446,7 @@
             gap: 2px;
             opacity: 0;
             transition: opacity 0.2s;
+            z-index: 30;
         }
 
         .event-control-btn {
@@ -724,6 +726,7 @@
         let scheduledEvents = [];
         let draggedItem = null;
         let dragSource = null;
+        let dragOffset = 0;
         let collapsedDays = true;
         let accessToken = null;
         let currentEditingEvent = null;
@@ -872,15 +875,17 @@
             syncStatus.classList.add('syncing');
             syncStatus.innerHTML = '<span>↻</span><span>Importing...</span>';
             
+            // Clear existing data to prevent duplicates
             libraryEvents = [];
             scheduledEvents = [];
             document.querySelectorAll('.event-block').forEach(block => block.remove());
             
             let totalEvents = 0;
+            const seenEventIds = new Set();
 
             for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
                 try {
-                    const events = await importSingleCalendarData(calendarKey, calendarId);
+                    const events = await importSingleCalendarData(calendarKey, calendarId, seenEventIds);
                     totalEvents += events.length;
                 } catch (error) {
                     console.error(`Failed ${calendarKey}:`, error);
@@ -903,7 +908,7 @@
         }
 
         // Import single calendar
-        async function importSingleCalendarData(calendarKey, calendarId) {
+        async function importSingleCalendarData(calendarKey, calendarId, seenEventIds) {
             const startOfRange = new Date(currentWeekStart);
             startOfRange.setDate(startOfRange.getDate() - 14);
             const endOfRange = new Date(currentWeekStart);
@@ -929,14 +934,14 @@
 
             const data = await response.json();
             const events = data.items || [];
+            let addedCount = 0;
             
             events.forEach(event => {
-                const existsInLibrary = libraryEvents.some(e => e.googleEventId === event.id);
-                const existsInScheduled = scheduledEvents.some(e => e.googleEventId === event.id);
-                
-                if (existsInLibrary || existsInScheduled) {
+                // Skip if we've already seen this event ID
+                if (seenEventIds.has(event.id)) {
                     return;
                 }
+                seenEventIds.add(event.id);
                 
                 let duration = 120;
                 if (event.start && event.end) {
@@ -958,6 +963,7 @@
                     isAllDay: !event.start.dateTime
                 };
 
+                // Add to scheduled events if it has a specific time
                 if (event.start.dateTime) {
                     const scheduledEvent = convertToScheduledEvent(eventData);
                     if (scheduledEvent) {
@@ -965,10 +971,13 @@
                     }
                 }
 
+                // Only add to library if it's an all-day event
                 if (!event.start.dateTime) {
                     eventData.duration = 1440;
+                    libraryEvents.push(eventData);
                 }
-                libraryEvents.push(eventData);
+                
+                addedCount++;
             });
 
             return events;
@@ -998,10 +1007,19 @@
 
             for (const event of currentWeekEvents) {
                 try {
-                    const eventDate = new Date(currentWeekStart);
-                    eventDate.setDate(eventDate.getDate() + (event.day || 0));
+                    // Use the actual date if available
+                    let eventDate;
+                    if (event.actualDate) {
+                        eventDate = new Date(event.actualDate);
+                    } else {
+                        eventDate = new Date(currentWeekStart);
+                        eventDate.setDate(eventDate.getDate() + (event.day || 0));
+                    }
+                    
+                    // Set the time
                     eventDate.setHours(event.startHour);
                     eventDate.setMinutes(event.startMinute);
+                    eventDate.setSeconds(0);
                     
                     const endDate = new Date(eventDate);
                     endDate.setMinutes(endDate.getMinutes() + event.duration);
@@ -1021,15 +1039,43 @@
                         description: event.description || 'Scheduled via TSL Theater Scheduler'
                     };
 
-                    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(eventBody)
-                    });
+                    let response;
+                    // Check if this is an existing Google Calendar event that needs updating
+                    if (event.googleEventId && !event.id.toString().startsWith('existing-')) {
+                        // Update existing event
+                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${event.googleEventId}`;
+                        response = await fetch(url, {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(eventBody)
+                        });
+                    } else if (event.id.toString().startsWith('existing-')) {
+                        // This is an imported event that was moved/edited - update it
+                        const googleId = event.googleEventId || event.id.replace('existing-', '');
+                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleId}`;
+                        response = await fetch(url, {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(eventBody)
+                        });
+                    } else {
+                        // Create new event only if it doesn't have a googleEventId
+                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
+                        response = await fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(eventBody)
+                        });
+                    }
 
                     if (response.ok) {
                         successCount++;
@@ -1039,10 +1085,11 @@
                         }
                     } else {
                         failCount++;
+                        console.error('Failed to push event:', event.title, await response.text());
                     }
                 } catch (error) {
                     failCount++;
-                    console.error('Error pushing event:', error);
+                    console.error('Error pushing event:', event.title, error);
                 }
             }
 
@@ -1051,9 +1098,9 @@
             syncStatus.innerHTML = '<span>✓</span><span>Connected</span>';
             
             if (successCount > 0) {
-                showToast(`Pushed ${successCount} events to Google Calendar`);
+                showToast(`Pushed ${successCount} events to Google Calendar${failCount > 0 ? `. ${failCount} failed.` : ''}`);
             } else {
-                showToast('No events to push');
+                showToast('No events to push or all events failed');
             }
         }
 
@@ -1124,19 +1171,200 @@
             }
         }
 
-        // Render events for current week
+        // Render events for current week with overlap handling
         function renderEventsForCurrentWeek() {
             document.querySelectorAll('.event-block').forEach(block => block.remove());
+            
+            // Group events by theater and day for overlap detection
+            const eventsByLane = {};
             
             scheduledEvents.forEach(event => {
                 if (event.actualDate) {
                     const dayOfWeek = calculateDayOfWeek(event.actualDate);
                     if (dayOfWeek >= 0 && dayOfWeek <= 6) {
                         const renderEvent = { ...event, day: dayOfWeek };
-                        renderScheduledEvent(renderEvent);
+                        const laneKey = `${dayOfWeek}-${renderEvent.theater}`;
+                        
+                        if (!eventsByLane[laneKey]) {
+                            eventsByLane[laneKey] = [];
+                        }
+                        eventsByLane[laneKey].push(renderEvent);
                     }
                 }
             });
+            
+            // Render each lane's events with overlap handling
+            Object.keys(eventsByLane).forEach(laneKey => {
+                const laneEvents = eventsByLane[laneKey];
+                
+                // Sort events by start time
+                laneEvents.sort((a, b) => {
+                    const timeA = a.startHour * 60 + a.startMinute;
+                    const timeB = b.startHour * 60 + b.startMinute;
+                    return timeA - timeB;
+                });
+                
+                // Detect overlaps and assign columns
+                const columns = [];
+                laneEvents.forEach(event => {
+                    const eventStart = event.startHour * 60 + event.startMinute;
+                    const eventEnd = eventStart + event.duration;
+                    
+                    // Find available column
+                    let column = 0;
+                    let placed = false;
+                    
+                    while (!placed) {
+                        if (!columns[column]) {
+                            columns[column] = [];
+                        }
+                        
+                        // Check if event fits in this column
+                        let fits = true;
+                        for (const existingEvent of columns[column]) {
+                            const existingStart = existingEvent.startHour * 60 + existingEvent.startMinute;
+                            const existingEnd = existingStart + existingEvent.duration;
+                            
+                            if (!(eventEnd <= existingStart || eventStart >= existingEnd)) {
+                                fits = false;
+                                break;
+                            }
+                        }
+                        
+                        if (fits) {
+                            columns[column].push(event);
+                            event.column = column;
+                            event.totalColumns = 1;
+                            placed = true;
+                        } else {
+                            column++;
+                        }
+                    }
+                });
+                
+                // Update total columns for width calculation
+                const totalColumns = columns.length;
+                laneEvents.forEach(event => {
+                    event.totalColumns = totalColumns;
+                });
+                
+                // Render events with calculated positions
+                laneEvents.forEach(event => {
+                    renderScheduledEventWithOverlap(event);
+                });
+            });
+        }
+
+        // Render scheduled event with overlap handling
+        function renderScheduledEventWithOverlap(event) {
+            const dayColumn = document.getElementById(`day-${event.day}`);
+            if (!dayColumn) return;
+            
+            const lanes = dayColumn.querySelectorAll('.theater-lane');
+            const lane = lanes[event.theater];
+            if (!lane) return;
+            
+            const eventBlock = document.createElement('div');
+            eventBlock.className = `event-block calendar-${event.calendar}`;
+            eventBlock.draggable = true;
+            eventBlock.dataset.eventId = event.id;
+            
+            const theaterHour = convertToTheaterHour(event.startHour);
+            const top = theaterHour * 60 + (event.startMinute / 15) * 15;
+            const height = (event.duration / 60) * 60;
+            
+            eventBlock.style.top = `${top}px`;
+            eventBlock.style.height = `${height}px`;
+            
+            // Handle overlapping events
+            if (event.totalColumns > 1) {
+                const width = 100 / event.totalColumns;
+                const left = width * event.column;
+                eventBlock.style.width = `calc(${width}% - 2px)`;
+                eventBlock.style.left = `${left}%`;
+                eventBlock.style.fontSize = '10px';
+            }
+            
+            const endMinutes = event.startMinute + event.duration;
+            const actualEndHour = event.startHour + Math.floor(endMinutes / 60);
+            const endMinute = endMinutes % 60;
+            
+            eventBlock.innerHTML = `
+                <div class="event-controls">
+                    <button class="event-control-btn edit-btn" onclick="editEvent('${event.id}')" title="Edit">✎</button>
+                    <button class="event-control-btn delete-btn" onclick="deleteEvent('${event.id}')" title="Delete">×</button>
+                </div>
+                <div class="event-title">${event.title}</div>
+                <div class="event-time">${formatTimeRange(event.startHour, event.startMinute, actualEndHour, endMinute)}</div>
+            `;
+            
+            eventBlock.addEventListener('dragstart', handleDragStart);
+            eventBlock.addEventListener('dragend', handleDragEnd);
+            
+            lane.appendChild(eventBlock);
+        }
+
+        // Render scheduled event (for manually placed events)
+        function renderScheduledEvent(event) {
+            const dayColumn = document.getElementById(`day-${event.day}`);
+            if (!dayColumn) return;
+            
+            const lanes = dayColumn.querySelectorAll('.theater-lane');
+            const lane = lanes[event.theater];
+            if (!lane) return;
+            
+            // Check for overlaps with existing events
+            const existingEvents = lane.querySelectorAll('.event-block');
+            const eventStart = event.startHour * 60 + event.startMinute;
+            const eventEnd = eventStart + event.duration;
+            
+            let hasOverlap = false;
+            existingEvents.forEach(existing => {
+                const existingTop = parseInt(existing.style.top);
+                const existingHeight = parseInt(existing.style.height);
+                const existingStart = (existingTop / 60) * 60;
+                const existingEnd = existingStart + existingHeight;
+                
+                if (!(eventEnd <= existingStart || eventStart >= existingEnd)) {
+                    hasOverlap = true;
+                }
+            });
+            
+            const eventBlock = document.createElement('div');
+            eventBlock.className = `event-block calendar-${event.calendar}`;
+            eventBlock.draggable = true;
+            eventBlock.dataset.eventId = event.id;
+            
+            const theaterHour = convertToTheaterHour(event.startHour);
+            const top = theaterHour * 60 + (event.startMinute / 15) * 15;
+            const height = (event.duration / 60) * 60;
+            
+            eventBlock.style.top = `${top}px`;
+            eventBlock.style.height = `${height}px`;
+            
+            if (hasOverlap) {
+                eventBlock.style.width = 'calc(50% - 2px)';
+                eventBlock.style.left = '50%';
+                eventBlock.style.fontSize = '10px';
+            }
+            
+            const endMinutes = event.startMinute + event.duration;
+            const actualEndHour = event.startHour + Math.floor(endMinutes / 60);
+            const endMinute = endMinutes % 60;
+            
+            eventBlock.innerHTML = `
+                <div class="event-controls">
+                    <button class="event-control-btn edit-btn" onclick="editEvent('${event.id}')" title="Edit">✎</button>
+                    <button class="event-control-btn delete-btn" onclick="deleteEvent('${event.id}')" title="Delete">×</button>
+                </div>
+                <div class="event-title">${event.title}</div>
+                <div class="event-time">${formatTimeRange(event.startHour, event.startMinute, actualEndHour, endMinute)}</div>
+            `;
+            
+            eventBlock.addEventListener('dragstart', handleDragStart);
+            eventBlock.addEventListener('dragend', handleDragEnd);
+            
+            lane.appendChild(eventBlock);
         }
 
         // Change week
@@ -1258,10 +1486,16 @@
                 ? libraryEvents 
                 : libraryEvents.filter(e => e.calendar === filter);
             
-            if (filteredEvents.length === 0) {
+            if (filteredEvents.length === 0 && libraryEvents.length === 0) {
                 container.innerHTML = `
                     <div style="padding: 20px; text-align: center; color: #86868b; font-size: 14px;">
-                        No events found
+                        No all-day events found. Timed events appear directly on the grid.
+                    </div>
+                `;
+            } else if (filteredEvents.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: #86868b; font-size: 14px;">
+                        No events in this calendar
                     </div>
                 `;
             } else {
@@ -1294,6 +1528,14 @@
             
             dragSource = this.closest('.library-panel') ? 'library' : 'grid';
             
+            // Calculate offset from top of the element for grid items
+            if (dragSource === 'grid') {
+                const rect = this.getBoundingClientRect();
+                dragOffset = e.clientY - rect.top;
+            } else {
+                dragOffset = 0;
+            }
+            
             const eventId = this.dataset.eventId;
             const event = libraryEvents.find(e => e.id == eventId) || 
                          scheduledEvents.find(e => e.id == eventId);
@@ -1310,6 +1552,7 @@
             }
             draggedItem = null;
             dragSource = null;
+            dragOffset = 0;
         }
 
         function handleDragOver(e) {
@@ -1332,11 +1575,21 @@
             
             const event = JSON.parse(eventData);
             const rect = this.getBoundingClientRect();
-            const y = e.clientY - rect.top;
+            
+            // Calculate drop position - apply offset to make it snap from top
+            let y = e.clientY - rect.top;
+            if (source === 'grid') {
+                y = y - dragOffset;
+            }
+            
+            // Snap to 15-minute grid
             const snapY = Math.floor(y / 15) * 15;
             
-            const theaterHour = Math.floor(snapY / 60);
-            const minute = ((snapY % 60) / 15) * 15;
+            // Ensure the event doesn't go above the top of the lane
+            const finalY = Math.max(0, snapY);
+            
+            const theaterHour = Math.floor(finalY / 60);
+            const minute = ((finalY % 60) / 15) * 15;
             
             const scheduledDate = new Date(currentWeekStart);
             scheduledDate.setDate(scheduledDate.getDate() + parseInt(this.dataset.day));
@@ -1374,46 +1627,6 @@
             
             const action = source === 'library' ? 'scheduled' : 'moved';
             showToast(`Event ${action} successfully!`);
-        }
-
-        // Render scheduled event
-        function renderScheduledEvent(event) {
-            const dayColumn = document.getElementById(`day-${event.day}`);
-            if (!dayColumn) return;
-            
-            const lanes = dayColumn.querySelectorAll('.theater-lane');
-            const lane = lanes[event.theater];
-            if (!lane) return;
-            
-            const eventBlock = document.createElement('div');
-            eventBlock.className = `event-block calendar-${event.calendar}`;
-            eventBlock.draggable = true;
-            eventBlock.dataset.eventId = event.id;
-            
-            const theaterHour = convertToTheaterHour(event.startHour);
-            const top = theaterHour * 60 + (event.startMinute / 15) * 15;
-            const height = (event.duration / 60) * 60;
-            
-            eventBlock.style.top = `${top}px`;
-            eventBlock.style.height = `${height}px`;
-            
-            const endMinutes = event.startMinute + event.duration;
-            const actualEndHour = event.startHour + Math.floor(endMinutes / 60);
-            const endMinute = endMinutes % 60;
-            
-            eventBlock.innerHTML = `
-                <div class="event-controls">
-                    <button class="event-control-btn edit-btn" onclick="editEvent('${event.id}')" title="Edit">✎</button>
-                    <button class="event-control-btn delete-btn" onclick="deleteEvent('${event.id}')" title="Delete">×</button>
-                </div>
-                <div class="event-title">${event.title}</div>
-                <div class="event-time">${formatTimeRange(event.startHour, event.startMinute, actualEndHour, endMinute)}</div>
-            `;
-            
-            eventBlock.addEventListener('dragstart', handleDragStart);
-            eventBlock.addEventListener('dragend', handleDragEnd);
-            
-            lane.appendChild(eventBlock);
         }
 
         function formatTimeRange(startH, startM, endH, endM) {
@@ -1544,11 +1757,8 @@
             }
             
             if (scheduledIndex !== -1) {
-                const eventBlock = document.querySelector(`[data-event-id="${currentEditingEvent.id}"]`);
-                if (eventBlock) {
-                    eventBlock.remove();
-                }
-                renderScheduledEvent(scheduledEvents[scheduledIndex]);
+                document.querySelectorAll('.event-block').forEach(block => block.remove());
+                renderEventsForCurrentWeek();
             }
             
             renderLibrary();
