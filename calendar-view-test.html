@@ -1,99 +1,260 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TSL Calendar — Full</title>
-  <style>
-    body { font-family: Helvetica, Arial, sans-serif; margin:0; background:#fff; color:#202124; }
-    header { display:flex; justify-content:space-between; align-items:center; padding:10px 20px; border-bottom:1px solid #dadce0; }
-    .nav-group { display:flex; align-items:center; gap:8px; }
-    .nav-btn, #pdfBtn, .view-btn {
-      background:#f1f3f4; border:1px solid #dadce0; border-radius:4px; padding:5px 10px; cursor:pointer; font-size:14px;
-    }
-    .nav-btn:hover, #pdfBtn:hover, .view-btn:hover { background:#e8eaed; }
-    #pdfBtn { background:#1a73e8; color:white; border:none; }
-    #pdfBtn:hover { background:#1765cc; }
-    .month-label { font-size:18px; font-weight:500; flex:1; text-align:center; }
-    .calendar { display:grid; grid-template-columns:repeat(7,1fr); border-top:1px solid #dadce0; border-left:1px solid #dadce0; }
-    .day-header { background:#f8f9fa; padding:6px; text-align:center; border-right:1px solid #dadce0; border-bottom:1px solid #dadce0; font-size:12px; font-weight:500; }
-    .day { border-right:1px solid #dadce0; border-bottom:1px solid #dadce0; min-height:100px; padding:2px; font-size:11px; }
-    .day.other { background:#f8f9fa; color:#9aa0a6; }
-    .date-num { font-size:11px; font-weight:500; margin:2px; }
-    .event-line { display:flex; align-items:center; gap:4px; margin:1px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
-    .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-    .dot.events { background:#d93025; }
-    .dot.non-public { background:#f29900; }
-    .dot.tbd { background:#1a73e8; }
-    .dot.theater-1 { background:#5f6368; }
-    .dot.theater-2 { background:#188038; }
-    .more { font-size:10px; color:#5f6368; cursor:pointer; }
-    .legend { display:flex; justify-content:center; gap:16px; padding:10px; border-top:1px solid #dadce0; font-size:12px; }
-    .legend-item { display:flex; align-items:center; gap:4px; }
-    .legend-dot { width:10px; height:10px; border-radius:50%; }
-    /* Week view */
-    .week-grid { display:grid; grid-template-columns:50px repeat(7,1fr); border-top:1px solid #dadce0; border-left:1px solid #dadce0; height:calc(100vh - 120px); overflow:auto; }
-    .time-slot { height:30px; font-size:10px; color:#5f6368; border-bottom:1px solid #f1f3f4; }
-    .week-day-col { border-right:1px solid #dadce0; position:relative; }
-    .week-event { position:absolute; left:2px; right:2px; font-size:11px; padding:2px 4px; background:rgba(26,115,232,0.1); border-left:3px solid #1a73e8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
-    /* Schedule view */
-    .schedule { padding:10px 20px; }
-    .schedule-day { margin-bottom:12px; }
-    .schedule-date { font-weight:500; margin-bottom:4px; font-size:13px; }
-    .schedule-event { display:flex; align-items:center; gap:4px; font-size:12px; margin:2px 0; }
-    .schedule-event.past { color:#9aa0a6; }
-    /* Modals */
-    .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; }
-    .modal-content { background:white; margin:8% auto; padding:20px; border-radius:8px; width:90%; max-width:500px; position:relative; }
-    .modal-close { position:absolute; top:10px; right:15px; font-size:22px; cursor:pointer; color:#5f6368; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSL Calendar</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Google Sans', Roboto, Arial, sans-serif;
+            background: #fff;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: #fff;
+            border-bottom: 1px solid #dadce0;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+            flex-shrink: 0;
+        }
+
+        .logo {
+            font-size: 20px;
+            color: #3c4043;
+            font-weight: 400;
+        }
+
+        .calendar-info {
+            font-size: 14px;
+            color: #5f6368;
+        }
+
+        .calendar-container {
+            height: calc(100vh - 64px);
+            width: 100%;
+            position: relative;
+        }
+
+        .calendar-embed {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #5f6368;
+            font-size: 16px;
+            z-index: 10;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .error-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fce8e6;
+            color: #d93025;
+            padding: 24px;
+            border-radius: 8px;
+            border: 1px solid #fad2cf;
+            max-width: 500px;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .error-title {
+            font-weight: 500;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .error-details {
+            font-size: 14px;
+            line-height: 1.4;
+            margin-bottom: 16px;
+        }
+
+        .retry-btn {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .retry-btn:hover {
+            background: #1557b0;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 12px 16px;
+                height: 56px;
+            }
+
+            .calendar-container {
+                height: calc(100vh - 56px);
+            }
+
+            .logo {
+                font-size: 18px;
+            }
+
+            .calendar-info {
+                font-size: 12px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <div class="nav-group">
-      <button class="nav-btn" id="prevBtn">‹</button>
-      <button class="nav-btn" id="todayBtn">Today</button>
-      <button class="nav-btn" id="nextBtn">›</button>
+    <div class="header">
+        <div class="logo">TSL Calendar</div>
+        <div class="calendar-info">All TSL Events & Schedules</div>
     </div>
-    <div class="month-label" id="viewLabel">Loading…</div>
-    <div class="nav-group">
-      <button class="view-btn" data-view="month">Month</button>
-      <button class="view-btn" data-view="week">Week</button>
-      <button class="view-btn" data-view="schedule">Schedule</button>
-      <button id="pdfBtn">Download PDF</button>
+
+    <div class="calendar-container">
+        <div id="loadingMessage" class="loading">
+            Loading Google Calendar...
+        </div>
+        
+        <div id="errorContainer" style="display: none;"></div>
+        
+        <iframe 
+            id="calendarEmbed"
+            class="calendar-embed"
+            src=""
+            style="display: none;"
+            onload="handleCalendarLoad()"
+            onerror="handleCalendarError()">
+        </iframe>
     </div>
-  </header>
 
-  <div id="calendarContainer"></div>
+    <script>
+        // TSL Calendar IDs
+        const CALENDAR_IDS = [
+            '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com', // TSL Events
+            '6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700@group.calendar.google.com', // TSL Events (NON-PUBLIC)
+            '7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306@group.calendar.google.com', // TSL TBD
+            '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com', // TSL Theater 1
+            'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'  // TSL Theater 2
+        ];
 
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:#d93025"></div> Events</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#f29900"></div> Non-Public</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#1a73e8"></div> TBD</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#5f6368"></div> Theater 1</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#188038"></div> Theater 2</div>
-  </div>
+        // Calendar colors for better visual distinction
+        const CALENDAR_COLORS = [
+            '%23D50000', // Red for main events
+            '%23F09300', // Orange for non-public
+            '%231976D2', // Blue for TBD
+            '%23616161', // Gray for Theater 1
+            '%23388E3C'  // Green for Theater 2
+        ];
 
-  <!-- Modals -->
-  <div id="eventModal" class="modal">
-    <div class="modal-content">
-      <span class="modal-close" id="eventClose">&times;</span>
-      <div id="eventDetails"></div>
-    </div>
-  </div>
+        function buildCalendarURL() {
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            
+            // Build the embed URL with all calendars
+            let url = 'https://calendar.google.com/calendar/embed?';
+            
+            // Add each calendar with its color
+            CALENDAR_IDS.forEach((calendarId, index) => {
+                url += `src=${encodeURIComponent(calendarId)}`;
+                if (CALENDAR_COLORS[index]) {
+                    url += `&color=${CALENDAR_COLORS[index]}`;
+                }
+                url += '&';
+            });
+            
+            // Add timezone and display options
+            url += `ctz=${encodeURIComponent(timezone)}`;
+            url += '&mode=MONTH';           // Default to month view
+            url += '&showTitle=0';          // Hide the title
+            url += '&showNav=1';            // Show navigation
+            url += '&showDate=1';           // Show date
+            url += '&showPrint=0';          // Hide print button
+            url += '&showTabs=1';           // Show view tabs (Month/Week/Day)
+            url += '&showCalendars=1';      // Show calendar list on the side
+            url += '&showTz=0';             // Hide timezone
+            url += '&hl=en';                // Language
+            
+            return url;
+        }
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script>
+        function loadCalendar() {
+            const iframe = document.getElementById('calendarEmbed');
+            const loading = document.getElementById('loadingMessage');
+            const errorContainer = document.getElementById('errorContainer');
+            
+            // Hide previous error messages
+            errorContainer.style.display = 'none';
+            loading.style.display = 'block';
+            iframe.style.display = 'none';
+            
+            // Set the iframe source
+            iframe.src = buildCalendarURL();
+        }
 
-// JS content omitted in this demo due to size...
+        function handleCalendarLoad() {
+            const iframe = document.getElementById('calendarEmbed');
+            const loading = document.getElementById('loadingMessage');
+            
+            loading.style.display = 'none';
+            iframe.style.display = 'block';
+        }
 
-    window.onload=load;
-    window.addEventListener("keydown",e=>{
-      if(e.key==="ArrowLeft"){if(currentView==="month"){currentDate.setMonth(currentDate.getMonth()-1);}else{currentDate.setDate(currentDate.getDate()-7);}load();}
-      else if(e.key==="ArrowRight"){if(currentView==="month"){currentDate.setMonth(currentDate.getMonth()+1);}else{currentDate.setDate(currentDate.getDate()+7);}load();}
-      else if(e.key.toLowerCase()==="t"){currentDate=new Date();load();}
-    });
-  </script>
+        function handleCalendarError() {
+            const loading = document.getElementById('loadingMessage');
+            const errorContainer = document.getElementById('errorContainer');
+            
+            loading.style.display = 'none';
+            
+            errorContainer.innerHTML = `
+                <div class="error-message">
+                    <div class="error-title">Unable to load calendar</div>
+                    <div class="error-details">
+                        This might happen if the TSL calendars are not publicly accessible or if there are network issues.
+                        <br><br>
+                        <strong>To fix this:</strong><br>
+                        • Make sure the TSL calendars are set to "Public" in Google Calendar<br>
+                        • Check your internet connection<br>
+                        • Try refreshing the page
+                    </div>
+                    <button class="retry-btn" onclick="loadCalendar()">Try Again</button>
+                </div>
+            `;
+            
+            errorContainer.style.display = 'block';
+        }
+
+        // Set a timeout in case the iframe doesn't load
+        setTimeout(() => {
+            const loading = document.getElementById('loadingMessage');
+            if (loading.style.display !== 'none') {
+                handleCalendarError();
+            }
+        }, 10000); // 10 second timeout
+
+        // Load calendar when page loads
+        window.addEventListener('load', loadCalendar);
+    </script>
 </body>
 </html>
