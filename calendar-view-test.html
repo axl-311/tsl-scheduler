@@ -682,45 +682,22 @@
             document.getElementById('dateTitle').textContent = 
                 `${weekStart.toLocaleDateString()} - ${new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toLocaleDateString()}`;
             
-            // Render week headers
-            const headerContainer = document.getElementById('weekHeader');
-            headerContainer.innerHTML = '';
-            
-            for (let i = 0; i < 7; i++) {
-                const date = new Date(weekStart);
-                date.setDate(weekStart.getDate() + i);
-                
-                const header = document.createElement('div');
-                header.className = 'week-day-header';
-                if (isToday(date)) header.classList.add('today');
-                
-                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-                const dayNumber = date.getDate();
-                
-                header.innerHTML = `
-                    <div class="week-day-name">${dayName}</div>
-                    <div class="week-day-number">${dayNumber}</div>
-                `;
-                
-                headerContainer.appendChild(header);
-            }
-            
             // Render time column
-            const timeContainer = document.getElementById('timeColumn');
+            const timeContainer = document.getElementById('weekTimeColumn');
             timeContainer.innerHTML = '';
             
             for (let hour = 14; hour <= 24; hour++) {
                 const displayHour = hour % 24;
                 const timeSlot = document.createElement('div');
-                timeSlot.className = 'time-slot';
+                timeSlot.className = 'week-time-slot';
                 const h = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
                 const period = displayHour < 12 ? 'AM' : 'PM';
                 timeSlot.textContent = `${h} ${period}`;
                 timeContainer.appendChild(timeSlot);
             }
             
-            // Render week days with theater lanes
-            const daysContainer = document.getElementById('weekDays');
+            // Render week days
+            const daysContainer = document.getElementById('weekDaysContainer');
             daysContainer.innerHTML = '';
             
             for (let i = 0; i < 7; i++) {
@@ -729,6 +706,24 @@
                 
                 const dayColumn = document.createElement('div');
                 dayColumn.className = 'week-day-column';
+                
+                // Day header
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'week-day-header';
+                if (isToday(date)) dayHeader.classList.add('today');
+                
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                const dayNumber = date.getDate();
+                
+                dayHeader.innerHTML = `
+                    <div class="week-day-name">${dayName}</div>
+                    <div class="week-day-number">${dayNumber}</div>
+                `;
+                dayColumn.appendChild(dayHeader);
+                
+                // Day content with theater lanes
+                const dayContent = document.createElement('div');
+                dayContent.className = 'week-day-content';
                 
                 const theaterLanes = document.createElement('div');
                 theaterLanes.className = 'theater-lanes';
@@ -756,15 +751,24 @@
                         if (theaterHour >= 0) {
                             const top = theaterHour * 60 + (event.start.getMinutes() / 15) * 15;
                             const duration = (event.end - event.start) / 60000;
-                            const height = (duration / 60) * 60;
+                            const height = Math.max((duration / 60) * 60, 20);
                             
                             const eventElement = document.createElement('div');
-                            eventElement.className = `week-event event-${event.calendar}`;
-                            eventElement.style.top = `${top + 20}px`; // +20 for label space
-                            eventElement.style.height = `${Math.max(height, 20)}px`;
-                            eventElement.textContent = event.title;
+                            eventElement.className = 'week-event';
+                            eventElement.style.top = `${top + 16}px`; // +16 for label space
+                            eventElement.style.height = `${height}px`;
                             eventElement.title = `${event.title}\n${formatTime(event.start)} - ${formatTime(event.end)}`;
                             eventElement.onclick = () => showEventDetails(event);
+                            
+                            const dot = document.createElement('div');
+                            dot.className = `event-dot dot-${event.calendar}`;
+                            
+                            const text = document.createElement('div');
+                            text.className = 'event-text';
+                            text.textContent = event.title;
+                            
+                            eventElement.appendChild(dot);
+                            eventElement.appendChild(text);
                             
                             lane.appendChild(eventElement);
                         }
@@ -773,8 +777,103 @@
                     theaterLanes.appendChild(lane);
                 });
                 
-                dayColumn.appendChild(theaterLanes);
+                dayContent.appendChild(theaterLanes);
+                dayColumn.appendChild(dayContent);
                 daysContainer.appendChild(dayColumn);
+            }
+        }
+
+        function renderScheduleView() {
+            const { start } = getDateRange();
+            const weekStart = new Date(start);
+            
+            document.getElementById('dateTitle').textContent = 
+                `${weekStart.toLocaleDateString()} - ${new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toLocaleDateString()}`;
+            
+            const container = document.getElementById('scheduleContainer');
+            container.innerHTML = '';
+            
+            // Group events by day
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(weekStart);
+                date.setDate(weekStart.getDate() + i);
+                
+                const dayEvents = allEvents.filter(event => 
+                    event.start.toDateString() === date.toDateString()
+                ).sort((a, b) => a.start - b.start);
+                
+                if (dayEvents.length > 0) {
+                    const daySection = document.createElement('div');
+                    daySection.className = 'schedule-day-section';
+                    
+                    const dayHeader = document.createElement('div');
+                    dayHeader.className = 'schedule-day-header';
+                    if (isToday(date)) dayHeader.classList.add('today');
+                    
+                    const dayName = date.toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        month: 'short', 
+                        day: 'numeric' 
+                    });
+                    dayHeader.textContent = dayName;
+                    
+                    daySection.appendChild(dayHeader);
+                    
+                    dayEvents.forEach(event => {
+                        const eventElement = document.createElement('div');
+                        eventElement.className = 'schedule-event';
+                        eventElement.onclick = () => showEventDetails(event);
+                        
+                        const timeElement = document.createElement('div');
+                        timeElement.className = 'schedule-time';
+                        timeElement.textContent = formatTime(event.start);
+                        
+                        const contentElement = document.createElement('div');
+                        contentElement.className = 'schedule-event-content';
+                        
+                        const dot = document.createElement('div');
+                        dot.className = `event-dot dot-${event.calendar}`;
+                        
+                        const titleElement = document.createElement('div');
+                        titleElement.className = 'schedule-event-title';
+                        titleElement.textContent = event.title;
+                        
+                        const duration = Math.round((event.end - event.start) / 60000);
+                        const hours = Math.floor(duration / 60);
+                        const minutes = duration % 60;
+                        const durationStr = hours > 0 ? 
+                            (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`) : 
+                            `${minutes}m`;
+                        
+                        const theater = event.calendar === 'theater-1' ? 'Theater 1' : 
+                                       event.calendar === 'theater-2' ? 'Theater 2' : '';
+                        
+                        const detailsText = theater ? `${durationStr} • ${theater}` : durationStr;
+                        
+                        const detailsElement = document.createElement('div');
+                        detailsElement.className = 'schedule-event-details';
+                        detailsElement.textContent = detailsText;
+                        
+                        contentElement.appendChild(dot);
+                        contentElement.appendChild(titleElement);
+                        
+                        eventElement.appendChild(timeElement);
+                        eventElement.appendChild(contentElement);
+                        eventElement.appendChild(detailsElement);
+                        
+                        daySection.appendChild(eventElement);
+                    });
+                    
+                    container.appendChild(daySection);
+                }
+            }
+            
+            if (container.children.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: #5f6368; padding: 40px;">
+                        No events scheduled for this week
+                    </div>
+                `;
             }
         }
 
