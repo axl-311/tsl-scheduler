@@ -533,7 +533,6 @@
             text-align: center;
         }
 
-        /* Ensure time preview is visible on leftmost columns */
         .day-column:first-child .drag-preview::before,
         .day-column:nth-child(1):not(.collapsed) .drag-preview::before,
         .day-column:nth-child(4) .drag-preview::before {
@@ -554,6 +553,21 @@
 
         .import-button:hover {
             background: #30a852;
+        }
+
+        .add-event-button {
+            padding: 8px 16px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .add-event-button:hover {
+            background: #0051d5;
         }
 
         .toast {
@@ -666,6 +680,11 @@
             font-size: 12px;
             color: #666;
         }
+
+        textarea.form-input {
+            resize: vertical;
+            min-height: 80px;
+        }
     </style>
 </head>
 <body>
@@ -729,6 +748,9 @@
                 <button class="import-button" id="importFromGoogle" style="width: 100%; margin-top: 15px;">
                     Import from Google Calendar
                 </button>
+                <button class="add-event-button" id="addEventButton" style="width: 100%; margin-top: 10px;">
+                    Add New Event
+                </button>
                 <div class="debug-panel">
                     <div>Library Events: <span id="debugLibraryCount">0</span></div>
                     <div>Scheduled Events: <span id="debugScheduledCount">0</span></div>
@@ -787,6 +809,53 @@
         </div>
     </div>
 
+    <!-- Add Event Modal -->
+    <div id="addEventModal" class="modal-overlay" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <span>Add New Event</span>
+                <button class="modal-close" id="addEventModalClose">×</button>
+            </div>
+            <form id="addEventForm">
+                <div class="form-group">
+                    <label class="form-label">Title</label>
+                    <input type="text" id="addEventTitle" class="form-input" required placeholder="Event name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Duration</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="number" id="addEventHours" class="form-input" min="0" max="23" style="width: 80px;" placeholder="2" value="2">
+                            <span>hrs</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="number" id="addEventMinutes" class="form-input" min="0" max="59" style="width: 80px;" placeholder="0" value="0">
+                            <span>min</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Calendar Type</label>
+                    <select id="addEventCalendar" class="form-input">
+                        <option value="events">TSL Events</option>
+                        <option value="non-public">TSL Events (NON-PUBLIC)</option>
+                        <option value="tbd">TSL TBD</option>
+                        <option value="theater-1">TSL Theater 1</option>
+                        <option value="theater-2">TSL Theater 2</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description (optional)</label>
+                    <textarea id="addEventDescription" class="form-input" rows="3" placeholder="Event description, URL, or other details..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="addEventModalCancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     <script>
@@ -799,6 +868,7 @@
          * - Drag-and-drop scheduling interface
          * - Push to Google Calendar with clean description handling
          * - TBD calendar for planning/staging
+         * - Add custom events to library
          * - Save/Load functionality
          * - Event editing and management
          * - Week navigation
@@ -908,6 +978,74 @@
             }
         }
 
+        // Add Event Functions
+        function openAddEventModal() {
+            document.getElementById('addEventModal').style.display = 'flex';
+            document.getElementById('addEventTitle').focus();
+        }
+
+        function closeAddEventModal() {
+            document.getElementById('addEventModal').style.display = 'none';
+            document.getElementById('addEventForm').reset();
+            document.getElementById('addEventHours').value = '2';
+            document.getElementById('addEventMinutes').value = '0';
+        }
+
+        function addNewEvent() {
+            const title = document.getElementById('addEventTitle').value.trim();
+            const hours = parseInt(document.getElementById('addEventHours').value) || 0;
+            const minutes = parseInt(document.getElementById('addEventMinutes').value) || 0;
+            const calendar = document.getElementById('addEventCalendar').value;
+            const description = document.getElementById('addEventDescription').value.trim();
+            
+            const duration = (hours * 60) + minutes;
+            
+            if (!title) {
+                showToast('Title is required');
+                return;
+            }
+            
+            if (duration <= 0) {
+                showToast('Duration must be greater than 0');
+                return;
+            }
+            
+            // Check if event with same title already exists
+            const existingEvent = libraryEvents.find(e => e.title.toLowerCase() === title.toLowerCase());
+            if (existingEvent) {
+                if (!confirm(`An event named "${title}" already exists. Add anyway?`)) {
+                    return;
+                }
+            }
+            
+            // Create new event
+            const newEvent = {
+                id: `custom-${Date.now()}-${Math.random()}`,
+                title: title,
+                duration: duration,
+                calendar: calendar,
+                description: description,
+                location: '',
+                googleEventId: null,
+                isCustom: true,
+                startTime: null,
+                endTime: null,
+                isAllDay: false
+            };
+            
+            // Add to library
+            libraryEvents.push(newEvent);
+            
+            // Re-render library
+            renderLibrary();
+            updateDebugCounts();
+            
+            // Close modal
+            closeAddEventModal();
+            
+            showToast(`Added "${title}" to library`);
+        }
+
         // Google Calendar Integration - Fixed Description Handling
         async function pushToGoogle() {
             if (!accessToken) {
@@ -915,7 +1053,6 @@
                 return;
             }
             
-            // Get current week events
             const currentWeekEvents = scheduledEvents.filter(event => {
                 if (event.actualDate) {
                     const dayOfWeek = calculateDayOfWeek(event.actualDate);
@@ -929,7 +1066,6 @@
                 return;
             }
             
-            // Show progress
             const syncStatus = document.getElementById('syncStatus');
             const pushButton = document.getElementById('pushToGoogle');
             
@@ -954,11 +1090,9 @@
                         console.error(`✗ Failed to create ${event.title}:`, error);
                     }
                     
-                    // Rate limiting
                     await new Promise(resolve => setTimeout(resolve, 100));
                 }
                 
-                // Update UI
                 syncStatus.classList.remove('syncing');
                 if (errorCount === 0) {
                     syncStatus.classList.add('connected');
@@ -968,7 +1102,6 @@
                     syncStatus.innerHTML = '<span>⚠</span><span>Push completed with errors</span>';
                     showToast(`Pushed ${successCount} events, ${errorCount} failed`);
                     
-                    // Log detailed errors
                     console.group('Push Errors:');
                     errors.forEach(err => console.error(`${err.event}: ${err.error}`));
                     console.groupEnd();
@@ -986,13 +1119,11 @@
         }
 
         async function createGoogleCalendarEvent(scheduleEvent) {
-            // Get the calendar ID for this event type
             const calendarId = CALENDAR_IDS[scheduleEvent.calendar];
             if (!calendarId) {
                 throw new Error(`No calendar ID found for type: ${scheduleEvent.calendar}`);
             }
             
-            // Calculate start and end times
             const startDateTime = new Date(scheduleEvent.actualDate);
             startDateTime.setHours(scheduleEvent.startHour, scheduleEvent.startMinute, 0, 0);
             
@@ -1014,7 +1145,6 @@
                 `${cleanDescription}\n\nScheduled via TSL Schedule Maker 2000` : 
                 'Scheduled via TSL Schedule Maker 2000';
             
-            // Format for Google Calendar API
             const eventData = {
                 summary: scheduleEvent.title,
                 description: finalDescription,
@@ -1027,7 +1157,6 @@
                     dateTime: endDateTime.toISOString(),
                     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
                 },
-                // Add metadata to help identify our events
                 extendedProperties: {
                     private: {
                         'tsl-scheduler': 'true',
@@ -1042,7 +1171,6 @@
             if (scheduleEvent.googleEventId && scheduleEvent.originalCalendar && scheduleEvent.originalCalendar !== scheduleEvent.calendar) {
                 console.log(`Event moved from ${scheduleEvent.originalCalendar} to ${scheduleEvent.calendar}, will delete old and create new`);
                 
-                // Delete from original calendar
                 const originalCalendarId = CALENDAR_IDS[scheduleEvent.originalCalendar];
                 if (originalCalendarId) {
                     try {
@@ -1053,7 +1181,6 @@
                     }
                 }
                 
-                // Clear the old ID since we're creating in a new calendar
                 scheduleEvent.googleEventId = null;
             }
             
@@ -1077,13 +1204,13 @@
                         return await response.json();
                     } else if (response.status === 404) {
                         console.log(`Event not found in current calendar, creating new: ${scheduleEvent.title}`);
-                        scheduleEvent.googleEventId = null; // Clear invalid ID
+                        scheduleEvent.googleEventId = null;
                     } else {
                         throw new Error(`Update failed: ${response.status} ${response.statusText}`);
                     }
                 } catch (error) {
                     console.log(`Update failed, will create new event: ${error.message}`);
-                    scheduleEvent.googleEventId = null; // Clear invalid ID
+                    scheduleEvent.googleEventId = null;
                 }
             }
             
@@ -1107,9 +1234,7 @@
             
             const createdEvent = await response.json();
             
-            // Update our local event with the new Google Calendar ID
             scheduleEvent.googleEventId = createdEvent.id;
-            // Update originalCalendar to current calendar to track future moves
             scheduleEvent.originalCalendar = scheduleEvent.calendar;
             
             console.log(`✓ Created new event: ${scheduleEvent.title}`);
@@ -1330,18 +1455,15 @@
             syncStatus.innerHTML = '<span>↻</span><span>Rebuilding database...</span>';
             
             try {
-                // Clear existing data
                 libraryEvents.length = 0;
                 scheduledEvents.length = 0;
                 
-                // Clear UI
                 document.querySelectorAll('.event-block').forEach(block => {
                     if (block.parentNode) {
                         block.parentNode.removeChild(block);
                     }
                 });
                 
-                // Import range: 2 weeks before to 12 weeks after current week
                 const startOfRange = new Date(currentWeekStart);
                 startOfRange.setDate(startOfRange.getDate() - 14);
                 const endOfRange = new Date(currentWeekStart);
@@ -1354,7 +1476,6 @@
                 let totalScheduledEvents = 0;
                 const processedEventIds = new Set();
 
-                // Fetch from all TSL calendars
                 for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
                     try {
                         console.log(`Fetching events from ${calendarKey} calendar...`);
@@ -1470,7 +1591,6 @@
             
             const allLibraryEvents = [];
             
-            // Add events from other weeks that can be scheduled
             scheduledEvents.forEach(event => {
                 if (event.actualDate) {
                     const dayOfWeek = calculateDayOfWeek(event.actualDate);
@@ -1509,7 +1629,6 @@
                 });
             });
             
-            // Deduplicate by title
             const uniqueByTitle = new Map();
             allLibraryEvents.forEach(event => {
                 const key = event.title.toLowerCase().trim();
@@ -2102,7 +2221,7 @@
             document.getElementById('saveSchedule').onclick = saveSchedule;
             document.getElementById('loadSchedule').onclick = loadSchedule;
             
-            // Modal handlers
+            // Edit Modal handlers
             document.getElementById('modalClose').onclick = closeEditModal;
             document.getElementById('modalCancel').onclick = closeEditModal;
             document.getElementById('editForm').onsubmit = (e) => {
