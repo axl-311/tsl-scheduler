@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Schedule Maker 2000</title>
+    <title>TSL Schedule Maker 2000 - v1.0</title>
+    <meta name="description" content="Theater scheduling application for Time & Space Limited">
+    <meta name="author" content="TSL">
     <style>
         * {
             margin: 0;
@@ -32,44 +34,38 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
         }
 
         .header h1 {
             font-size: 24px;
             font-weight: 600;
-            color: #1d1d1f;
         }
 
-        .header-controls {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-
-        .auth-section {
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .version-badge {
+            font-size: 12px;
+            background: #007aff;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            margin-left: 10px;
+            font-weight: 500;
         }
 
         .auth-button {
             padding: 8px 16px;
-            background: #007AFF;
+            background: #34c759;
             color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
+            transition: background 0.2s;
+            margin-left: auto;
+            margin-right: 15px;
         }
 
         .auth-button:hover {
-            background: #0056cc;
-            transform: translateY(-1px);
+            background: #30a852;
         }
 
         .auth-button.sign-out {
@@ -83,480 +79,550 @@
         .sync-status {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 6px 12px;
-            background: #f2f2f7;
-            border-radius: 16px;
-            font-size: 13px;
-            color: #8e8e93;
+            gap: 10px;
+            padding: 8px 16px;
+            background: #e8e8e8;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #86868b;
         }
 
         .sync-status.connected {
             background: #e8f5e9;
-            color: #34c759;
+            color: #2e7d32;
         }
 
         .sync-status.syncing {
             background: #fff3e0;
-            color: #ff9500;
+            color: #ef6c00;
+            animation: pulse 2s infinite;
         }
 
-        .sync-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: currentColor;
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
 
         .controls {
             background: white;
             border-radius: 12px;
-            padding: 20px;
+            padding: 15px;
             margin-bottom: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .control-section {
             display: flex;
+            justify-content: space-between;
+            align-items: center;
             flex-wrap: wrap;
             gap: 15px;
-            align-items: center;
-            margin-bottom: 15px;
         }
 
-        .control-section:last-child {
-            margin-bottom: 0;
-        }
-
-        .week-nav {
+        .week-navigation {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 15px;
         }
 
-        .week-nav button {
-            padding: 8px 12px;
-            background: #f2f2f7;
-            color: #007AFF;
+        .week-navigation button {
+            padding: 8px 16px;
+            background: #007aff;
+            color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
+            transition: background 0.2s;
         }
 
-        .week-nav button:hover {
-            background: #e5e5ea;
-            transform: translateY(-1px);
+        .week-navigation button:hover {
+            background: #0051d5;
         }
 
-        .week-info {
+        .week-display {
             font-size: 16px;
-            font-weight: 600;
-            color: #1d1d1f;
-            padding: 0 10px;
+            font-weight: 500;
+            min-width: 200px;
+            text-align: center;
         }
 
-        .action-buttons {
+        .week-actions {
             display: flex;
             gap: 10px;
-            flex-wrap: wrap;
+            align-items: center;
+            font-size: 14px;
         }
 
-        .action-button {
-            padding: 10px 16px;
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: #007aff;
+        }
+
+        .collapse-toggle {
+            padding: 8px 16px;
+            background: #f0f0f2;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
+            transition: background 0.2s;
         }
 
-        .import-btn {
-            background: #34c759;
+        .collapse-toggle:hover {
+            background: #e0e0e2;
+        }
+
+        .btn-primary {
+            background: #007aff;
             color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
         }
 
-        .import-btn:hover {
-            background: #30a852;
-            transform: translateY(-1px);
+        .btn-primary:hover:not(:disabled) {
+            background: #0051d5;
         }
 
-        .push-btn {
-            background: #ff9500;
-            color: white;
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
-        .push-btn:hover {
-            background: #e6850e;
-            transform: translateY(-1px);
+        .btn-secondary {
+            background: #f0f0f2;
+            color: #1d1d1f;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
         }
 
-        .save-btn {
-            background: #007AFF;
-            color: white;
-        }
-
-        .save-btn:hover {
-            background: #0056cc;
-            transform: translateY(-1px);
-        }
-
-        .load-btn {
-            background: #8e8e93;
-            color: white;
-        }
-
-        .load-btn:hover {
-            background: #7d7d7d;
-            transform: translateY(-1px);
+        .btn-secondary:hover {
+            background: #e0e0e2;
         }
 
         .main-content {
-            display: grid;
-            grid-template-columns: 300px 1fr;
+            display: flex;
             gap: 20px;
         }
 
-        .library {
+        .library-panel {
+            width: 280px;
             background: white;
             border-radius: 12px;
+            padding: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            height: fit-content;
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
         }
 
         .library-header {
-            padding: 20px;
-            border-bottom: 1px solid #f2f2f7;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .library-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1d1d1f;
-        }
-
-        .collapse-btn {
-            background: #f2f2f7;
-            border: none;
-            border-radius: 6px;
-            padding: 6px 10px;
-            cursor: pointer;
-            font-size: 12px;
-            color: #8e8e93;
-            transition: all 0.2s;
-        }
-
-        .collapse-btn:hover {
-            background: #e5e5ea;
-        }
-
-        .filter-controls {
-            padding: 15px 20px;
-            border-bottom: 1px solid #f2f2f7;
-        }
-
-        .filter-select {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #d1d1d6;
-            border-radius: 8px;
-            background: white;
+        .library-count {
             font-size: 14px;
-            color: #1d1d1f;
+            color: #86868b;
+            font-weight: normal;
         }
 
-        .filter-select:focus {
-            outline: none;
-            border-color: #007AFF;
+        .calendar-filter {
+            margin-bottom: 15px;
         }
 
-        .library-content {
-            max-height: 600px;
-            overflow-y: auto;
+        .calendar-filter select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
         }
 
         .library-item {
-            padding: 12px 20px;
-            cursor: grab;
-            border-bottom: 1px solid #f2f2f7;
-            transition: background-color 0.2s;
-            user-select: none;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            cursor: move;
+            position: relative;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .library-item:hover {
-            background: #f8f9fa;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
-        .library-item:active {
-            cursor: grabbing;
+        .library-item.dragging {
+            opacity: 0.5;
         }
 
-        .library-item:last-child {
-            border-bottom: none;
-        }
-
-        .event-title {
-            font-size: 14px;
+        .library-item-title {
             font-weight: 500;
-            color: #1d1d1f;
             margin-bottom: 4px;
+            color: white;
         }
 
-        .event-meta {
+        .library-item-duration {
             font-size: 12px;
-            color: #8e8e93;
+            color: rgba(255,255,255,0.8);
         }
 
-        .event-calendar {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 500;
-            text-transform: uppercase;
-            margin-left: 8px;
-        }
+        /* Calendar colors */
+        .calendar-events { background: #ec407a; }
+        .calendar-non-public { background: #ff9800; }
+        .calendar-tbd { background: #42a5f5; }
+        .calendar-theater-1 { background: #757575; }
+        .calendar-theater-2 { background: #66bb6a; }
+        .calendar-theater { background: #757575; }
 
-        .calendar-events { background: #ffe6e6; color: #d32f2f; }
-        .calendar-non-public { background: #fff3e0; color: #ef6c00; }
-        .calendar-tbd { background: #e3f2fd; color: #1976d2; }
-        .calendar-theater-1 { background: #f3e5f5; color: #7b1fa2; }
-        .calendar-theater-2 { background: #e8f5e9; color: #388e3c; }
-
-        .schedule {
+        .schedule-container {
+            flex: 1;
             background: white;
             border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .schedule-header {
-            padding: 20px;
-            border-bottom: 1px solid #f2f2f7;
-        }
-
-        .schedule-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1d1d1f;
+            overflow-x: auto;
         }
 
         .schedule-grid {
-            overflow-x: auto;
-            overflow-y: visible;
-        }
-
-        .grid-container {
-            display: grid;
-            grid-template-columns: 80px repeat(7, 1fr);
-            min-width: 800px;
-        }
-
-        .time-label {
-            padding: 15px 10px;
-            font-size: 12px;
-            color: #8e8e93;
-            background: #f8f9fa;
-            border-right: 1px solid #f2f2f7;
-            border-bottom: 1px solid #f2f2f7;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 500;
+            min-width: 1000px;
+        }
+
+        .days-container {
+            flex: 1;
+            display: flex;
+        }
+
+        .day-column {
+            flex: 1;
+            min-width: 180px;
+            border-right: 1px solid #e0e0e0;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .day-column.collapsed {
+            display: none;
+        }
+
+        .day-column:last-child {
+            border-right: none;
         }
 
         .day-header {
-            padding: 15px 10px;
-            text-align: center;
+            height: 70px;
+            padding: 15px 10px 25px 10px;
             font-weight: 600;
-            color: #1d1d1f;
-            background: #f8f9fa;
-            border-right: 1px solid #f2f2f7;
-            border-bottom: 1px solid #f2f2f7;
-            position: sticky;
-            top: 0;
+            text-align: center;
+            border-bottom: 2px solid #e0e0e0;
+            background: #f8f8f8;
+        }
+
+        .day-content {
+            display: flex;
+            height: calc(60px * 11);
+        }
+
+        .day-time-column {
+            width: 35px;
+            border-right: 1px solid #e0e0e0;
+            background: #fafafa;
+        }
+
+        .day-time-slot {
+            height: 60px;
+            padding: 2px 4px;
+            font-size: 10px;
+            color: #86868b;
+            text-align: right;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-end;
+        }
+
+        .theater-lanes {
+            display: flex;
+            flex: 1;
+            position: relative;
+        }
+
+        .theater-lane {
+            flex: 1;
+            border-right: 1px solid #e8e8e8;
+            position: relative;
+            height: calc(60px * 11);
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent,
+                transparent 14px,
+                #f0f0f0 14px,
+                #f0f0f0 15px,
+                transparent 15px,
+                transparent 29px,
+                #f0f0f0 29px,
+                #f0f0f0 30px,
+                transparent 30px,
+                transparent 44px,
+                #f0f0f0 44px,
+                #f0f0f0 45px,
+                transparent 45px,
+                transparent 59px,
+                #e2e2e2 59px,
+                #e2e2e2 60px
+            );
+        }
+
+        .theater-lane:last-child {
+            border-right: none;
+        }
+
+        .theater-lane-header {
+            position: absolute;
+            top: -25px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 11px;
+            color: #86868b;
+            font-weight: 500;
+        }
+
+        .theater-lane.drop-active {
+            background-color: rgba(0, 122, 255, 0.05);
+        }
+
+        .event-block {
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            border-radius: 6px;
+            padding: 4px 6px;
+            cursor: move;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 2px solid rgba(255,255,255,0.8);
+            transition: transform 0.2s, box-shadow 0.2s;
             z-index: 10;
+            min-width: 40px;
         }
 
-        .day-date {
-            font-size: 14px;
-            color: #1d1d1f;
+        .event-block:hover {
+            transform: scale(1.02);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 100;
+            border: 2px solid white;
         }
 
-        .day-name {
-            font-size: 12px;
-            color: #8e8e93;
-            margin-top: 2px;
+        .event-block:hover .event-controls {
+            opacity: 1;
         }
 
-        .time-slot {
-            min-height: 80px;
-            border-right: 1px solid #f2f2f7;
-            border-bottom: 1px solid #f2f2f7;
-            position: relative;
-            padding: 5px;
+        .event-block.dragging {
+            opacity: 0.5;
+            z-index: 200;
         }
 
-        .theater-section {
-            height: 50%;
-            border-bottom: 1px dashed #e5e5ea;
-            position: relative;
+        .event-controls {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            display: flex;
+            gap: 2px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 30;
+        }
+
+        .event-control-btn {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            border: none;
+            cursor: pointer;
+            font-size: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 35px;
-        }
-
-        .theater-section:last-child {
-            border-bottom: none;
-        }
-
-        .theater-section.drop-zone {
-            background: #e8f5e9;
-            border: 2px dashed #34c759;
-        }
-
-        .scheduled-event {
-            background: linear-gradient(135deg, #007AFF, #5ac8fa);
             color: white;
-            padding: 6px 8px;
-            border-radius: 6px;
+        }
+
+        .edit-btn {
+            background: rgba(0, 122, 255, 0.8);
+        }
+
+        .delete-btn {
+            background: rgba(255, 59, 48, 0.8);
+        }
+        
+        .tbd-btn {
+            background: rgba(66, 165, 245, 0.8);
+            font-size: 8px;
+            font-weight: bold;
+        }
+
+        .event-control-btn:hover {
+            opacity: 0.8;
+        }
+
+        .event-title {
             font-size: 11px;
             font-weight: 500;
-            cursor: pointer;
-            width: 100%;
-            text-align: center;
-            position: relative;
-            transition: all 0.2s;
-            line-height: 1.2;
+            color: white;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-
-        .scheduled-event:hover {
-            transform: scale(1.02);
-            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
-        }
-
-        .scheduled-event.events { background: linear-gradient(135deg, #d32f2f, #f44336); }
-        .scheduled-event.non-public { background: linear-gradient(135deg, #ef6c00, #ff9800); }
-        .scheduled-event.tbd { background: linear-gradient(135deg, #1976d2, #2196f3); }
-        .scheduled-event.theater-1 { background: linear-gradient(135deg, #7b1fa2, #9c27b0); }
-        .scheduled-event.theater-2 { background: linear-gradient(135deg, #388e3c, #4caf50); }
 
         .event-time {
             font-size: 10px;
-            opacity: 0.9;
-            margin-bottom: 2px;
+            color: rgba(255,255,255,0.9);
+            margin-top: 2px;
         }
 
-        .event-name {
+        .event-runtime {
+            font-size: 10px;
+            color: rgba(255,255,255,0.95);
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .drag-preview {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #007aff;
+            pointer-events: none;
+            z-index: 200;
+        }
+
+        .drag-preview::before {
+            content: attr(data-time);
+            position: absolute;
+            left: -60px;
+            top: -8px;
+            background: #007aff;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
             font-size: 11px;
             font-weight: 600;
-            overflow: hidden;
-            text-overflow: ellipsis;
             white-space: nowrap;
+            z-index: 201;
+            min-width: 50px;
+            text-align: center;
         }
 
-        .theater-label {
-            position: absolute;
-            left: 2px;
-            top: 2px;
-            font-size: 9px;
-            opacity: 0.6;
-            background: rgba(0,0,0,0.1);
-            padding: 1px 4px;
-            border-radius: 3px;
+        /* Ensure time preview is visible on leftmost columns */
+        .day-column:first-child .drag-preview::before,
+        .day-column:nth-child(1):not(.collapsed) .drag-preview::before,
+        .day-column:nth-child(4) .drag-preview::before {
+            left: 5px;
+            top: -25px;
+        }
+
+        .import-button {
+            padding: 8px 16px;
+            background: #34c759;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .import-button:hover {
+            background: #30a852;
         }
 
         .toast {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: #1d1d1f;
+            background: #323232;
             color: white;
             padding: 12px 20px;
             border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             z-index: 1000;
-            transform: translateY(100px);
-            opacity: 0;
-            transition: all 0.3s;
+            animation: slideIn 0.3s ease;
         }
 
-        .toast.show {
-            transform: translateY(0);
-            opacity: 1;
+        @keyframes slideIn {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
 
-        .toast.success {
-            background: #34c759;
-        }
-
-        .toast.error {
-            background: #ff3b30;
-        }
-
-        .modal {
+        .modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.5);
-            display: none;
-            justify-content: center;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
             align-items: center;
+            justify-content: center;
             z-index: 1000;
         }
 
-        .modal.show {
-            display: flex;
-        }
-
-        .modal-content {
+        .modal {
             background: white;
             border-radius: 12px;
             padding: 24px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
+            width: 400px;
+            max-width: 90vw;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         }
 
         .modal-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
         }
 
-        .modal-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1d1d1f;
-        }
-
-        .close-modal {
+        .modal-close {
             background: none;
             border: none;
             font-size: 24px;
             cursor: pointer;
-            color: #8e8e93;
+            color: #86868b;
             padding: 0;
-            width: 30px;
-            height: 30px;
+            width: 24px;
+            height: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
-        }
-
-        .close-modal:hover {
-            color: #1d1d1f;
         }
 
         .form-group {
@@ -565,189 +631,93 @@
 
         .form-label {
             display: block;
-            margin-bottom: 6px;
-            font-size: 14px;
             font-weight: 500;
+            margin-bottom: 6px;
             color: #1d1d1f;
         }
 
         .form-input {
             width: 100%;
             padding: 10px 12px;
-            border: 1px solid #d1d1d6;
+            border: 1px solid #d2d2d7;
             border-radius: 8px;
             font-size: 14px;
-            color: #1d1d1f;
-            background: white;
+            font-family: inherit;
         }
 
         .form-input:focus {
             outline: none;
-            border-color: #007AFF;
-        }
-
-        .form-select {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #d1d1d6;
-            border-radius: 8px;
-            font-size: 14px;
-            color: #1d1d1f;
-            background: white;
-        }
-
-        .form-select:focus {
-            outline: none;
-            border-color: #007AFF;
+            border-color: #007aff;
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
         }
 
         .form-actions {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             justify-content: flex-end;
-            margin-top: 20px;
+            margin-top: 24px;
         }
 
-        .btn-secondary {
-            padding: 10px 16px;
-            background: #f2f2f7;
-            color: #1d1d1f;
-            border: none;
+        .debug-panel {
+            background: #f0f0f2;
             border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .btn-secondary:hover {
-            background: #e5e5ea;
-        }
-
-        .btn-primary {
-            padding: 10px 16px;
-            background: #007AFF;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .btn-primary:hover {
-            background: #0056cc;
-        }
-
-        .btn-danger {
-            padding: 10px 16px;
-            background: #ff3b30;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .btn-danger:hover {
-            background: #d70015;
-        }
-
-        @media (max-width: 768px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-            
-            .header {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .header-controls {
-                justify-content: center;
-            }
-            
-            .control-section {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .week-nav {
-                justify-content: center;
-            }
-            
-            .action-buttons {
-                justify-content: center;
-            }
-        }
-
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #f2f2f7;
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #d1d1d6;
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #bcbcc0;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
         }
     </style>
 </head>
 <body>
     <div class="app-container">
-        <!-- Header -->
         <div class="header">
-            <h1>TSL Schedule Maker 2000</h1>
-            <div class="header-controls">
-                <div class="auth-section">
-                    <button id="authButton" class="auth-button">Connect Google Calendar</button>
-                    <div id="syncStatus" class="sync-status">
-                        <div class="sync-dot"></div>
-                        <span>Not Connected</span>
-                    </div>
-                </div>
+            <div>
+                <h1>TSL Schedule Maker 2000<span class="version-badge">v1.0</span></h1>
+            </div>
+            <button id="authButton" class="auth-button">
+                Connect Google Calendar
+            </button>
+            <div class="sync-status" id="syncStatus">
+                <span>○</span>
+                <span>Not connected</span>
             </div>
         </div>
 
-        <!-- Controls -->
         <div class="controls">
-            <div class="control-section">
-                <div class="week-nav">
-                    <button id="prevWeek">← Previous Week</button>
-                    <div class="week-info" id="weekInfo">Loading...</div>
-                    <button id="nextWeek">Next Week →</button>
-                </div>
+            <div class="week-navigation">
+                <button id="prevWeek">← Previous Week</button>
+                <div class="week-display" id="weekDisplay">Loading...</div>
+                <button id="nextWeek">Next Week →</button>
             </div>
-            <div class="control-section">
-                <div class="action-buttons">
-                    <button id="importButton" class="action-button import-btn">Import from Calendar</button>
-                    <button id="pushButton" class="action-button push-btn">Push to Google</button>
-                    <button id="saveButton" class="action-button save-btn">Save</button>
-                    <button id="loadButton" class="action-button load-btn">Load</button>
+            <div class="week-actions">
+                <div class="stat-item">
+                    <span>Week Total:</span>
+                    <span class="stat-value" id="weekTotal">0 events</span>
                 </div>
+                <button class="collapse-toggle" id="collapseToggle">
+                    Show Tues-Thurs
+                </button>
+                <button class="btn-primary" id="pushToGoogle">
+                    Push to Google
+                </button>
+                <button class="btn-secondary" id="saveSchedule">
+                    Save
+                </button>
+                <button class="btn-secondary" id="loadSchedule">
+                    Load
+                </button>
             </div>
         </div>
 
-        <!-- Main Content -->
         <div class="main-content">
-            <!-- Library Sidebar -->
-            <div class="library">
+            <div class="library-panel">
                 <div class="library-header">
-                    <div class="library-title">Event Library</div>
-                    <button id="collapseLibrary" class="collapse-btn">Collapse</button>
+                    <span>Movie/Event Library</span>
+                    <span class="library-count" id="libraryCount">(0)</span>
                 </div>
-                <div class="filter-controls">
-                    <select id="calendarFilter" class="filter-select">
-                        <option value="">All Calendars</option>
+                <div class="calendar-filter">
+                    <select id="calendarFilter">
+                        <option value="all">All Calendars</option>
                         <option value="events">TSL Events</option>
                         <option value="non-public">TSL Events (NON-PUBLIC)</option>
                         <option value="tbd">TSL TBD</option>
@@ -755,51 +725,53 @@
                         <option value="theater-2">TSL Theater 2</option>
                     </select>
                 </div>
-                <div class="library-content" id="libraryContent">
-                    <!-- Library items will be populated here -->
+                <div id="libraryItems"></div>
+                <button class="import-button" id="importFromGoogle" style="width: 100%; margin-top: 15px;">
+                    Import from Google Calendar
+                </button>
+                <div class="debug-panel">
+                    <div>Library Events: <span id="debugLibraryCount">0</span></div>
+                    <div>Scheduled Events: <span id="debugScheduledCount">0</span></div>
+                    <div>Import Range: <span id="debugImportRange">--</span></div>
                 </div>
             </div>
 
-            <!-- Schedule Grid -->
-            <div class="schedule">
-                <div class="schedule-header">
-                    <div class="schedule-title">Weekly Schedule</div>
-                </div>
+            <div class="schedule-container" id="scheduleContainer">
                 <div class="schedule-grid">
-                    <div class="grid-container" id="scheduleGrid">
-                        <!-- Schedule grid will be populated here -->
-                    </div>
+                    <div class="days-container" id="daysContainer"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="toast"></div>
-
-    <!-- Edit Event Modal -->
-    <div id="editModal" class="modal">
-        <div class="modal-content">
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal-overlay" style="display: none;">
+        <div class="modal">
             <div class="modal-header">
-                <div class="modal-title">Edit Event</div>
-                <button class="close-modal" onclick="closeEditModal()">&times;</button>
+                <span>Edit Event</span>
+                <button class="modal-close" id="modalClose">×</button>
             </div>
             <form id="editForm">
                 <div class="form-group">
-                    <label class="form-label">Event Title</label>
+                    <label class="form-label">Title</label>
                     <input type="text" id="editTitle" class="form-input" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Start Time</label>
-                    <input type="time" id="editTime" class="form-input" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Duration (minutes)</label>
-                    <input type="number" id="editDuration" class="form-input" min="15" step="15" required>
+                    <label class="form-label">Duration</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="number" id="editHours" class="form-input" min="0" max="23" style="width: 80px;" placeholder="0">
+                            <span>hrs</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="number" id="editMinutes" class="form-input" min="0" max="59" style="width: 80px;" placeholder="0">
+                            <span>min</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Calendar Type</label>
-                    <select id="editCalendar" class="form-select" required>
+                    <select id="editCalendar" class="form-input">
                         <option value="events">TSL Events</option>
                         <option value="non-public">TSL Events (NON-PUBLIC)</option>
                         <option value="tbd">TSL TBD</option>
@@ -808,16 +780,49 @@
                     </select>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn-danger" onclick="deleteEvent()">Delete</button>
-                    <button type="button" class="btn-secondary" onclick="convertToTBD()">Convert to TBD</button>
-                    <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
-                    <button type="submit" class="btn-primary">Save Changes</button>
+                    <button type="button" class="btn btn-secondary" id="modalCancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
     <script>
+        /*
+         * TSL Schedule Maker 2000 - Version 1.0
+         * Theater scheduling application for Time & Space Limited
+         * 
+         * Features:
+         * - Google Calendar integration (5 TSL calendars)
+         * - Drag-and-drop scheduling interface
+         * - Push to Google Calendar with clean description handling
+         * - TBD calendar for planning/staging
+         * - Save/Load functionality
+         * - Event editing and management
+         * - Week navigation
+         * 
+         * Production deployment: https://axl-311.github.io/tsl-scheduler/
+         */
+
+        // Application State
+        let currentWeekStart = new Date();
+        currentWeekStart.setHours(0, 0, 0, 0);
+        const dayOfWeek = currentWeekStart.getDay();
+        const daysFromTuesday = (dayOfWeek + 5) % 7;
+        currentWeekStart.setDate(currentWeekStart.getDate() - daysFromTuesday);
+
+        let libraryEvents = [];
+        let scheduledEvents = [];
+        let draggedItem = null;
+        let dragSource = null;
+        let dragOffset = 0;
+        let collapsedDays = true;
+        let accessToken = null;
+        let currentEditingEvent = null;
+        let isImporting = false;
+
         // Google Calendar API Configuration
         const CLIENT_ID = '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
         const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
@@ -833,825 +838,1315 @@
             'theater-2': 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
         };
 
-        // Global State
-        let accessToken = null;
-        let currentWeekStart = null;
-        let libraryEvents = [];
-        let scheduledEvents = [];
-        let currentEditingEvent = null;
-
-        // Initialize the application
-        async function initializeApp() {
-            console.log('Initializing TSL Schedule Maker 2000...');
+        // Utility Functions
+        function showToast(message) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
             
-            // Load Google API
-            await loadGoogleAPI();
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
             
-            // Set up week navigation
-            setCurrentWeek();
-            updateWeekDisplay();
-            
-            // Set up event listeners
-            setupEventListeners();
-            
-            // Render the schedule grid
-            renderScheduleGrid();
-            
-            console.log('App initialized successfully');
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
         }
 
-        // Load Google API
-        function loadGoogleAPI() {
-            return new Promise((resolve, reject) => {
-                if (typeof gapi !== 'undefined') {
-                    resolve();
-                    return;
+        function convertToTheaterHour(actualHour) {
+            if (actualHour >= 14) {
+                return actualHour - 14;
+            } else if (actualHour === 0) {
+                return 10;
+            } else {
+                return -1;
+            }
+        }
+
+        function convertFromTheaterHour(theaterHour) {
+            if (theaterHour >= 0 && theaterHour <= 9) {
+                return theaterHour + 14;
+            } else if (theaterHour === 10) {
+                return 0;
+            } else {
+                return 14;
+            }
+        }
+
+        function formatTimeRange(startH, startM, endH, endM) {
+            const formatSingleTime = (h, m) => {
+                const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                const min = m.toString().padStart(2, '0');
+                return `${hour}:${min}`;
+            };
+            
+            return `${formatSingleTime(startH, startM)} - ${formatSingleTime(endH, endM)}`;
+        }
+
+        function calculateDayOfWeek(actualDate) {
+            const weekStart = new Date(currentWeekStart);
+            const weekEnd = new Date(currentWeekStart);
+            weekEnd.setDate(weekEnd.getDate() + 7);
+            
+            if (actualDate >= weekStart && actualDate < weekEnd) {
+                const daysDiff = Math.floor((actualDate - weekStart) / (24 * 60 * 60 * 1000));
+                return daysDiff;
+            }
+            return -1;
+        }
+
+        function formatDuration(minutes) {
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            
+            if (hours === 0) {
+                return `${mins} minutes`;
+            } else if (mins === 0) {
+                return `${hours} hour${hours > 1 ? 's' : ''}`;
+            } else {
+                return `${hours} hour${hours > 1 ? 's' : ''} ${mins} minutes`;
+            }
+        }
+
+        // Google Calendar Integration - Fixed Description Handling
+        async function pushToGoogle() {
+            if (!accessToken) {
+                showToast('Please connect to Google Calendar first');
+                return;
+            }
+            
+            // Get current week events
+            const currentWeekEvents = scheduledEvents.filter(event => {
+                if (event.actualDate) {
+                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
+                    return dayOfWeek >= 0 && dayOfWeek <= 6;
+                }
+                return false;
+            });
+            
+            if (currentWeekEvents.length === 0) {
+                showToast('No events to push for this week');
+                return;
+            }
+            
+            // Show progress
+            const syncStatus = document.getElementById('syncStatus');
+            const pushButton = document.getElementById('pushToGoogle');
+            
+            syncStatus.classList.add('syncing');
+            syncStatus.innerHTML = '<span>↻</span><span>Pushing to Google Calendar...</span>';
+            pushButton.disabled = true;
+            pushButton.textContent = 'Pushing...';
+            
+            let successCount = 0;
+            let errorCount = 0;
+            const errors = [];
+            
+            try {
+                for (const event of currentWeekEvents) {
+                    try {
+                        await createGoogleCalendarEvent(event);
+                        successCount++;
+                        console.log(`✓ Created: ${event.title}`);
+                    } catch (error) {
+                        errorCount++;
+                        errors.push({ event: event.title, error: error.message });
+                        console.error(`✗ Failed to create ${event.title}:`, error);
+                    }
+                    
+                    // Rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 100));
                 }
                 
-                const script = document.createElement('script');
-                script.src = 'https://apis.google.com/js/api.js';
-                script.onload = () => {
-                    gapi.load('auth2:client', async () => {
-                        try {
-                            await gapi.client.init({
-                                apiKey: API_KEY,
-                                clientId: CLIENT_ID,
-                                discoveryDocs: DISCOVERY_DOCS,
-                                scope: SCOPES
-                            });
-                            resolve();
-                        } catch (error) {
-                            reject(error);
-                        }
-                    });
-                };
-                script.onerror = reject;
-                document.head.appendChild(script);
-            });
-        }
-
-        // Authentication
-        async function toggleAuth() {
-            const authInstance = gapi.auth2.getAuthInstance();
-            
-            if (authInstance.isSignedIn.get()) {
-                await authInstance.signOut();
-                updateAuthUI(false);
-                showToast('Disconnected from Google Calendar', 'error');
-            } else {
-                try {
-                    await authInstance.signIn();
-                    accessToken = authInstance.currentUser.get().getAuthResponse().access_token;
-                    updateAuthUI(true);
-                    showToast('Connected to Google Calendar successfully!', 'success');
-                } catch (error) {
-                    console.error('Authentication failed:', error);
-                    showToast('Failed to connect to Google Calendar', 'error');
+                // Update UI
+                syncStatus.classList.remove('syncing');
+                if (errorCount === 0) {
+                    syncStatus.classList.add('connected');
+                    syncStatus.innerHTML = '<span>✓</span><span>Events pushed successfully</span>';
+                    showToast(`Successfully pushed ${successCount} events to Google Calendar`);
+                } else {
+                    syncStatus.innerHTML = '<span>⚠</span><span>Push completed with errors</span>';
+                    showToast(`Pushed ${successCount} events, ${errorCount} failed`);
+                    
+                    // Log detailed errors
+                    console.group('Push Errors:');
+                    errors.forEach(err => console.error(`${err.event}: ${err.error}`));
+                    console.groupEnd();
                 }
+                
+            } catch (error) {
+                console.error('Push operation failed:', error);
+                syncStatus.classList.remove('syncing');
+                syncStatus.innerHTML = '<span>✗</span><span>Push failed</span>';
+                showToast('Failed to push events to Google Calendar');
+            } finally {
+                pushButton.disabled = false;
+                pushButton.textContent = 'Push to Google';
             }
         }
 
-        function updateAuthUI(isAuthenticated) {
-            const authButton = document.getElementById('authButton');
-            const syncStatus = document.getElementById('syncStatus');
-            
-            if (isAuthenticated) {
-                authButton.textContent = 'Sign Out';
-                authButton.className = 'auth-button sign-out';
-                syncStatus.className = 'sync-status connected';
-                syncStatus.querySelector('span').textContent = 'Connected';
-            } else {
-                authButton.textContent = 'Connect Google Calendar';
-                authButton.className = 'auth-button';
-                syncStatus.className = 'sync-status';
-                syncStatus.querySelector('span').textContent = 'Not Connected';
-                accessToken = null;
-                libraryEvents = [];
-                renderLibrary();
+        async function createGoogleCalendarEvent(scheduleEvent) {
+            // Get the calendar ID for this event type
+            const calendarId = CALENDAR_IDS[scheduleEvent.calendar];
+            if (!calendarId) {
+                throw new Error(`No calendar ID found for type: ${scheduleEvent.calendar}`);
             }
-        }
-
-        // Week Navigation
-        function setCurrentWeek() {
-            const today = new Date();
-            const dayOfWeek = today.getDay();
-            const tuesday = new Date(today);
-            tuesday.setDate(today.getDate() - dayOfWeek + 2);
-            currentWeekStart = tuesday;
-        }
-
-        function updateWeekDisplay() {
-            const weekInfo = document.getElementById('weekInfo');
-            if (!currentWeekStart) return;
             
-            const endOfWeek = new Date(currentWeekStart);
-            endOfWeek.setDate(currentWeekStart.getDate() + 6);
+            // Calculate start and end times
+            const startDateTime = new Date(scheduleEvent.actualDate);
+            startDateTime.setHours(scheduleEvent.startHour, scheduleEvent.startMinute, 0, 0);
             
-            const formatOptions = { month: 'short', day: 'numeric' };
-            const startStr = currentWeekStart.toLocaleDateString('en-US', formatOptions);
-            const endStr = endOfWeek.toLocaleDateString('en-US', formatOptions);
+            const endDateTime = new Date(startDateTime);
+            endDateTime.setMinutes(endDateTime.getMinutes() + scheduleEvent.duration);
             
-            weekInfo.textContent = `${startStr} - ${endStr}`;
-        }
-
-        function navigateWeek(direction) {
-            const newDate = new Date(currentWeekStart);
-            newDate.setDate(currentWeekStart.getDate() + (direction * 7));
-            currentWeekStart = newDate;
-            updateWeekDisplay();
-            renderScheduleGrid();
-        }
-
-        // Enhanced Description Cleaning Function
-        function cleanEventDescription(description) {
-            if (!description) return '';
+            // Clean up description - remove attribution lines but preserve URLs and other content
+            let cleanDescription = scheduleEvent.description || '';
             
-            let cleaned = description.trim();
-            
-            // Remove ALL instances of "Scheduled via..." regardless of position
-            cleaned = cleaned.replace(/.*Scheduled via[^\n\r]*/gi, '');
-            
-            // Remove ALL instances of "Created by..." regardless of position  
-            cleaned = cleaned.replace(/.*Created by[^\n\r]*/gi, '');
-            
-            // Remove duplicate runtime/theater info patterns
-            cleaned = cleaned.replace(/Runtime:\s*\d+[^\n\r]*/gi, '');
-            cleaned = cleaned.replace(/Theater:\s*Theater\s*[12][^\n\r]*/gi, '');
+            // Remove lines that start with or contain only attribution text
+            cleanDescription = cleanDescription.replace(/^.*Scheduled via.*$/gmi, '');
+            cleanDescription = cleanDescription.replace(/^.*Created by.*$/gmi, '');
             
             // Clean up extra whitespace and empty lines
-            cleaned = cleaned.replace(/\n\s*\n/g, '\n').trim();
+            cleanDescription = cleanDescription.replace(/\n\s*\n/g, '\n').trim();
             
-            return cleaned;
-        }
-
-        // Enhanced Event Creation Function  
-        async function createGoogleCalendarEvent(scheduleEvent) {
-            if (!accessToken) {
-                throw new Error('Not authenticated');
-            }
-
-            const calendarId = CALENDAR_IDS[scheduleEvent.calendar] || CALENDAR_IDS['events'];
+            // Build final description with single clean attribution
+            const finalDescription = cleanDescription ? 
+                `${cleanDescription}\n\nScheduled via TSL Schedule Maker 2000` : 
+                'Scheduled via TSL Schedule Maker 2000';
             
-            // Calculate event timing
-            const eventDate = new Date(currentWeekStart);
-            eventDate.setDate(currentWeekStart.getDate() + (scheduleEvent.day || 0));
-            eventDate.setHours(scheduleEvent.startHour || 14);
-            eventDate.setMinutes(scheduleEvent.startMinute || 0);
-            eventDate.setSeconds(0);
-            
-            const endDate = new Date(eventDate);
-            endDate.setMinutes(endDate.getMinutes() + (scheduleEvent.duration || 120));
-            
-            // Use existing description and only add attribution if none exists
-            let finalDescription = scheduleEvent.description || scheduleEvent.originalDescription || '';
-            
-            // Only add attribution if it doesn't already exist
-            if (!finalDescription.includes('Scheduled via')) {
-                if (finalDescription.trim()) {
-                    finalDescription += '\n\n';
-                }
-                finalDescription += 'Scheduled via TSL Schedule Maker 2000';
-            }
-
+            // Format for Google Calendar API
             const eventData = {
                 summary: scheduleEvent.title,
                 description: finalDescription,
-                location: scheduleEvent.location || `Theater ${(scheduleEvent.theater || 0) + 1}`,
+                location: scheduleEvent.location || (scheduleEvent.theater === 0 ? 'Theater 1' : 'Theater 2'),
                 start: {
-                    dateTime: eventDate.toISOString(),
+                    dateTime: startDateTime.toISOString(),
                     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
                 },
                 end: {
-                    dateTime: endDate.toISOString(),
+                    dateTime: endDateTime.toISOString(),
                     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
                 },
+                // Add metadata to help identify our events
                 extendedProperties: {
                     private: {
                         'tsl-scheduler': 'true',
-                        'tsl-theater': (scheduleEvent.theater || 0).toString(),
+                        'tsl-theater': scheduleEvent.theater.toString(),
                         'tsl-original-calendar': scheduleEvent.originalCalendar || scheduleEvent.calendar,
                         'tsl-created': new Date().toISOString()
                     }
                 }
             };
-
-            // Handle calendar switching - delete from old calendar if moved
-            if (scheduleEvent.googleEventId && scheduleEvent.originalCalendar && 
-                scheduleEvent.originalCalendar !== scheduleEvent.calendar) {
+            
+            // Smart calendar switching - delete from old calendar if moved
+            if (scheduleEvent.googleEventId && scheduleEvent.originalCalendar && scheduleEvent.originalCalendar !== scheduleEvent.calendar) {
+                console.log(`Event moved from ${scheduleEvent.originalCalendar} to ${scheduleEvent.calendar}, will delete old and create new`);
                 
-                console.log(`Event moved from ${scheduleEvent.originalCalendar} to ${scheduleEvent.calendar}, deleting old event`);
-                
+                // Delete from original calendar
                 const originalCalendarId = CALENDAR_IDS[scheduleEvent.originalCalendar];
                 if (originalCalendarId) {
                     try {
                         await deleteGoogleCalendarEvent(originalCalendarId, scheduleEvent.googleEventId);
                         console.log(`✓ Deleted old event from ${scheduleEvent.originalCalendar} calendar`);
                     } catch (error) {
-                        console.warn(`Could not delete old event: ${error.message}`);
+                        console.log(`Could not delete old event (may already be gone): ${error.message}`);
                     }
                 }
                 
-                // Clear the old event ID since we're creating a new one
+                // Clear the old ID since we're creating in a new calendar
                 scheduleEvent.googleEventId = null;
             }
-
-            // Create or update event
-            let response;
+            
+            // Try to update existing event in same calendar
             if (scheduleEvent.googleEventId) {
-                // Update existing event
-                const updateUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${scheduleEvent.googleEventId}`;
-                response = await fetch(updateUrl, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(eventData)
-                });
-            } else {
-                // Create new event
-                const createUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
-                response = await fetch(createUrl, {
+                try {
+                    const response = await fetch(
+                        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${scheduleEvent.googleEventId}`,
+                        {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(eventData)
+                        }
+                    );
+                    
+                    if (response.ok) {
+                        console.log(`✓ Updated existing event: ${scheduleEvent.title}`);
+                        return await response.json();
+                    } else if (response.status === 404) {
+                        console.log(`Event not found in current calendar, creating new: ${scheduleEvent.title}`);
+                        scheduleEvent.googleEventId = null; // Clear invalid ID
+                    } else {
+                        throw new Error(`Update failed: ${response.status} ${response.statusText}`);
+                    }
+                } catch (error) {
+                    console.log(`Update failed, will create new event: ${error.message}`);
+                    scheduleEvent.googleEventId = null; // Clear invalid ID
+                }
+            }
+            
+            // Create new event
+            const response = await fetch(
+                `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+                {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(eventData)
-                });
-            }
-
+                }
+            );
+            
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(`Calendar API error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
+                const errorData = await response.json().catch(() => null);
+                throw new Error(`API Error ${response.status}: ${errorData?.error?.message || response.statusText}`);
             }
-
-            const result = await response.json();
-            scheduleEvent.googleEventId = result.id;
+            
+            const createdEvent = await response.json();
+            
+            // Update our local event with the new Google Calendar ID
+            scheduleEvent.googleEventId = createdEvent.id;
+            // Update originalCalendar to current calendar to track future moves
             scheduleEvent.originalCalendar = scheduleEvent.calendar;
-
-            return result;
+            
+            console.log(`✓ Created new event: ${scheduleEvent.title}`);
+            return createdEvent;
         }
 
-        // Delete Google Calendar Event
         async function deleteGoogleCalendarEvent(calendarId, eventId) {
-            if (!accessToken) {
-                throw new Error('Not authenticated');
+            const response = await fetch(
+                `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
+                {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                    }
+                }
+            );
+            
+            if (!response.ok && response.status !== 404) {
+                throw new Error(`Delete failed: ${response.status} ${response.statusText}`);
             }
+        }
 
-            const deleteUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`;
-            const response = await fetch(deleteUrl, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`
+        // Save/Load Functionality
+        function saveSchedule() {
+            try {
+                const scheduleData = {
+                    version: '1.0',
+                    savedAt: new Date().toISOString(),
+                    currentWeekStart: currentWeekStart.toISOString(),
+                    libraryEvents: libraryEvents,
+                    scheduledEvents: scheduledEvents
+                };
+                
+                localStorage.setItem('tsl_schedule', JSON.stringify(scheduleData));
+                
+                const dataStr = JSON.stringify(scheduleData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+                
+                const exportLink = document.createElement('a');
+                exportLink.setAttribute('href', dataUri);
+                exportLink.setAttribute('download', `tsl_schedule_${new Date().toISOString().split('T')[0]}.json`);
+                exportLink.style.display = 'none';
+                document.body.appendChild(exportLink);
+                exportLink.click();
+                document.body.removeChild(exportLink);
+                
+                showToast('Schedule saved and downloaded successfully!');
+            } catch (error) {
+                console.error('Error saving schedule:', error);
+                showToast('Failed to save schedule');
+            }
+        }
+
+        function loadSchedule() {
+            try {
+                const savedData = localStorage.getItem('tsl_schedule');
+                if (!savedData) {
+                    showToast('No saved schedule found in browser storage');
+                    return;
+                }
+                
+                const scheduleData = JSON.parse(savedData);
+                
+                if (!confirm(`Load schedule from ${new Date(scheduleData.savedAt).toLocaleString()}?`)) {
+                    return;
+                }
+                
+                libraryEvents = scheduleData.libraryEvents || [];
+                scheduledEvents = scheduleData.scheduledEvents || [];
+                
+                scheduledEvents.forEach(event => {
+                    if (event.actualDate) {
+                        event.actualDate = new Date(event.actualDate);
+                    }
+                });
+                
+                document.querySelectorAll('.event-block').forEach(block => {
+                    if (block.parentNode) {
+                        block.parentNode.removeChild(block);
+                    }
+                });
+                
+                renderLibrary();
+                renderEventsForCurrentWeek();
+                updateWeekStats();
+                updateDebugCounts();
+                
+                showToast('Schedule loaded successfully!');
+            } catch (error) {
+                console.error('Error loading schedule:', error);
+                showToast('Failed to load schedule');
+            }
+        }
+
+        // Google API Initialization
+        function initGoogleAPI() {
+            gapi.load('client', async () => {
+                try {
+                    await gapi.client.init({
+                        apiKey: API_KEY,
+                        discoveryDocs: DISCOVERY_DOCS
+                    });
+                    console.log('Google API client initialized');
+                } catch (error) {
+                    console.error('Error initializing Google API client:', error);
+                    showToast('Failed to initialize Google Calendar API');
                 }
             });
 
-            if (!response.ok && response.status !== 404) {
-                throw new Error(`Failed to delete event: ${response.status} ${response.statusText}`);
-            }
-
-            return true;
+            google.accounts.id.initialize({
+                client_id: CLIENT_ID,
+                callback: handleCredentialResponse,
+                auto_select: false,
+                cancel_on_tap_outside: false
+            });
         }
 
-        // Enhanced Push to Google Calendar
-        async function pushToGoogle() {
-            if (!accessToken) {
-                showToast('Please connect to Google Calendar first', 'error');
-                return;
-            }
+        function handleCredentialResponse(response) {
+            console.log('Credential response received');
+        }
 
-            const pushButton = document.getElementById('pushButton');
-            const originalText = pushButton.textContent;
-            pushButton.textContent = 'Pushing...';
-            pushButton.disabled = true;
-
-            try {
-                updateSyncStatus('syncing', 'Pushing to Calendar...');
-
-                const currentWeekEvents = scheduledEvents.filter(event => {
-                    if (event.actualDate) {
-                        const dayOfWeek = calculateDayOfWeek(event.actualDate);
-                        return dayOfWeek >= 0 && dayOfWeek <= 6;
+        function initOAuth() {
+            const tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (response) => {
+                    if (response.access_token) {
+                        accessToken = response.access_token;
+                        updateSigninStatus(true);
+                        importFromGoogle();
                     }
-                    return false;
+                },
+            });
+            
+            window.tokenClient = tokenClient;
+        }
+
+        function updateSigninStatus(isSignedIn) {
+            const authButton = document.getElementById('authButton');
+            const syncStatus = document.getElementById('syncStatus');
+            
+            if (isSignedIn) {
+                authButton.textContent = 'Sign Out';
+                authButton.classList.add('sign-out');
+                syncStatus.classList.add('connected');
+                syncStatus.innerHTML = '<span>✓</span><span>Connected to Google Calendar</span>';
+            } else {
+                authButton.textContent = 'Connect Google Calendar';
+                authButton.classList.remove('sign-out');
+                syncStatus.classList.remove('connected');
+                syncStatus.innerHTML = '<span>○</span><span>Not connected</span>';
+                accessToken = null;
+                libraryEvents = [];
+                scheduledEvents = [];
+                renderLibrary();
+                updateDebugCounts();
+            }
+        }
+
+        function handleAuthClick() {
+            if (accessToken) {
+                google.accounts.oauth2.revoke(accessToken, () => {
+                    console.log('Access token revoked');
                 });
-
-                console.log(`Pushing ${currentWeekEvents.length} events to Google Calendar...`);
-
-                let successCount = 0;
-                let errorCount = 0;
-
-                for (const event of currentWeekEvents) {
-                    try {
-                        await createGoogleCalendarEvent(event);
-                        successCount++;
-                        
-                        // Rate limiting - wait 100ms between requests
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                        
-                    } catch (error) {
-                        console.error(`Failed to push event "${event.title}":`, error);
-                        errorCount++;
-                    }
-                }
-
-                if (errorCount === 0) {
-                    showToast(`Successfully pushed ${successCount} events to Google Calendar!`, 'success');
+                updateSigninStatus(false);
+                showToast('Disconnected from Google Calendar');
+            } else {
+                if (window.tokenClient) {
+                    window.tokenClient.requestAccessToken();
                 } else {
-                    showToast(`Pushed ${successCount} events, ${errorCount} failed. Check console for details.`, 'error');
+                    showToast('Authentication not ready. Please refresh the page.');
                 }
-
-                updateSyncStatus('connected', 'Connected');
-
-            } catch (error) {
-                console.error('Push to Google Calendar failed:', error);
-                showToast('Failed to push events to Google Calendar', 'error');
-                updateSyncStatus('connected', 'Connected');
-            } finally {
-                pushButton.textContent = originalText;
-                pushButton.disabled = false;
             }
         }
 
-        // Import from Google Calendar
+        // Event Conversion and Import
+        function convertToScheduledEvent(eventData) {
+            if (!eventData.startTime || !eventData.startTime.dateTime) {
+                return null;
+            }
+            
+            const startDate = new Date(eventData.startTime.dateTime);
+            const eventDate = new Date(startDate);
+            eventDate.setHours(0, 0, 0, 0);
+            
+            let theater = 0;
+            if (eventData.calendar === 'theater-2') {
+                theater = 1;
+            }
+            
+            return {
+                ...eventData,
+                actualDate: eventDate,
+                theater: theater,
+                startHour: startDate.getHours(),
+                startMinute: startDate.getMinutes(),
+                id: `existing-${eventData.googleEventId || Date.now()}`
+            };
+        }
+
+        // Database Rebuild from Google Calendar
         async function importFromGoogle() {
             if (!accessToken) {
-                showToast('Please connect to Google Calendar first', 'error');
+                showToast('Please connect to Google Calendar first');
                 return;
             }
 
-            const importButton = document.getElementById('importButton');
-            const originalText = importButton.textContent;
-            importButton.textContent = 'Importing...';
-            importButton.disabled = true;
+            if (isImporting) {
+                showToast('Import already in progress...');
+                return;
+            }
 
+            isImporting = true;
+            console.log('=== STARTING CLEAN DATABASE REBUILD ===');
+
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.classList.add('syncing');
+            syncStatus.innerHTML = '<span>↻</span><span>Rebuilding database...</span>';
+            
             try {
-                updateSyncStatus('syncing', 'Importing from Calendar...');
+                // Clear existing data
+                libraryEvents.length = 0;
+                scheduledEvents.length = 0;
+                
+                // Clear UI
+                document.querySelectorAll('.event-block').forEach(block => {
+                    if (block.parentNode) {
+                        block.parentNode.removeChild(block);
+                    }
+                });
+                
+                // Import range: 2 weeks before to 12 weeks after current week
+                const startOfRange = new Date(currentWeekStart);
+                startOfRange.setDate(startOfRange.getDate() - 14);
+                const endOfRange = new Date(currentWeekStart);
+                endOfRange.setDate(endOfRange.getDate() + 84);
+                
+                document.getElementById('debugImportRange').textContent = 
+                    `${startOfRange.toLocaleDateString()} - ${endOfRange.toLocaleDateString()}`;
 
-                const weekStart = new Date(currentWeekStart);
-                weekStart.setDate(weekStart.getDate() - 14); // 2 weeks before
-                const weekEnd = new Date(currentWeekStart);
-                weekEnd.setDate(weekEnd.getDate() + 84); // 12 weeks after
+                let totalLibraryEvents = 0;
+                let totalScheduledEvents = 0;
+                const processedEventIds = new Set();
 
-                const timeMin = weekStart.toISOString();
-                const timeMax = weekEnd.toISOString();
-
-                libraryEvents = [];
-                const eventsByTitle = new Map();
-
-                for (const [calendarType, calendarId] of Object.entries(CALENDAR_IDS)) {
+                // Fetch from all TSL calendars
+                for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
                     try {
+                        console.log(`Fetching events from ${calendarKey} calendar...`);
+                        
                         const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
-                            `timeMin=${encodeURIComponent(timeMin)}&` +
-                            `timeMax=${encodeURIComponent(timeMax)}&` +
+                            `timeMin=${startOfRange.toISOString()}&` +
+                            `timeMax=${endOfRange.toISOString()}&` +
+                            `showDeleted=false&` +
                             `singleEvents=true&` +
                             `orderBy=startTime&` +
-                            `maxResults=2500`;
+                            `key=${API_KEY}`;
 
                         const response = await fetch(url, {
-                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`
+                            }
                         });
 
                         if (!response.ok) {
-                            console.error(`Failed to fetch from ${calendarType}:`, response.status);
+                            console.error(`Failed to fetch ${calendarKey}:`, response.status);
                             continue;
                         }
 
                         const data = await response.json();
+                        const events = data.items || [];
                         
-                        for (const googleEvent of data.items || []) {
-                            if (!googleEvent.start?.dateTime) continue;
-
-                            const startTime = new Date(googleEvent.start.dateTime);
-                            const endTime = new Date(googleEvent.end?.dateTime || googleEvent.start.dateTime);
-                            const duration = Math.round((endTime - startTime) / (1000 * 60));
-
-                            const event = {
-                                id: `existing-${googleEvent.id}`,
-                                title: googleEvent.summary || 'Untitled Event',
-                                description: googleEvent.description || '',
-                                originalDescription: googleEvent.description || '',
-                                calendar: calendarType,
-                                duration: duration,
-                                startTime: startTime,
-                                location: googleEvent.location || '',
-                                googleEventId: googleEvent.id,
-                                originalCalendar: calendarType
-                            };
-
-                            // Deduplicate by title
-                            const existingEvent = eventsByTitle.get(event.title.toLowerCase());
-                            if (!existingEvent || event.calendar === 'events') {
-                                eventsByTitle.set(event.title.toLowerCase(), event);
+                        console.log(`Found ${events.length} events in ${calendarKey} calendar`);
+                        
+                        events.forEach(event => {
+                            if (!event.id || processedEventIds.has(event.id)) {
+                                return;
                             }
-                        }
+                            processedEventIds.add(event.id);
+                            
+                            let duration = 120;
+                            if (event.start && event.end) {
+                                const start = new Date(event.start.dateTime || event.start.date);
+                                const end = new Date(event.end.dateTime || event.end.date);
+                                duration = Math.round((end - start) / 60000);
+                            }
 
-                        // Rate limiting
-                        await new Promise(resolve => setTimeout(resolve, 200));
-
+                            const eventData = {
+                                id: event.id,
+                                title: event.summary || 'Untitled Event',
+                                duration: duration,
+                                calendar: calendarKey,
+                                description: event.description || '',
+                                location: event.location || '',
+                                googleEventId: event.id,
+                                startTime: event.start,
+                                endTime: event.end,
+                                isAllDay: !event.start.dateTime
+                            };
+                            
+                            if (event.start && event.start.dateTime) {
+                                const scheduledEvent = convertToScheduledEvent(eventData);
+                                if (scheduledEvent) {
+                                    scheduledEvents.push(scheduledEvent);
+                                    totalScheduledEvents++;
+                                }
+                            } else {
+                                libraryEvents.push(eventData);
+                                totalLibraryEvents++;
+                            }
+                        });
+                        
                     } catch (error) {
-                        console.error(`Error fetching ${calendarType} calendar:`, error);
+                        console.error(`Failed to process ${calendarKey} calendar:`, error);
                     }
                 }
-
-                libraryEvents = Array.from(eventsByTitle.values())
-                    .sort((a, b) => a.title.localeCompare(b.title));
-
+                
+                console.log(`=== DATABASE REBUILD COMPLETE ===`);
+                console.log(`Final counts: libraryEvents=${libraryEvents.length}, scheduledEvents=${scheduledEvents.length}`);
+                
                 renderLibrary();
-                showToast(`Imported ${libraryEvents.length} unique events`, 'success');
-                updateSyncStatus('connected', 'Connected');
-
+                renderEventsForCurrentWeek();
+                updateWeekStats();
+                updateDebugCounts();
+                
+                syncStatus.classList.remove('syncing');
+                syncStatus.classList.add('connected');
+                syncStatus.innerHTML = '<span>✓</span><span>Database rebuilt successfully</span>';
+                
+                const totalEvents = totalLibraryEvents + totalScheduledEvents;
+                showToast(`Imported ${totalEvents} events (${totalLibraryEvents} library + ${totalScheduledEvents} scheduled)`);
+                
             } catch (error) {
                 console.error('Import failed:', error);
-                showToast('Failed to import from Google Calendar', 'error');
-                updateSyncStatus('connected', 'Connected');
+                syncStatus.classList.remove('syncing');
+                syncStatus.innerHTML = '<span>✗</span><span>Import failed</span>';
+                showToast('Import failed - check console for details');
             } finally {
-                importButton.textContent = originalText;
-                importButton.disabled = false;
+                isImporting = false;
             }
         }
 
-        // Update sync status
-        function updateSyncStatus(status, text) {
-            const syncStatus = document.getElementById('syncStatus');
-            syncStatus.className = `sync-status ${status}`;
-            syncStatus.querySelector('span').textContent = text;
-        }
-
-        // Save/Load Functions
-        function saveSchedule() {
-            const scheduleData = {
-                libraryEvents: libraryEvents,
-                scheduledEvents: scheduledEvents,
-                currentWeekStart: currentWeekStart,
-                savedAt: new Date().toISOString()
-            };
-
-            // Save to localStorage
-            localStorage.setItem('tsl-schedule-data', JSON.stringify(scheduleData));
-
-            // Also download as JSON file
-            const blob = new Blob([JSON.stringify(scheduleData, null, 2)], {
-                type: 'application/json'
-            });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `tsl-schedule-${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-
-            showToast('Schedule saved successfully!', 'success');
-        }
-
-        function loadSchedule() {
-            const savedData = localStorage.getItem('tsl-schedule-data');
-            if (!savedData) {
-                showToast('No saved schedule found', 'error');
-                return;
-            }
-
-            try {
-                const scheduleData = JSON.parse(savedData);
-                
-                if (confirm('Load saved schedule? This will replace current data.')) {
-                    libraryEvents = scheduleData.libraryEvents || [];
-                    scheduledEvents = scheduleData.scheduledEvents || [];
-                    
-                    if (scheduleData.currentWeekStart) {
-                        currentWeekStart = new Date(scheduleData.currentWeekStart);
-                        updateWeekDisplay();
-                    }
-
-                    renderLibrary();
-                    renderScheduleGrid();
-                    showToast('Schedule loaded successfully!', 'success');
-                }
-            } catch (error) {
-                console.error('Load failed:', error);
-                showToast('Failed to load schedule', 'error');
-            }
-        }
-
-        // Render Functions
+        // Library Rendering with Deduplication
         function renderLibrary() {
-            const libraryContent = document.getElementById('libraryContent');
-            const calendarFilter = document.getElementById('calendarFilter');
-            const filterValue = calendarFilter.value;
-
-            const filteredEvents = filterValue 
-                ? libraryEvents.filter(event => event.calendar === filterValue)
-                : libraryEvents;
-
-            if (filteredEvents.length === 0) {
-                libraryContent.innerHTML = '<div style="padding: 20px; text-align: center; color: #8e8e93;">No events found</div>';
-                return;
-            }
-
-            libraryContent.innerHTML = filteredEvents.map(event => `
-                <div class="library-item" draggable="true" data-event-id="${event.id}">
-                    <div class="event-title">${event.title}</div>
-                    <div class="event-meta">
-                        ${event.duration ? `${Math.floor(event.duration / 60)}h ${event.duration % 60}m` : 'No duration'}
-                        <span class="event-calendar calendar-${event.calendar}">${event.calendar.toUpperCase()}</span>
-                    </div>
-                </div>
-            `).join('');
-
-            // Add drag event listeners
-            libraryContent.querySelectorAll('.library-item').forEach(item => {
-                item.addEventListener('dragstart', handleDragStart);
-            });
-        }
-
-        function renderScheduleGrid() {
-            const scheduleGrid = document.getElementById('scheduleGrid');
-            const days = ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday'];
-            const timeSlots = [];
+            const container = document.getElementById('libraryItems');
+            const filter = document.getElementById('calendarFilter').value;
+            container.innerHTML = '';
             
-            // Generate time slots from 2 PM to 12 AM + 12 AM slot
-            for (let hour = 14; hour <= 23; hour++) {
-                timeSlots.push(hour);
-            }
-            timeSlots.push(0); // Add midnight
-
-            let gridHTML = '<div class="time-label"></div>';
-            
-            // Day headers
-            days.forEach((day, dayIndex) => {
-                const date = new Date(currentWeekStart);
-                date.setDate(currentWeekStart.getDate() + dayIndex);
-                gridHTML += `
-                    <div class="day-header">
-                        <div class="day-date">${date.getDate()}</div>
-                        <div class="day-name">${day}</div>
+            if (!accessToken) {
+                container.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: #86868b;">
+                        <p style="margin-bottom: 10px;">📅</p>
+                        <p style="font-size: 14px;">Connect to Google Calendar to import events</p>
                     </div>
                 `;
+                document.getElementById('libraryCount').textContent = '(0)';
+                return;
+            }
+            
+            const allLibraryEvents = [];
+            
+            // Add events from other weeks that can be scheduled
+            scheduledEvents.forEach(event => {
+                if (event.actualDate) {
+                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
+                    if (dayOfWeek < 0 || dayOfWeek > 6) {
+                        let normalizedCalendar = event.calendar;
+                        if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
+                            normalizedCalendar = 'theater';
+                        }
+                        
+                        allLibraryEvents.push({
+                            id: event.googleEventId || event.id,
+                            title: event.title,
+                            duration: event.duration,
+                            calendar: normalizedCalendar,
+                            originalCalendar: event.calendar,
+                            description: event.description || '',
+                            location: event.location || '',
+                            googleEventId: event.googleEventId,
+                            startTime: event.startTime,
+                            endTime: event.endTime
+                        });
+                    }
+                }
             });
-
-            // Time slots and theater sections
-            timeSlots.forEach(hour => {
-                const timeLabel = hour === 0 ? '12 AM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
-                gridHTML += `<div class="time-label">${timeLabel}</div>`;
+            
+            libraryEvents.forEach(event => {
+                let normalizedCalendar = event.calendar;
+                if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
+                    normalizedCalendar = 'theater';
+                }
                 
-                days.forEach((day, dayIndex) => {
-                    gridHTML += `
-                        <div class="time-slot" data-day="${dayIndex}" data-hour="${hour}">
-                            <div class="theater-section" data-theater="0">
-                                <div class="theater-label">T1</div>
-                                ${renderEventsForSlot(dayIndex, hour, 0)}
-                            </div>
-                            <div class="theater-section" data-theater="1">
-                                <div class="theater-label">T2</div>
-                                ${renderEventsForSlot(dayIndex, hour, 1)}
-                            </div>
-                        </div>
-                    `;
+                allLibraryEvents.push({
+                    ...event,
+                    calendar: normalizedCalendar,
+                    originalCalendar: event.calendar
                 });
             });
-
-            scheduleGrid.innerHTML = gridHTML;
-
-            // Add drop event listeners
-            scheduleGrid.querySelectorAll('.theater-section').forEach(section => {
-                section.addEventListener('dragover', handleDragOver);
-                section.addEventListener('drop', handleDrop);
-                section.addEventListener('dragenter', handleDragEnter);
-                section.addEventListener('dragleave', handleDragLeave);
+            
+            // Deduplicate by title
+            const uniqueByTitle = new Map();
+            allLibraryEvents.forEach(event => {
+                const key = event.title.toLowerCase().trim();
+                if (!uniqueByTitle.has(key)) {
+                    uniqueByTitle.set(key, event);
+                }
             });
+            
+            const uniqueLibraryEvents = Array.from(uniqueByTitle.values());
+            
+            let filteredEvents;
+            if (filter === 'all') {
+                filteredEvents = uniqueLibraryEvents;
+            } else if (filter === 'theater-1' || filter === 'theater-2') {
+                filteredEvents = uniqueLibraryEvents.filter(e => e.calendar === 'theater');
+            } else {
+                filteredEvents = uniqueLibraryEvents.filter(e => e.calendar === filter);
+            }
+            
+            if (filteredEvents.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: #86868b; font-size: 14px;">
+                        No events found. Click "Import from Google Calendar".
+                    </div>
+                `;
+            } else {
+                filteredEvents.forEach(event => {
+                    const item = document.createElement('div');
+                    const styleCalendar = event.calendar === 'theater' ? 'theater-1' : event.calendar;
+                    item.className = `library-item calendar-${styleCalendar}`;
+                    item.draggable = true;
+                    item.dataset.eventId = event.id || event.googleEventId;
+                    
+                    const hours = Math.floor(event.duration / 60);
+                    const minutes = event.duration % 60;
+                    const runtime = hours > 0 ? 
+                        (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`) : 
+                        `${minutes}m`;
+                    
+                    item.innerHTML = `
+                        <div class="library-item-title">${event.title}</div>
+                        <div class="library-item-duration">${runtime}</div>
+                    `;
+                    
+                    item.addEventListener('dragstart', function(e) {
+                        handleDragStart.call(this, e);
+                    });
+                    
+                    item.addEventListener('dragend', function(e) {
+                        handleDragEnd.call(this, e);
+                    });
+                    
+                    container.appendChild(item);
+                });
+            }
+            
+            document.getElementById('libraryCount').textContent = `(${filteredEvents.length})`;
+        }
 
-            // Add click event listeners to scheduled events
-            scheduleGrid.querySelectorAll('.scheduled-event').forEach(event => {
-                event.addEventListener('click', handleEventClick);
+        // Event Rendering for Current Week
+        function renderEventsForCurrentWeek() {
+            document.querySelectorAll('.event-block').forEach(block => {
+                if (block.parentNode) {
+                    block.parentNode.removeChild(block);
+                }
+            });
+            
+            scheduledEvents.forEach(event => {
+                if (event.actualDate) {
+                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
+                    if (dayOfWeek >= 0 && dayOfWeek <= 6) {
+                        const renderEvent = { ...event, day: dayOfWeek };
+                        renderScheduledEvent(renderEvent);
+                    }
+                }
             });
         }
 
-        function renderEventsForSlot(day, hour, theater) {
-            const eventsInSlot = scheduledEvents.filter(event => 
-                event.day === day && 
-                event.startHour === hour && 
-                event.theater === theater
-            );
+        function renderScheduledEvent(event) {
+            const dayColumn = document.getElementById(`day-${event.day}`);
+            if (!dayColumn) return;
+            
+            const lanes = dayColumn.querySelectorAll('.theater-lane');
+            const lane = lanes[event.theater];
+            if (!lane) return;
+            
+            const eventBlock = document.createElement('div');
+            eventBlock.className = `event-block calendar-${event.calendar}`;
+            eventBlock.draggable = true;
+            eventBlock.dataset.eventId = event.id;
+            
+            const theaterHour = convertToTheaterHour(event.startHour);
+            const top = theaterHour * 60 + (event.startMinute / 15) * 15;
+            const height = (event.duration / 60) * 60;
+            
+            eventBlock.style.top = `${top}px`;
+            eventBlock.style.height = `${height}px`;
+            
+            const endMinutes = event.startMinute + event.duration;
+            const actualEndHour = event.startHour + Math.floor(endMinutes / 60);
+            const endMinute = endMinutes % 60;
+            
+            const hours = Math.floor(event.duration / 60);
+            const minutes = event.duration % 60;
+            const runtime = hours > 0 ? 
+                (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`) : 
+                `${minutes}m`;
+            
+            const tbdText = event.calendar === 'tbd' ? '↺' : 'TBD';
+            const tbdTitle = event.calendar === 'tbd' ? 'Restore original calendar' : 'Convert to TBD';
+            
+            eventBlock.innerHTML = `
+                <div class="event-controls">
+                    <button class="event-control-btn tbd-btn" title="${tbdTitle}">${tbdText}</button>
+                    <button class="event-control-btn edit-btn" title="Edit">✎</button>
+                    <button class="event-control-btn delete-btn" title="Delete">×</button>
+                </div>
+                <div class="event-title">${event.title}</div>
+                <div class="event-time">${formatTimeRange(event.startHour, event.startMinute, actualEndHour, endMinute)}</div>
+                <div class="event-runtime">${runtime}</div>
+            `;
+            
+            eventBlock.addEventListener('dragstart', function(e) {
+                handleDragStart.call(this, e);
+            });
+            
+            eventBlock.addEventListener('dragend', function(e) {
+                handleDragEnd.call(this, e);
+            });
+            
+            lane.appendChild(eventBlock);
+        }
 
-            return eventsInSlot.map(event => {
-                const timeStr = `${event.startHour === 0 ? 12 : event.startHour > 12 ? event.startHour - 12 : event.startHour}:${event.startMinute.toString().padStart(2, '0')} ${event.startHour >= 12 && event.startHour !== 0 ? 'PM' : 'AM'}`;
-                return `
-                    <div class="scheduled-event ${event.calendar}" data-event-id="${event.id}">
-                        <div class="event-time">${timeStr}</div>
-                        <div class="event-name">${event.title}</div>
-                    </div>
-                `;
-            }).join('');
+        // Event Management Functions
+        function convertToTBD(eventId) {
+            const event = scheduledEvents.find(e => e.id == eventId);
+            
+            if (!event) {
+                showToast('Event not found');
+                return;
+            }
+            
+            if (event.calendar === 'tbd') {
+                const originalCalendar = event.originalCalendar || 'events';
+                event.calendar = originalCalendar;
+                delete event.originalCalendar;
+                showToast(`Restored "${event.title}" to ${originalCalendar}`);
+            } else {
+                event.originalCalendar = event.calendar;
+                event.calendar = 'tbd';
+                showToast(`Changed "${event.title}" to TBD`);
+            }
+            
+            renderEventsForCurrentWeek();
+        }
+
+        function editEvent(eventId) {
+            const event = scheduledEvents.find(e => e.id == eventId) || 
+                         libraryEvents.find(e => e.id == eventId);
+            
+            if (!event) {
+                showToast('Event not found');
+                return;
+            }
+            
+            currentEditingEvent = event;
+            
+            document.getElementById('editTitle').value = event.title;
+            
+            const totalMinutes = event.duration;
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            
+            document.getElementById('editHours').value = hours;
+            document.getElementById('editMinutes').value = minutes;
+            document.getElementById('editCalendar').value = event.calendar;
+            
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+            currentEditingEvent = null;
+        }
+
+        function saveEventChanges() {
+            if (!currentEditingEvent) return;
+            
+            const newTitle = document.getElementById('editTitle').value.trim();
+            const hours = parseInt(document.getElementById('editHours').value) || 0;
+            const minutes = parseInt(document.getElementById('editMinutes').value) || 0;
+            const newCalendar = document.getElementById('editCalendar').value;
+            
+            const newDuration = (hours * 60) + minutes;
+            
+            if (!newTitle) {
+                showToast('Title is required');
+                return;
+            }
+            
+            if (newDuration <= 0) {
+                showToast('Duration must be greater than 0');
+                return;
+            }
+            
+            const scheduledIndex = scheduledEvents.findIndex(e => e.id == currentEditingEvent.id);
+            if (scheduledIndex !== -1) {
+                scheduledEvents[scheduledIndex].title = newTitle;
+                scheduledEvents[scheduledIndex].duration = newDuration;
+                scheduledEvents[scheduledIndex].calendar = newCalendar;
+            }
+            
+            const libraryIndex = libraryEvents.findIndex(e => e.id == currentEditingEvent.id || e.googleEventId == currentEditingEvent.googleEventId);
+            if (libraryIndex !== -1) {
+                libraryEvents[libraryIndex].title = newTitle;
+                libraryEvents[libraryIndex].duration = newDuration;
+                libraryEvents[libraryIndex].calendar = newCalendar;
+            }
+            
+            if (scheduledIndex !== -1) {
+                renderEventsForCurrentWeek();
+            }
+            
+            renderLibrary();
+            closeEditModal();
+            showToast('Event updated');
+        }
+
+        function deleteEvent(eventId) {
+            if (!confirm('Delete this event?')) return;
+            
+            const eventToDelete = scheduledEvents.find(e => e.id == eventId);
+            
+            if (!eventToDelete) {
+                return;
+            }
+            
+            scheduledEvents = scheduledEvents.filter(e => e.id != eventId);
+            
+            const eventBlock = document.querySelector(`[data-event-id="${eventId}"]`);
+            if (eventBlock) {
+                eventBlock.remove();
+            }
+            
+            renderLibrary();
+            updateWeekStats();
+            updateDebugCounts();
+            showToast('Event deleted');
+        }
+
+        // UI Update Functions
+        function updateWeekDisplay() {
+            const endDate = new Date(currentWeekStart);
+            endDate.setDate(endDate.getDate() + 6);
+            
+            const options = { month: 'short', day: 'numeric', year: 'numeric' };
+            const startStr = currentWeekStart.toLocaleDateString('en-US', options);
+            const endStr = endDate.toLocaleDateString('en-US', options);
+            
+            document.getElementById('weekDisplay').textContent = `${startStr} - ${endStr}`;
+        }
+
+        function updateWeekStats() {
+            const currentWeekEvents = scheduledEvents.filter(event => {
+                if (event.actualDate) {
+                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
+                    return dayOfWeek >= 0 && dayOfWeek <= 6;
+                }
+                return false;
+            });
+            
+            const total = currentWeekEvents.length;
+            document.getElementById('weekTotal').textContent = `${total} event${total !== 1 ? 's' : ''}`;
+        }
+
+        function updateDebugCounts() {
+            document.getElementById('debugLibraryCount').textContent = libraryEvents.length;
+            document.getElementById('debugScheduledCount').textContent = scheduledEvents.length;
+        }
+
+        function changeWeek(direction) {
+            currentWeekStart.setDate(currentWeekStart.getDate() + (direction * 7));
+            document.getElementById('daysContainer').innerHTML = '';
+            generateDaysColumns();
+            updateWeekDisplay();
+            renderEventsForCurrentWeek();
+            updateWeekStats();
+            renderLibrary();
+        }
+
+        function toggleCollapse() {
+            const days = [0, 1, 2];
+            days.forEach(day => {
+                const dayColumn = document.getElementById(`day-${day}`);
+                if (dayColumn) {
+                    dayColumn.classList.toggle('collapsed');
+                }
+            });
+            
+            collapsedDays = !collapsedDays;
+            const button = document.getElementById('collapseToggle');
+            button.textContent = collapsedDays ? 'Show Tues-Thurs' : 'Hide Tues-Thurs';
+        }
+
+        // Grid Generation
+        function generateDaysColumns() {
+            const daysContainer = document.getElementById('daysContainer');
+            const days = ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday'];
+            
+            days.forEach((day, index) => {
+                const dayColumn = document.createElement('div');
+                dayColumn.className = 'day-column';
+                dayColumn.id = `day-${index}`;
+                
+                if (index <= 2 && collapsedDays) {
+                    dayColumn.classList.add('collapsed');
+                }
+                
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'day-header';
+                const date = new Date(currentWeekStart);
+                date.setDate(date.getDate() + index);
+                dayHeader.textContent = `${day.substr(0, 3)} ${date.getMonth() + 1}/${date.getDate()}`;
+                dayColumn.appendChild(dayHeader);
+                
+                const dayContent = document.createElement('div');
+                dayContent.className = 'day-content';
+                
+                const dayTimeColumn = document.createElement('div');
+                dayTimeColumn.className = 'day-time-column';
+                
+                for (let hour = 14; hour <= 24; hour++) {
+                    const displayHour = hour % 24;
+                    const timeSlot = document.createElement('div');
+                    timeSlot.className = 'day-time-slot';
+                    const h = displayHour === 0 ? 12 : displayHour > 12 ? displayHour - 12 : displayHour;
+                    const period = displayHour < 12 ? 'AM' : 'PM';
+                    timeSlot.textContent = `${h}${period}`;
+                    dayTimeColumn.appendChild(timeSlot);
+                }
+                
+                dayContent.appendChild(dayTimeColumn);
+                
+                const theaterLanes = document.createElement('div');
+                theaterLanes.className = 'theater-lanes';
+                
+                ['Theater 1', 'Theater 2'].forEach((theater, theaterIndex) => {
+                    const lane = document.createElement('div');
+                    lane.className = 'theater-lane';
+                    lane.dataset.day = index;
+                    lane.dataset.theater = theaterIndex;
+                    
+                    const laneHeader = document.createElement('div');
+                    laneHeader.className = 'theater-lane-header';
+                    laneHeader.textContent = theater;
+                    lane.appendChild(laneHeader);
+                    
+                    lane.addEventListener('dragover', function(e) {
+                        handleDragOver.call(this, e);
+                    });
+                    
+                    lane.addEventListener('drop', function(e) {
+                        handleDrop.call(this, e);
+                    });
+                    
+                    lane.addEventListener('dragleave', function(e) {
+                        handleDragLeave.call(this, e);
+                    });
+                    
+                    theaterLanes.appendChild(lane);
+                });
+                
+                dayContent.appendChild(theaterLanes);
+                dayColumn.appendChild(dayContent);
+                daysContainer.appendChild(dayColumn);
+            });
         }
 
         // Drag and Drop Handlers
         function handleDragStart(e) {
-            e.dataTransfer.setData('text/plain', e.target.dataset.eventId);
-            e.dataTransfer.effectAllowed = 'copy';
+            draggedItem = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            
+            dragSource = this.closest('.library-panel') ? 'library' : 'grid';
+            
+            if (dragSource === 'grid') {
+                const rect = this.getBoundingClientRect();
+                dragOffset = e.clientY - rect.top;
+            } else {
+                dragOffset = 0;
+            }
+            
+            const eventId = this.dataset.eventId;
+            let event = null;
+            
+            event = scheduledEvents.find(e => {
+                if (e.id == eventId) return true;
+                if (e.googleEventId == eventId) return true;
+                if (eventId.startsWith('existing-') && e.googleEventId == eventId.replace('existing-', '')) return true;
+                if (eventId.startsWith('existing-') && e.id == eventId.replace('existing-', '')) return true;
+                return false;
+            });
+            
+            if (!event) {
+                event = libraryEvents.find(e => {
+                    if (e.id == eventId) return true;
+                    if (e.googleEventId == eventId) return true;
+                    if (eventId.startsWith('existing-') && e.googleEventId == eventId.replace('existing-', '')) return true;
+                    if (eventId.startsWith('existing-') && e.id == eventId.replace('existing-', '')) return true;
+                    return false;
+                });
+            }
+            
+            if (!event && dragSource === 'library') {
+                const title = this.querySelector('.library-item-title')?.textContent;
+                if (title) {
+                    event = scheduledEvents.find(e => e.title === title) || libraryEvents.find(e => e.title === title);
+                }
+            }
+            
+            if (event) {
+                e.dataTransfer.setData('event', JSON.stringify(event));
+                e.dataTransfer.setData('source', dragSource);
+            }
+        }
+
+        function handleDragEnd(e) {
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+            }
+            draggedItem = null;
+            dragSource = null;
+            dragOffset = 0;
         }
 
         function handleDragOver(e) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-        }
-
-        function handleDragEnter(e) {
-            e.preventDefault();
-            e.target.closest('.theater-section').classList.add('drop-zone');
+            e.dataTransfer.dropEffect = 'move';
+            this.classList.add('drop-active');
+            
+            let preview = this.querySelector('.drag-preview');
+            if (!preview) {
+                preview = document.createElement('div');
+                preview.className = 'drag-preview';
+                this.appendChild(preview);
+            }
+            
+            const rect = this.getBoundingClientRect();
+            let y = e.clientY - rect.top;
+            
+            const source = e.dataTransfer.getData('source') || dragSource || 'library';
+            if (source === 'grid' && dragOffset > 0) {
+                y = y - dragOffset;
+            }
+            
+            const snapY = Math.floor(y / 15) * 15;
+            const finalY = Math.max(0, snapY);
+            
+            const theaterHour = Math.floor(finalY / 60);
+            const minute = ((finalY % 60) / 15) * 15;
+            const actualHour = convertFromTheaterHour(theaterHour);
+            
+            const displayHour = actualHour === 0 ? 12 : actualHour > 12 ? actualHour - 12 : actualHour;
+            const displayMinute = minute.toString().padStart(2, '0');
+            const period = actualHour < 12 ? 'AM' : 'PM';
+            
+            preview.style.top = `${finalY}px`;
+            preview.setAttribute('data-time', `${displayHour}:${displayMinute} ${period}`);
         }
 
         function handleDragLeave(e) {
-            if (!e.target.closest('.theater-section').contains(e.relatedTarget)) {
-                e.target.closest('.theater-section').classList.remove('drop-zone');
+            this.classList.remove('drop-active');
+            const preview = this.querySelector('.drag-preview');
+            if (preview) {
+                preview.remove();
             }
         }
 
         function handleDrop(e) {
             e.preventDefault();
-            const theaterSection = e.target.closest('.theater-section');
-            theaterSection.classList.remove('drop-zone');
-            
-            const eventId = e.dataTransfer.getData('text/plain');
-            const slot = theaterSection.closest('.time-slot');
-            const day = parseInt(slot.dataset.day);
-            const hour = parseInt(slot.dataset.hour);
-            const theater = parseInt(theaterSection.dataset.theater);
-
-            // Find the event in library
-            const libraryEvent = libraryEvents.find(event => event.id === eventId);
-            if (!libraryEvent) return;
-
-            // Create scheduled event
-            const scheduledEvent = {
-                id: `scheduled-${Date.now()}-${Math.random()}`,
-                title: libraryEvent.title,
-                description: libraryEvent.description,
-                originalDescription: libraryEvent.originalDescription,
-                calendar: libraryEvent.calendar,
-                duration: libraryEvent.duration || 120,
-                day: day,
-                startHour: hour,
-                startMinute: 0,
-                theater: theater,
-                googleEventId: null,
-                originalCalendar: libraryEvent.calendar
-            };
-
-            // Calculate actual date
-            const eventDate = new Date(currentWeekStart);
-            eventDate.setDate(currentWeekStart.getDate() + day);
-            scheduledEvent.actualDate = eventDate;
-
-            scheduledEvents.push(scheduledEvent);
-            renderScheduleGrid();
-            showToast(`Scheduled "${libraryEvent.title}" for ${getDayName(day)} at ${getTimeString(hour, 0)}`, 'success');
-        }
-
-        // Event Management
-        function handleEventClick(e) {
             e.stopPropagation();
-            const eventId = e.target.closest('.scheduled-event').dataset.eventId;
-            const event = scheduledEvents.find(ev => ev.id === eventId);
-            if (event) {
-                openEditModal(event);
+            this.classList.remove('drop-active');
+            
+            const preview = this.querySelector('.drag-preview');
+            let previewTop = 0;
+            if (preview) {
+                previewTop = parseInt(preview.style.top) || 0;
+                preview.remove();
+            }
+            
+            const eventData = e.dataTransfer.getData('event');
+            const source = e.dataTransfer.getData('source');
+            
+            if (!eventData) {
+                return;
+            }
+            
+            try {
+                const event = JSON.parse(eventData);
+                
+                const theaterHour = Math.floor(previewTop / 60);
+                const minute = ((previewTop % 60) / 15) * 15;
+                const actualHour = convertFromTheaterHour(theaterHour);
+                
+                const scheduledDate = new Date(currentWeekStart);
+                scheduledDate.setDate(scheduledDate.getDate() + parseInt(this.dataset.day));
+                scheduledDate.setHours(0, 0, 0, 0);
+                
+                let scheduledEvent;
+                
+                if (source === 'library') {
+                    scheduledEvent = {
+                        ...event,
+                        day: parseInt(this.dataset.day),
+                        theater: parseInt(this.dataset.theater),
+                        startHour: actualHour,
+                        startMinute: minute,
+                        actualDate: scheduledDate,
+                        id: `scheduled-${Date.now()}-${Math.random()}`,
+                        googleEventId: event.googleEventId,
+                        instanceOf: event.googleEventId || event.id
+                    };
+                    
+                    scheduledEvents.push(scheduledEvent);
+                    
+                } else if (source === 'grid') {
+                    const originalId = event.id;
+                    
+                    const originalIndex = scheduledEvents.findIndex(e => e.id == originalId);
+                    if (originalIndex !== -1) {
+                        scheduledEvents.splice(originalIndex, 1);
+                    }
+                    
+                    if (draggedItem && draggedItem.parentNode) {
+                        draggedItem.parentNode.removeChild(draggedItem);
+                    }
+                    
+                    scheduledEvent = {
+                        ...event,
+                        day: parseInt(this.dataset.day),
+                        theater: parseInt(this.dataset.theater),
+                        startHour: actualHour,
+                        startMinute: minute,
+                        actualDate: scheduledDate,
+                        id: originalId
+                    };
+                    
+                    scheduledEvents.push(scheduledEvent);
+                }
+                
+                if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
+                    scheduledEvent.calendar = this.dataset.theater === '0' ? 'theater-1' : 'theater-2';
+                } else {
+                    scheduledEvent.calendar = event.calendar;
+                }
+                
+                renderScheduledEvent(scheduledEvent);
+                renderLibrary();
+                updateWeekStats();
+                updateDebugCounts();
+                
+                const action = source === 'library' ? 'scheduled' : 'moved';
+                showToast(`${event.title} ${action} to ${actualHour}:${minute.toString().padStart(2, '0')}`);
+                
+            } catch (error) {
+                console.error('Drop error:', error);
+                showToast('Failed to drop event');
             }
         }
 
-        function openEditModal(event) {
-            currentEditingEvent = event;
-            document.getElementById('editTitle').value = event.title;
-            document.getElementById('editTime').value = `${event.startHour.toString().padStart(2, '0')}:${event.startMinute.toString().padStart(2, '0')}`;
-            document.getElementById('editDuration').value = event.duration;
-            document.getElementById('editCalendar').value = event.calendar;
-            document.getElementById('editModal').classList.add('show');
-        }
-
-        function closeEditModal() {
-            currentEditingEvent = null;
-            document.getElementById('editModal').classList.remove('show');
-        }
-
-        function saveEventChanges() {
-            if (!currentEditingEvent) return;
-
-            const title = document.getElementById('editTitle').value;
-            const time = document.getElementById('editTime').value;
-            const duration = parseInt(document.getElementById('editDuration').value);
-            const calendar = document.getElementById('editCalendar').value;
-
-            const [hours, minutes] = time.split(':').map(Number);
-
-            currentEditingEvent.title = title;
-            currentEditingEvent.startHour = hours;
-            currentEditingEvent.startMinute = minutes;
-            currentEditingEvent.duration = duration;
-            currentEditingEvent.calendar = calendar;
-
-            renderScheduleGrid();
-            closeEditModal();
-            showToast('Event updated successfully!', 'success');
-        }
-
-        function deleteEvent() {
-            if (!currentEditingEvent) return;
-
-            if (confirm('Are you sure you want to delete this event?')) {
-                scheduledEvents = scheduledEvents.filter(event => event.id !== currentEditingEvent.id);
-                renderScheduleGrid();
-                closeEditModal();
-                showToast('Event deleted successfully!', 'success');
-            }
-        }
-
-        function convertToTBD() {
-            if (!currentEditingEvent) return;
-
-            currentEditingEvent.calendar = 'tbd';
-            document.getElementById('editCalendar').value = 'tbd';
-            showToast('Event converted to TBD!', 'success');
-        }
-
-        // Utility Functions
-        function calculateDayOfWeek(date) {
-            const eventDate = new Date(date);
-            const weekStart = new Date(currentWeekStart);
-            const diffTime = eventDate - weekStart;
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            return diffDays;
-        }
-
-        function getDayName(dayIndex) {
-            const days = ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday'];
-            return days[dayIndex];
-        }
-
-        function getTimeString(hour, minute) {
-            const ampm = hour >= 12 && hour !== 0 ? 'PM' : 'AM';
-            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-            return `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
-        }
-
-        function showToast(message, type = 'info') {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = `toast ${type} show`;
-
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
-        }
-
-        // Event Listeners Setup
-        function setupEventListeners() {
-            // Authentication
-            document.getElementById('authButton').addEventListener('click', toggleAuth);
-
-            // Week Navigation
-            document.getElementById('prevWeek').addEventListener('click', () => navigateWeek(-1));
-            document.getElementById('nextWeek').addEventListener('click', () => navigateWeek(1));
-
-            // Action Buttons
-            document.getElementById('importButton').addEventListener('click', importFromGoogle);
-            document.getElementById('pushButton').addEventListener('click', pushToGoogle);
-            document.getElementById('saveButton').addEventListener('click', saveSchedule);
-            document.getElementById('loadButton').addEventListener('click', loadSchedule);
-
-            // Library Controls
-            document.getElementById('calendarFilter').addEventListener('change', renderLibrary);
-            document.getElementById('collapseLibrary').addEventListener('click', toggleLibrary);
-
-            // Edit Modal
-            document.getElementById('editForm').addEventListener('submit', (e) => {
+        // Application Initialization
+        function init() {
+            console.log('Initializing TSL Schedule Maker 2000 v1.0...');
+            
+            generateDaysColumns();
+            updateWeekDisplay();
+            updateWeekStats();
+            updateDebugCounts();
+            
+            // Button handlers
+            document.getElementById('authButton').onclick = handleAuthClick;
+            document.getElementById('prevWeek').onclick = () => changeWeek(-1);
+            document.getElementById('nextWeek').onclick = () => changeWeek(1);
+            document.getElementById('collapseToggle').onclick = toggleCollapse;
+            document.getElementById('importFromGoogle').onclick = importFromGoogle;
+            document.getElementById('calendarFilter').onchange = renderLibrary;
+            document.getElementById('pushToGoogle').onclick = pushToGoogle;
+            document.getElementById('saveSchedule').onclick = saveSchedule;
+            document.getElementById('loadSchedule').onclick = loadSchedule;
+            
+            // Modal handlers
+            document.getElementById('modalClose').onclick = closeEditModal;
+            document.getElementById('modalCancel').onclick = closeEditModal;
+            document.getElementById('editForm').onsubmit = (e) => {
                 e.preventDefault();
                 saveEventChanges();
-            });
-
-            // Close modal on outside click
-            document.getElementById('editModal').addEventListener('click', (e) => {
+            };
+            document.getElementById('editModal').onclick = (e) => {
                 if (e.target.id === 'editModal') {
                     closeEditModal();
                 }
-            });
-        }
-
-        function toggleLibrary() {
-            const library = document.querySelector('.library');
-            const mainContent = document.querySelector('.main-content');
+            };
             
-            if (library.style.display === 'none') {
-                library.style.display = 'block';
-                mainContent.style.gridTemplateColumns = '300px 1fr';
-                document.getElementById('collapseLibrary').textContent = 'Collapse';
-            } else {
-                library.style.display = 'none';
-                mainContent.style.gridTemplateColumns = '1fr';
-                document.getElementById('collapseLibrary').textContent = 'Show Library';
-            }
+            // Event delegation for control buttons
+            const scheduleContainer = document.getElementById('scheduleContainer');
+            scheduleContainer.addEventListener('click', function(e) {
+                if (e.target.classList.contains('tbd-btn')) {
+                    e.stopPropagation();
+                    const eventBlock = e.target.closest('.event-block');
+                    const eventId = eventBlock.dataset.eventId;
+                    convertToTBD(eventId);
+                } else if (e.target.classList.contains('edit-btn')) {
+                    e.stopPropagation();
+                    const eventBlock = e.target.closest('.event-block');
+                    const eventId = eventBlock.dataset.eventId;
+                    editEvent(eventId);
+                } else if (e.target.classList.contains('delete-btn')) {
+                    e.stopPropagation();
+                    const eventBlock = e.target.closest('.event-block');
+                    const eventId = eventBlock.dataset.eventId;
+                    deleteEvent(eventId);
+                }
+            });
+            
+            // Initialize Google API
+            initGoogleAPI();
+            setTimeout(() => {
+                initOAuth();
+            }, 1000);
+            
+            renderLibrary();
+            console.log('TSL Schedule Maker 2000 v1.0 initialized successfully');
         }
 
-        // Initialize the app when the page loads
-        document.addEventListener('DOMContentLoaded', initializeApp);
+        // Start the application
+        init();
     </script>
 </body>
 </html>
