@@ -1372,7 +1372,292 @@
             showToast('Event updated');
         }
 
-        // Delete event
+        // Push to Google Calendar
+        async function pushToGoogle() {
+            if (!accessToken) {
+                showToast('Please connect to Google Calendar first');
+                return;
+            }
+
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.classList.add('syncing');
+            syncStatus.innerHTML = '<span>↻</span><span>Pushing to Google...</span>';
+            
+            let successCount = 0;
+            let failCount = 0;
+            let deleteCount = 0;
+            
+            // Get current week events from scheduler
+            const currentWeekEvents = scheduledEvents.filter(event => {
+                if (event.actualDate) {
+                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
+                    return dayOfWeek >= 0 && dayOfWeek <= 6;
+                }
+                return false;
+            });
+
+            console.log('Current week events to push:', currentWeekEvents.length);
+
+            // First, get existing events from Google Calendar to check for deletions
+            const weekStart = new Date(currentWeekStart);
+            const weekEnd = new Date(currentWeekStart);
+            weekEnd.setDate(weekEnd.getDate() + 7);
+            
+            console.log('Week range:', weekStart.toISOString(), 'to', weekEnd.toISOString());
+            
+            // Track which Google events we've processed
+            const processedGoogleIds = new Set();
+            
+            // Update or create events
+            for (const event of currentWeekEvents) {
+                try {
+                    let eventDate;
+                    if (event.actualDate) {
+                        eventDate = new Date(event.actualDate);
+                    } else {
+                        eventDate = new Date(currentWeekStart);
+                        eventDate.setDate(eventDate.getDate() + (event.day || 0));
+                    }
+                    
+                    eventDate.setHours(event.startHour);
+                    eventDate.setMinutes(event.startMinute);
+                    eventDate.setSeconds(0);
+                    
+                    const endDate = new Date(eventDate);
+                    endDate.setMinutes(endDate.getMinutes() + event.duration);
+                    
+                    let calendarId = CALENDAR_IDS[event.calendar] || CALENDAR_IDS['events'];
+                    
+                    const eventBody = {
+                        summary: event.title,
+                        start: {
+                            dateTime: eventDate.toISOString(),
+                            timeZone: 'America/New_York'
+                        },
+                        end: {
+                            dateTime: endDate.toISOString(),
+                            timeZone: 'America/New_York'
+                        },
+                        description: 'Scheduled via TSL Schedule Maker 2000' + (event.description ? '\n\n' + event.description : '')
+                    };
+
+                    let response;
+                    let googleEventId;
+                    
+                    if (event.googleEventId && !event.id.toString().startsWith('existing-')) {
+                        // Update existing event
+                        googleEventId = event.googleEventId;
+                        processedGoogleIds.add(googleEventId);
+                        console.log('Updating existing event:', event.title, googleEventId);
+                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEventId}`;
+                        response = await fetch(url, {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(eventBody)
+                        });
+                    } else if (event.id.toString().startsWith('existing-')) {
+                        // This is an imported event that was moved/edited
+                        googleEventId = event.googleEventId || event.id.replace('existing-', '');
+                        processedGoogleIds.add(googleEventId);
+                        console.log('Updating moved/edited event:', event.title, googleEventId);
+                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEventId}`;
+                        response = await fetch(url, {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(eventBody)
+                        });
+                    } else {
+                        // Create new event
+                        console.log('Creating new event:', event.title);
+                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
+                        response = await fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(eventBody)
+                        });
+                    }
+
+                    if (response.ok) {
+                        successCount++;
+                        const responseData = await response.json();
+                        googleEventId = googleEventId || responseData.id;
+                        if (!event.googleEventId) {
+                            event.googleEventId = googleEventId;
+                        }
+                        processedGoogleIds.add(googleEventId);
+                        console.log('Successfully processed event:', event.title, googleEventId);
+                    } else {
+                        failCount++;
+                        console.error('Failed to push event:', event.title, response.status, await response.text());
+                    }
+                } catch (error) {
+                    failCount++;
+                    console.error('Error pushing event:', event.title, error);
+                }
+            }
+
+            console.log('Processed Google IDs:', Array.from(processedGoogleIds));
+
+            // Delete orphaned events created by scheduler
+            for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
+                try {
+                    console.log('Checking calendar for orphans:', calendarKey);
+                    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
+                        `timeMin=${weekStart.toISOString()}&` +
+                        `timeMax=${weekEnd.toISOString()}&` +
+                        `showDeleted=false&` +
+                        `singleEvents=true&` +
+                        `key=${API_KEY}`;
+
+                    const response = await fetch(url, {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const events = data.items || [];
+                        console.log(`Found ${events.length} events in ${calendarKey} calendar`);
+                        
+                        for (const googleEvent of events) {
+                            const isSchedulerEvent = googleEvent.description && (
+                                googleEvent.description.includes('Scheduled via TSL Schedule Maker 2000') ||
+                                googleEvent.description.includes('Scheduled via TSL Event/Movie Scheduler') ||
+                                googleEvent.description.includes('Scheduled via TSL Theater Scheduler')
+                            );
+                            
+                            const isNotProcessed = !processedGoogleIds.has(googleEvent.id);
+                            
+                            if (isSchedulerEvent && isNotProcessed) {
+                                console.log('DELETING orphaned event:', googleEvent.summary, googleEvent.id);
+                                
+                                const deleteUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${googleEvent.id}`;
+                                const deleteResponse = await fetch(deleteUrl, {
+                                    method: 'DELETE',
+                                    headers: {
+                                        'Authorization': `Bearer ${accessToken}`
+                                    }
+                                });
+                                
+                                if (deleteResponse.ok || deleteResponse.status === 204) {
+                                    deleteCount++;
+                                    console.log('Successfully deleted orphaned event:', googleEvent.summary);
+                                } else {
+                                    console.error('Failed to delete event:', googleEvent.summary, deleteResponse.status);
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error checking for orphaned events in', calendarKey, ':', error);
+                }
+            }
+
+            syncStatus.classList.remove('syncing');
+            syncStatus.classList.add('connected');
+            syncStatus.innerHTML = '<span>✔</span><span>Connected</span>';
+            
+            let message = '';
+            if (successCount > 0) {
+                message = `Pushed ${successCount} events`;
+            }
+            if (deleteCount > 0) {
+                message += message ? `, deleted ${deleteCount} orphaned events` : `Deleted ${deleteCount} orphaned events`;
+            }
+            if (failCount > 0) {
+                message += `. ${failCount} failed`;
+            }
+            
+            if (message) {
+                showToast(message);
+            } else {
+                showToast('No changes to sync');
+            }
+            
+            console.log('Push complete:', { successCount, deleteCount, failCount });
+        }
+
+        // Save schedule
+        function saveSchedule() {
+            try {
+                const scheduleData = {
+                    version: '1.0',
+                    savedAt: new Date().toISOString(),
+                    currentWeekStart: currentWeekStart.toISOString(),
+                    libraryEvents: libraryEvents,
+                    scheduledEvents: scheduledEvents
+                };
+                
+                localStorage.setItem('tsl_schedule', JSON.stringify(scheduleData));
+                
+                const dataStr = JSON.stringify(scheduleData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+                
+                const exportLink = document.createElement('a');
+                exportLink.setAttribute('href', dataUri);
+                exportLink.setAttribute('download', `tsl_schedule_${new Date().toISOString().split('T')[0]}.json`);
+                exportLink.style.display = 'none';
+                document.body.appendChild(exportLink);
+                exportLink.click();
+                document.body.removeChild(exportLink);
+                
+                showToast('Schedule saved');
+            } catch (error) {
+                console.error('Error saving schedule:', error);
+                showToast('Failed to save schedule');
+            }
+        }
+
+        // Load schedule
+        function loadSchedule() {
+            try {
+                const savedData = localStorage.getItem('tsl_schedule');
+                if (!savedData) {
+                    showToast('No saved schedule found');
+                    return;
+                }
+                
+                const scheduleData = JSON.parse(savedData);
+                
+                if (!confirm(`Load schedule from ${new Date(scheduleData.savedAt).toLocaleString()}?`)) {
+                    return;
+                }
+                
+                libraryEvents = scheduleData.libraryEvents || [];
+                scheduledEvents = scheduleData.scheduledEvents || [];
+                
+                scheduledEvents.forEach(event => {
+                    if (event.actualDate) {
+                        event.actualDate = new Date(event.actualDate);
+                    }
+                });
+                
+                document.querySelectorAll('.event-block').forEach(block => {
+                    if (block.parentNode) {
+                        block.parentNode.removeChild(block);
+                    }
+                });
+                renderLibrary();
+                renderEventsForCurrentWeek();
+                updateWeekStats();
+                updateDebugCounts();
+                
+                showToast('Schedule loaded');
+            } catch (error) {
+                console.error('Error loading schedule:', error);
+                showToast('Failed to load schedule');
+            }
+        }
         function deleteEvent(eventId) {
             if (!confirm('Delete this event?')) return;
             
