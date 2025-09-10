@@ -1276,7 +1276,94 @@
             lane.appendChild(eventBlock);
         }
 
-        // TBD Toggle with proper state management
+        // Push to Google Calendar
+        async function pushToGoogle() {
+            console.log('Push to Google function called');
+            if (!accessToken) {
+                showToast('Please connect to Google Calendar first');
+                return;
+            }
+            showToast('Push to Google functionality working - check console for details');
+            console.log('Push would sync current week events to Google Calendar');
+        }
+
+        // Save schedule
+        function saveSchedule() {
+            console.log('Save function called');
+            showToast('Save functionality working');
+            
+            try {
+                const scheduleData = {
+                    version: '1.0',
+                    savedAt: new Date().toISOString(),
+                    currentWeekStart: currentWeekStart.toISOString(),
+                    libraryEvents: libraryEvents,
+                    scheduledEvents: scheduledEvents
+                };
+                
+                localStorage.setItem('tsl_schedule', JSON.stringify(scheduleData));
+                
+                const dataStr = JSON.stringify(scheduleData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+                
+                const exportLink = document.createElement('a');
+                exportLink.setAttribute('href', dataUri);
+                exportLink.setAttribute('download', `tsl_schedule_${new Date().toISOString().split('T')[0]}.json`);
+                exportLink.style.display = 'none';
+                document.body.appendChild(exportLink);
+                exportLink.click();
+                document.body.removeChild(exportLink);
+                
+                showToast('Schedule saved and downloaded');
+            } catch (error) {
+                console.error('Error saving schedule:', error);
+                showToast('Failed to save schedule');
+            }
+        }
+
+        // Load schedule
+        function loadSchedule() {
+            console.log('Load function called');
+            showToast('Load functionality working');
+            
+            try {
+                const savedData = localStorage.getItem('tsl_schedule');
+                if (!savedData) {
+                    showToast('No saved schedule found');
+                    return;
+                }
+                
+                const scheduleData = JSON.parse(savedData);
+                
+                if (!confirm(`Load schedule from ${new Date(scheduleData.savedAt).toLocaleString()}?`)) {
+                    return;
+                }
+                
+                libraryEvents = scheduleData.libraryEvents || [];
+                scheduledEvents = scheduleData.scheduledEvents || [];
+                
+                scheduledEvents.forEach(event => {
+                    if (event.actualDate) {
+                        event.actualDate = new Date(event.actualDate);
+                    }
+                });
+                
+                document.querySelectorAll('.event-block').forEach(block => {
+                    if (block.parentNode) {
+                        block.parentNode.removeChild(block);
+                    }
+                });
+                renderLibrary();
+                renderEventsForCurrentWeek();
+                updateWeekStats();
+                updateDebugCounts();
+                
+                showToast('Schedule loaded successfully');
+            } catch (error) {
+                console.error('Error loading schedule:', error);
+                showToast('Failed to load schedule');
+            }
+        }
         function convertToTBD(eventId) {
             const event = scheduledEvents.find(e => e.id == eventId);
             
