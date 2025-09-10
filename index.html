@@ -1399,9 +1399,16 @@
             }
         }
 
-        // Render events for current week
+        // Render events for current week with proper cleanup
         function renderEventsForCurrentWeek() {
-            document.querySelectorAll('.event-block').forEach(block => block.remove());
+            // COMPLETELY clear all existing event blocks first
+            document.querySelectorAll('.event-block').forEach(block => {
+                if (block.parentNode) {
+                    block.parentNode.removeChild(block);
+                }
+            });
+            
+            console.log('Re-rendering events for current week...');
             
             scheduledEvents.forEach(event => {
                 if (event.actualDate) {
@@ -1412,6 +1419,8 @@
                     }
                 }
             });
+            
+            console.log('Event rendering complete');
         }
 
         // Render scheduled event
