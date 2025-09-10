@@ -471,6 +471,12 @@
         .delete-btn {
             background: rgba(255, 59, 48, 0.8);
         }
+        
+        .tbd-btn {
+            background: rgba(66, 165, 245, 0.8);
+            font-size: 8px;
+            font-weight: bold;
+        }
 
         .event-control-btn:hover {
             opacity: 0.8;
@@ -922,7 +928,7 @@
             return -1;
         }
 
-        // Import from Google Calendar - FIXED duplicate prevention and multi-week import
+        // Import from Google Calendar - TRUE DATABASE BEHAVIOR
         async function importFromGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
@@ -933,13 +939,22 @@
             syncStatus.classList.add('syncing');
             syncStatus.innerHTML = '<span>↻</span><span>Importing...</span>';
             
-            // Clear existing data to prevent duplicates
-            libraryEvents = [];
-            scheduledEvents = [];
-            document.querySelectorAll('.event-block').forEach(block => block.remove());
+            // DO NOT CLEAR - maintain database behavior
+            // Create maps of existing events for quick lookup
+            const existingLibraryMap = new Map();
+            libraryEvents.forEach(e => {
+                if (e.googleEventId) existingLibraryMap.set(e.googleEventId, e);
+            });
             
-            let totalScheduledEvents = 0;
-            let totalLibraryEvents = 0;
+            const existingScheduledMap = new Map();
+            scheduledEvents.forEach(e => {
+                const googleId = e.googleEventId || (e.id.toString().startsWith('existing-') ? e.id.replace('existing-', '') : null);
+                if (googleId) existingScheduledMap.set(googleId, e);
+            });
+            
+            let totalUpdated = 0;
+            let totalAdded = 0;
+            let totalSkipped = 0;
             
             // Import range: 2 weeks before to 12 weeks after
             const startOfRange = new Date(currentWeekStart);
@@ -953,8 +968,8 @@
             
             console.log(`Import range: ${startOfRange.toISOString()} to ${endOfRange.toISOString()}`);
 
-            // Use a Map to prevent duplicates by googleEventId
-            const allEventsMap = new Map();
+            // Use a Map to collect all events from Google
+            const googleEventsMap = new Map();
 
             for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
                 try {
@@ -983,34 +998,30 @@
                     console.log(`Processing ${events.length} events from ${calendarKey}`);
                     
                     events.forEach(event => {
-                        // Skip if we've already processed this event ID
-                        if (allEventsMap.has(event.id)) {
-                            console.log(`Skipping duplicate: ${event.summary} (${event.id})`);
-                            return;
-                        }
-                        
-                        let duration = 120;
-                        if (event.start && event.end) {
-                            const start = new Date(event.start.dateTime || event.start.date);
-                            const end = new Date(event.end.dateTime || event.end.date);
-                            duration = Math.round((end - start) / 60000);
-                        }
+                        // Store all Google events in map (even duplicates will be overwritten)
+                        if (event.id) {
+                            let duration = 120;
+                            if (event.start && event.end) {
+                                const start = new Date(event.start.dateTime || event.start.date);
+                                const end = new Date(event.end.dateTime || event.end.date);
+                                duration = Math.round((end - start) / 60000);
+                            }
 
-                        const eventData = {
-                            id: event.id || Date.now() + Math.random(),
-                            title: event.summary || 'Untitled Event',
-                            duration: duration,
-                            calendar: calendarKey,
-                            description: event.description || '',
-                            location: event.location || '',
-                            googleEventId: event.id,
-                            startTime: event.start,
-                            endTime: event.end,
-                            isAllDay: !event.start.dateTime
-                        };
-                        
-                        // Store in map to prevent duplicates
-                        allEventsMap.set(event.id, eventData);
+                            const eventData = {
+                                id: event.id || Date.now() + Math.random(),
+                                title: event.summary || 'Untitled Event',
+                                duration: duration,
+                                calendar: calendarKey,
+                                description: event.description || '',
+                                location: event.location || '',
+                                googleEventId: event.id,
+                                startTime: event.start,
+                                endTime: event.end,
+                                isAllDay: !event.start.dateTime
+                            };
+                            
+                            googleEventsMap.set(event.id, eventData);
+                        }
                     });
                     
                 } catch (error) {
@@ -1018,44 +1029,89 @@
                 }
             }
 
-            // Now process all unique events
-            console.log(`Total unique events found: ${allEventsMap.size}`);
+            // Process Google events - update existing or add new
+            console.log(`Total events from Google: ${googleEventsMap.size}`);
             
-            // Process each unique event
-            for (const eventData of allEventsMap.values()) {
-                // If event has a specific time
-                if (eventData.startTime && eventData.startTime.dateTime) {
-                    const scheduledEvent = convertToScheduledEvent(eventData);
-                    if (scheduledEvent) {
-                        // Always add to scheduledEvents for persistence
-                        scheduledEvents.push(scheduledEvent);
-                        
-                        // Check if this event is in the current week
-                        const dayOfWeek = calculateDayOfWeek(scheduledEvent.actualDate);
-                        
-                        if (dayOfWeek >= 0 && dayOfWeek <= 6) {
-                            // Event is in current week - already scheduled, don't add to library
-                            totalScheduledEvents++;
-                            console.log(`Added to current week schedule: ${eventData.title} on ${new Date(eventData.startTime.dateTime).toLocaleDateString()}`);
-                        } else {
-                            // Event is in a different week - add to library as available to schedule
-                            libraryEvents.push(eventData);
-                            totalLibraryEvents++;
-                            console.log(`Added to library (future/past week): ${eventData.title} on ${new Date(eventData.startTime.dateTime).toLocaleDateString()}`);
+            // Track what we've already processed in this import to avoid duplicates
+            const processedInThisImport = new Set();
+            
+            // Process each Google event
+            for (const [googleId, eventData] of googleEventsMap.entries()) {
+                // Skip if we already processed this in the current import
+                if (processedInThisImport.has(googleId)) {
+                    console.log(`Skipping duplicate in import: ${eventData.title}`);
+                    continue;
+                }
+                processedInThisImport.add(googleId);
+                
+                // Check if this event already exists in our database
+                let foundExisting = false;
+                
+                // Check and update in scheduledEvents
+                for (let i = 0; i < scheduledEvents.length; i++) {
+                    const existing = scheduledEvents[i];
+                    const existingGoogleId = existing.googleEventId || 
+                        (existing.id.toString().startsWith('existing-') ? existing.id.replace('existing-', '') : null);
+                    
+                    if (existingGoogleId === googleId) {
+                        // Update existing scheduled event
+                        existing.title = eventData.title;
+                        existing.duration = eventData.duration;
+                        existing.description = eventData.description;
+                        existing.location = eventData.location;
+                        totalUpdated++;
+                        foundExisting = true;
+                        console.log(`Updated existing scheduled event: ${eventData.title}`);
+                        break;
+                    }
+                }
+                
+                // Check and update in library
+                if (!foundExisting) {
+                    for (let i = 0; i < libraryEvents.length; i++) {
+                        if (libraryEvents[i].googleEventId === googleId) {
+                            // Update existing library event
+                            libraryEvents[i].title = eventData.title;
+                            libraryEvents[i].duration = eventData.duration;
+                            libraryEvents[i].description = eventData.description;
+                            libraryEvents[i].location = eventData.location;
+                            totalUpdated++;
+                            foundExisting = true;
+                            console.log(`Updated existing library event: ${eventData.title}`);
+                            break;
                         }
                     }
-                } else {
-                    // All-day or TBD event - always add to library
-                    if (!eventData.startTime.dateTime) {
-                        eventData.duration = 120; // 2 hours default
+                }
+                
+                // If not found, add as new
+                if (!foundExisting) {
+                    if (eventData.startTime && eventData.startTime.dateTime) {
+                        const scheduledEvent = convertToScheduledEvent(eventData);
+                        if (scheduledEvent) {
+                            // Add ALL timed events to scheduledEvents only
+                            scheduledEvents.push(scheduledEvent);
+                            const dayOfWeek = calculateDayOfWeek(scheduledEvent.actualDate);
+                            
+                            if (dayOfWeek >= 0 && dayOfWeek <= 6) {
+                                console.log(`Added to current week schedule: ${eventData.title} on ${scheduledEvent.actualDate.toLocaleDateString()}`);
+                            } else {
+                                console.log(`Added to scheduled (other week): ${eventData.title} on ${scheduledEvent.actualDate.toLocaleDateString()}`);
+                            }
+                            totalAdded++;
+                        }
+                    } else {
+                        // All-day or TBD event - add to library only
+                        if (!eventData.startTime.dateTime) {
+                            eventData.duration = 120; // 2 hours default
+                        }
+                        libraryEvents.push(eventData);
+                        totalAdded++;
+                        console.log(`Added to library (all-day/TBD): ${eventData.title}`);
                     }
-                    libraryEvents.push(eventData);
-                    totalLibraryEvents++;
-                    console.log(`Added to library (all-day/TBD): ${eventData.title}`);
                 }
             }
-
-            console.log(`Import complete: ${totalScheduledEvents} scheduled, ${totalLibraryEvents} library`);
+            
+            console.log(`Import complete: ${totalAdded} added, ${totalUpdated} updated`);
             
             renderLibrary();
             renderEventsForCurrentWeek();
@@ -1063,14 +1119,19 @@
             updateDebugCounts();
             syncStatus.classList.remove('syncing');
             
-            const totalEvents = totalScheduledEvents + totalLibraryEvents;
-            if (totalEvents > 0) {
+            if (totalAdded > 0 || totalUpdated > 0) {
                 syncStatus.classList.add('connected');
                 syncStatus.innerHTML = '<span>✔</span><span>Connected</span>';
-                showToast(`Imported ${totalEvents} events (${totalScheduledEvents} scheduled, ${totalLibraryEvents} library)`);
+                let message = '';
+                if (totalAdded > 0) message += `${totalAdded} new events added`;
+                if (totalUpdated > 0) {
+                    if (message) message += ', ';
+                    message += `${totalUpdated} events updated`;
+                }
+                showToast(message);
             } else {
-                syncStatus.innerHTML = '<span>⚠</span><span>No events found</span>';
-                showToast('No events found');
+                syncStatus.innerHTML = '<span>✔</span><span>Already up to date</span>';
+                showToast('All events already imported');
             }
         }
 
@@ -1420,6 +1481,7 @@
             
             eventBlock.innerHTML = `
                 <div class="event-controls">
+                    <button class="event-control-btn tbd-btn" onclick="convertToTBD('${event.id}')" title="Convert to TBD">TBD</button>
                     <button class="event-control-btn edit-btn" onclick="editEvent('${event.id}')" title="Edit">✎</button>
                     <button class="event-control-btn delete-btn" onclick="deleteEvent('${event.id}')" title="Delete">×</button>
                 </div>
@@ -1442,6 +1504,7 @@
             updateWeekDisplay();
             renderEventsForCurrentWeek();
             updateWeekStats();
+            renderLibrary(); // Re-render library for new week
         }
 
         // Generate day columns
@@ -1532,7 +1595,7 @@
             }
         }
 
-        // Render library
+        // Render library - dynamically filter to avoid duplicates
         function renderLibrary() {
             const container = document.getElementById('libraryItems');
             const filter = document.getElementById('calendarFilter').value;
@@ -1549,9 +1612,66 @@
                 return;
             }
             
+            // Get events from other weeks from scheduledEvents
+            const currentWeekEventIds = new Set();
+            const otherWeekEvents = [];
+            
+            // First, collect all events that are in the current week
+            scheduledEvents.forEach(event => {
+                if (event.actualDate) {
+                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
+                    if (dayOfWeek >= 0 && dayOfWeek <= 6) {
+                        // Track events in current week by googleEventId
+                        if (event.googleEventId) {
+                            currentWeekEventIds.add(event.googleEventId);
+                        }
+                    }
+                }
+            });
+            
+            // Now collect events from other weeks for the library
+            scheduledEvents.forEach(event => {
+                if (event.actualDate) {
+                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
+                    if (dayOfWeek < 0 || dayOfWeek > 6) {
+                        // Event is in a different week
+                        // Don't add if it's already scheduled in current week
+                        if (!event.googleEventId || !currentWeekEventIds.has(event.googleEventId)) {
+                            // Convert back to library format
+                            const libraryEvent = {
+                                id: event.googleEventId || event.id,
+                                title: event.title,
+                                duration: event.duration,
+                                calendar: event.calendar,
+                                description: event.description || '',
+                                location: event.location || '',
+                                googleEventId: event.googleEventId,
+                                startTime: event.startTime,
+                                endTime: event.endTime
+                            };
+                            otherWeekEvents.push(libraryEvent);
+                        }
+                    }
+                }
+            });
+            
+            // Add true library events (all-day/TBD)
+            const allLibraryItems = [...libraryEvents, ...otherWeekEvents];
+            
+            // Remove duplicates based on googleEventId
+            const uniqueLibraryMap = new Map();
+            allLibraryItems.forEach(event => {
+                const key = event.googleEventId || event.id;
+                if (!uniqueLibraryMap.has(key)) {
+                    uniqueLibraryMap.set(key, event);
+                }
+            });
+            
+            const uniqueLibraryEvents = Array.from(uniqueLibraryMap.values());
+            
             const filteredEvents = filter === 'all' 
-                ? libraryEvents 
-                : libraryEvents.filter(e => e.calendar === filter);
+                ? uniqueLibraryEvents 
+                : uniqueLibraryEvents.filter(e => e.calendar === filter);
             
             if (filteredEvents.length === 0) {
                 container.innerHTML = `
@@ -1610,8 +1730,23 @@
             }
             
             const eventId = this.dataset.eventId;
-            const event = libraryEvents.find(e => e.id == eventId) || 
-                         scheduledEvents.find(e => e.id == eventId);
+            
+            // Find event in all possible locations
+            let event = null;
+            
+            // First check scheduled events
+            event = scheduledEvents.find(e => {
+                const id = e.googleEventId || e.id;
+                return id == eventId;
+            });
+            
+            // If not found, check library events (for all-day/TBD)
+            if (!event) {
+                event = libraryEvents.find(e => {
+                    const id = e.googleEventId || e.id;
+                    return id == eventId;
+                });
+            }
             
             if (event) {
                 e.dataTransfer.setData('event', JSON.stringify(event));
@@ -1736,20 +1871,8 @@
             
             // FIXED: Handle library database logic with proper removal
             if (source === 'library') {
-                console.log('Removing from library:', event.title, 'ID:', event.id, 'GoogleID:', event.googleEventId);
-                // Remove from library when scheduling - properly handle both ID types
-                libraryEvents = libraryEvents.filter(e => {
-                    // Remove if either the regular ID matches OR the googleEventId matches
-                    if (e.id == event.id) {
-                        console.log('Removing by ID match:', e.title);
-                        return false;
-                    }
-                    if (event.googleEventId && e.googleEventId === event.googleEventId) {
-                        console.log('Removing by googleEventId match:', e.title);
-                        return false;
-                    }
-                    return true;
-                });
+                console.log('Dragging from library:', event.title, 'ID:', event.id, 'GoogleID:', event.googleEventId);
+                // Just refresh library after adding (will automatically hide current week events)
                 renderLibrary(); // Update library display
                 updateDebugCounts();
             } else if (source === 'grid' && draggedItem) {
@@ -1832,6 +1955,25 @@
             }, 3000);
         }
 
+        // Convert event to TBD
+        function convertToTBD(eventId) {
+            // Find the event in scheduledEvents
+            const event = scheduledEvents.find(e => e.id == eventId);
+            
+            if (!event) {
+                showToast('Event not found');
+                return;
+            }
+            
+            // Change calendar type to TBD
+            event.calendar = 'tbd';
+            
+            // Re-render the current week to show the color change
+            renderEventsForCurrentWeek();
+            
+            showToast(`Changed "${event.title}" to TBD`);
+        }
+
         // FIXED DATABASE BEHAVIOR: Add back to library when deleted
         function deleteEvent(eventId) {
             if (!confirm('Delete this event?')) return;
@@ -1883,9 +2025,9 @@
                 
                 console.log('Adding back to library:', libraryEvent.title);
                 libraryEvents.push(libraryEvent);
-                renderLibrary(); // Update library display
             }
             
+            renderLibrary(); // Update library display
             updateWeekStats();
             updateDebugCounts();
             showToast('Event deleted and returned to library');
