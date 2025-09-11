@@ -3,205 +3,498 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Calendar</title>
+    <title>TSL Theater Calendar</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            margin: 0;
-            padding: 20px;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f5f5;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            line-height: 1.4;
+            font-weight: 400;
+            letter-spacing: -0.01em;
         }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        
-        h1 {
-            color: #333;
-            margin: 0;
-            font-size: 24px;
-        }
-        
-        .week-toggle {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 14px;
-            color: #666;
-        }
-        
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 50px;
-            height: 24px;
-        }
-        
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            border-radius: 24px;
-            transition: .4s;
-        }
-        
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            border-radius: 50%;
-            transition: .4s;
-        }
-        
-        input:checked + .slider {
-            background-color: #4285f4;
-        }
-        
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
-        
+
         .calendar-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow: hidden;
             max-width: 1200px;
             margin: 0 auto;
+            padding: 48px 24px;
+            min-height: 100vh;
         }
-        
-        iframe {
-            width: 100%;
-            height: 600px;
-            border: none;
+
+        .header {
+            margin-bottom: 48px;
+            border-bottom: 1px solid #e5e5e5;
+            padding-bottom: 32px;
         }
-        
+
+        .brand {
+            display: flex;
+            align-items: baseline;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .brand h1 {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #1a1a1a;
+        }
+
+        .brand .status {
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #666;
+            background: #f0f0f0;
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+
+        .nav-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+        }
+
+        .month-display {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .nav-btn {
+            background: none;
+            border: 1px solid #e5e5e5;
+            color: #666;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .nav-btn:hover {
+            border-color: #1a1a1a;
+            color: #1a1a1a;
+        }
+
         .legend {
-            padding: 15px 20px;
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #666;
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .events { background: #3b82f6; }
+        .theater1 { background: #10b981; }
+        .theater2 { background: #f59e0b; }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: #e5e5e5;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 48px;
+        }
+
+        .day-header {
+            background: #f8f8f8;
+            padding: 16px 8px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #666;
+        }
+
+        .day-cell {
+            background: white;
+            min-height: 120px;
+            padding: 12px 8px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .day-cell.other-month {
+            background: #fafafa;
+            color: #ccc;
+        }
+
+        .day-number {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #1a1a1a;
+        }
+
+        .other-month .day-number {
+            color: #ccc;
+        }
+
+        .event {
             background: #f8f9fa;
-            border-top: 1px solid #e0e0e0;
+            border-left: 3px solid #ef4444;
+            padding: 4px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            line-height: 1.3;
+            color: #1a1a1a;
+            margin-bottom: 2px;
+            font-weight: 500;
+        }
+
+        .event.theater1 {
+            border-left-color: #3b82f6;
+        }
+
+        .event.theater2 {
+            border-left-color: #10b981;
+        }
+
+        .event-time {
+            font-size: 10px;
+            color: #666;
+            font-weight: 400;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+            color: #666;
             font-size: 14px;
         }
-        
-        .legend-item {
-            display: inline-block;
-            margin-right: 20px;
-            margin-bottom: 5px;
+
+        .footer {
+            text-align: center;
+            padding-top: 32px;
+            border-top: 1px solid #e5e5e5;
+            color: #666;
+            font-size: 13px;
         }
-        
-        .color-dot {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 6px;
-            vertical-align: middle;
-        }
-        
+
         @media (max-width: 768px) {
-            body {
-                padding: 10px;
+            .calendar-container {
+                padding: 24px 16px;
             }
             
-            iframe {
-                height: 500px;
+            .brand h1 {
+                font-size: 24px;
             }
             
-            .legend-item {
-                display: block;
-                margin-bottom: 8px;
+            .nav-section {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+            }
+            
+            .legend {
+                gap: 16px;
+            }
+            
+            .day-cell {
+                min-height: 100px;
+                padding: 8px 6px;
+            }
+            
+            .event {
+                font-size: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .calendar-grid {
+                gap: 0;
+            }
+            
+            .day-header {
+                padding: 12px 4px;
+                font-size: 11px;
+            }
+            
+            .day-cell {
+                min-height: 80px;
+                padding: 6px 4px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>TSL Calendar</h1>
-        <div class="week-toggle">
-            <span>Sunday</span>
-            <label class="toggle-switch">
-                <input type="checkbox" id="weekStartToggle">
-                <span class="slider"></span>
-            </label>
-            <span>Monday</span>
-        </div>
-    </div>
-    
     <div class="calendar-container">
-        <iframe src="https://calendar.google.com/calendar/embed?height=600&wkst=1&bgcolor=%23ffffff&ctz=America%2FNew_York&src=1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255%40group.calendar.google.com&color=%23D50000&src=6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700%40group.calendar.google.com&color=%23FF6F00&src=7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306%40group.calendar.google.com&color=%232196F3&src=007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b%40group.calendar.google.com&color=%23757575&src=ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4%40group.calendar.google.com&color=%234CAF50&mode=MONTH&showTabs=1&showPrint=0&showDate=1&showNav=1&showTitle=0&showCalendars=1"></iframe>
-        
-        <div class="legend">
-            <div class="legend-item">
-                <span class="color-dot" style="background-color: #D50000;"></span>
-                TSL Events
+        <header class="header">
+            <div class="brand">
+                <h1>TSL Theater</h1>
+                <span class="status">Live</span>
             </div>
-            <div class="legend-item">
-                <span class="color-dot" style="background-color: #FF6F00;"></span>
-                TSL Events (NON-PUBLIC)
+            
+            <div class="nav-section">
+                <div class="month-display" id="monthDisplay">Loading...</div>
+                
+                <div class="controls">
+                    <button class="nav-btn" id="prevBtn">← Previous</button>
+                    <button class="nav-btn" id="todayBtn">Today</button>
+                    <button class="nav-btn" id="nextBtn">Next →</button>
+                </div>
+                
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-dot events"></div>
+                        <span>TSL Events</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot theater1"></div>
+                        <span>Theater 1</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot theater2"></div>
+                        <span>Theater 2</span>
+                    </div>
+                </div>
             </div>
-            <div class="legend-item">
-                <span class="color-dot" style="background-color: #2196F3;"></span>
-                TSL TBD
-            </div>
-            <div class="legend-item">
-                <span class="color-dot" style="background-color: #757575;"></span>
-                TSL Theater 1
-            </div>
-            <div class="legend-item">
-                <span class="color-dot" style="background-color: #4CAF50;"></span>
-                TSL Theater 2
-            </div>
+        </header>
+
+        <div id="loadingMessage" class="loading">
+            Loading events...
         </div>
+
+        <div class="calendar-grid" id="calendarGrid" style="display: none;">
+            <div class="day-header">Mon</div>
+            <div class="day-header">Tue</div>
+            <div class="day-header">Wed</div>
+            <div class="day-header">Thu</div>
+            <div class="day-header">Fri</div>
+            <div class="day-header">Sat</div>
+            <div class="day-header">Sun</div>
+        </div>
+
+        <footer class="footer">
+            <p>Updated in real-time from Google Calendar</p>
+        </footer>
     </div>
-    
+
     <script>
-        // Calendar embed URLs with all 5 correct TSL calendar IDs
-        const sundayStartUrl = "https://calendar.google.com/calendar/embed?height=600&wkst=1&bgcolor=%23ffffff&ctz=America%2FNew_York&src=1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255%40group.calendar.google.com&color=%23D50000&src=6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700%40group.calendar.google.com&color=%23FF6F00&src=7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306%40group.calendar.google.com&color=%232196F3&src=007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b%40group.calendar.google.com&color=%23757575&src=ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4%40group.calendar.google.com&color=%234CAF50&mode=MONTH&showTabs=1&showPrint=0&showDate=1&showNav=1&showTitle=0&showCalendars=1";
-        
-        const mondayStartUrl = "https://calendar.google.com/calendar/embed?height=600&wkst=2&bgcolor=%23ffffff&ctz=America%2FNew_York&src=1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255%40group.calendar.google.com&color=%23D50000&src=6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700%40group.calendar.google.com&color=%23FF6F00&src=7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306%40group.calendar.google.com&color=%232196F3&src=007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b%40group.calendar.google.com&color=%23757575&src=ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4%40group.calendar.google.com&color=%234CAF50&mode=MONTH&showTabs=1&showPrint=0&showDate=1&showNav=1&showTitle=0&showCalendars=1";
-        
-        const calendarFrame = document.querySelector('iframe');
-        const weekToggle = document.getElementById('weekStartToggle');
-        
-        // Load saved preference or default to Sunday
-        const savedPreference = localStorage.getItem('tsl-week-start');
-        if (savedPreference === 'monday') {
-            weekToggle.checked = true;
-            calendarFrame.src = mondayStartUrl;
-        }
-        
-        // Handle toggle change
-        weekToggle.addEventListener('change', function() {
-            if (this.checked) {
-                // Monday start
-                calendarFrame.src = mondayStartUrl;
-                localStorage.setItem('tsl-week-start', 'monday');
-            } else {
-                // Sunday start
-                calendarFrame.src = sundayStartUrl;
-                localStorage.setItem('tsl-week-start', 'sunday');
+        // Google Calendar Configuration
+        const CLIENT_ID = '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
+        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
+        const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
+
+        // Calendar IDs (PUBLIC ONLY)
+        const CALENDARS = {
+            'tsl.events@gmail.com': { name: 'TSL Events', class: 'events' },
+            'tsl.theater1@gmail.com': { name: 'Theater 1', class: 'theater1' },
+            'tsl.theater2@gmail.com': { name: 'Theater 2', class: 'theater2' }
+        };
+
+        let gapi;
+        let currentDate = new Date();
+
+        // Initialize Google API
+        async function initializeGapi() {
+            try {
+                await new Promise((resolve) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://apis.google.com/js/api.js';
+                    script.onload = resolve;
+                    document.head.appendChild(script);
+                });
+
+                gapi = window.gapi;
+                await gapi.load('client', async () => {
+                    await gapi.client.init({
+                        apiKey: API_KEY,
+                        discoveryDocs: [DISCOVERY_DOC],
+                    });
+                    
+                    document.getElementById('loadingMessage').textContent = 'Loading calendar...';
+                    await loadCalendar();
+                });
+            } catch (error) {
+                console.error('Error initializing Google API:', error);
+                document.getElementById('loadingMessage').textContent = 'Error loading calendar. Please refresh the page.';
             }
-        });
+        }
+
+        // Load calendar events
+        async function loadCalendar() {
+            try {
+                const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+                
+                // Extend to show full weeks
+                const startDate = new Date(startOfMonth);
+                startDate.setDate(startDate.getDate() - startOfMonth.getDay() + 1); // Start from Monday
+                
+                const endDate = new Date(endOfMonth);
+                const daysToAdd = 7 - endOfMonth.getDay();
+                endDate.setDate(endDate.getDate() + daysToAdd);
+
+                const allEvents = [];
+
+                // Fetch events from all calendars
+                for (const [calendarId, config] of Object.entries(CALENDARS)) {
+                    try {
+                        const response = await gapi.client.calendar.events.list({
+                            calendarId: calendarId,
+                            timeMin: startDate.toISOString(),
+                            timeMax: endDate.toISOString(),
+                            singleEvents: true,
+                            orderBy: 'startTime',
+                        });
+
+                        if (response.result.items) {
+                            response.result.items.forEach(event => {
+                                allEvents.push({
+                                    ...event,
+                                    calendarType: config.class,
+                                    calendarName: config.name
+                                });
+                            });
+                        }
+                    } catch (error) {
+                        console.warn(`Could not load calendar ${calendarId}:`, error);
+                    }
+                }
+
+                renderCalendar(startDate, endDate, allEvents);
+                updateMonthDisplay();
+                
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.getElementById('calendarGrid').style.display = 'grid';
+                
+            } catch (error) {
+                console.error('Error loading calendar:', error);
+                document.getElementById('loadingMessage').textContent = 'Error loading events.';
+            }
+        }
+
+        // Render calendar grid
+        function renderCalendar(startDate, endDate, events) {
+            const grid = document.getElementById('calendarGrid');
+            
+            // Clear existing day cells
+            const dayCells = grid.querySelectorAll('.day-cell');
+            dayCells.forEach(cell => cell.remove());
+
+            const currentMonth = currentDate.getMonth();
+            const date = new Date(startDate);
+
+            while (date <= endDate) {
+                const dayCell = document.createElement('div');
+                dayCell.className = 'day-cell';
+                
+                if (date.getMonth() !== currentMonth) {
+                    dayCell.classList.add('other-month');
+                }
+
+                const dayNumber = document.createElement('div');
+                dayNumber.className = 'day-number';
+                dayNumber.textContent = date.getDate();
+                dayCell.appendChild(dayNumber);
+
+                // Add events for this day
+                const dayEvents = events.filter(event => {
+                    const eventDate = new Date(event.start.dateTime || event.start.date);
+                    return eventDate.toDateString() === date.toDateString();
+                });
+
+                dayEvents.forEach(event => {
+                    const eventElement = document.createElement('div');
+                    eventElement.className = `event ${event.calendarType}`;
+                    
+                    let eventTime = '';
+                    if (event.start.dateTime) {
+                        const time = new Date(event.start.dateTime);
+                        eventTime = time.toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                        });
+                    }
+
+                    eventElement.innerHTML = `
+                        <div>${event.summary || 'Untitled Event'}</div>
+                        ${eventTime ? `<div class="event-time">${eventTime}</div>` : ''}
+                    `;
+                    
+                    dayCell.appendChild(eventElement);
+                });
+
+                grid.appendChild(dayCell);
+                date.setDate(date.getDate() + 1);
+            }
+        }
+
+        // Update month display
+        function updateMonthDisplay() {
+            const options = { month: 'long', year: 'numeric' };
+            document.getElementById('monthDisplay').textContent = 
+                currentDate.toLocaleDateString('en-US', options);
+        }
+
+        // Navigation functions
+        function previousMonth() {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            loadCalendar();
+        }
+
+        function nextMonth() {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            loadCalendar();
+        }
+
+        function goToToday() {
+            currentDate = new Date();
+            loadCalendar();
+        }
+
+        // Event listeners
+        document.getElementById('prevBtn').addEventListener('click', previousMonth);
+        document.getElementById('nextBtn').addEventListener('click', nextMonth);
+        document.getElementById('todayBtn').addEventListener('click', goToToday);
+
+        // Initialize
+        initializeGapi();
     </script>
 </body>
 </html>
