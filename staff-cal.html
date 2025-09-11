@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSL Calendar - Staff View</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f7;
+            color: #1d1d1f;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .toggle-label {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #007aff;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .week-labels {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .week-labels .active {
+            color: #007aff;
+        }
+
+        .week-labels .inactive {
+            color: #999;
+        }
+
+        .calendar-container {
+            height: calc(100vh - 100px);
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .calendar-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 50vh;
+            font-size: 18px;
+            color: #666;
+        }
+
+        .calendar-legend {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 12px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .legend-events { background: #ec407a; }
+        .legend-non-public { background: #ff9800; }
+        .legend-tbd { background: #42a5f5; }
+        .legend-theater-1 { background: #757575; }
+        .legend-theater-2 { background: #66bb6a; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>TSL Calendar - Staff View</h1>
+        <div class="toggle-container">
+            <div class="calendar-legend">
+                <div class="legend-item">
+                    <div class="legend-color legend-events"></div>
+                    <span>Events</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color legend-non-public"></div>
+                    <span>Non-Public</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color legend-tbd"></div>
+                    <span>TBD</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color legend-theater-1"></div>
+                    <span>Theater 1</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color legend-theater-2"></div>
+                    <span>Theater 2</span>
+                </div>
+            </div>
+            <div class="week-labels">
+                <span id="sundayLabel" class="active">Sunday Start</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="weekToggle">
+                    <span class="slider"></span>
+                </label>
+                <span id="mondayLabel" class="inactive">Monday Start</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="calendar-container">
+        <div class="loading" id="loading">Loading Calendar...</div>
+        <iframe id="calendarFrame" class="calendar-frame" style="display: none;"></iframe>
+    </div>
+
+    <script>
+        // TSL Calendar IDs (same as in the scheduler)
+        const CALENDAR_IDS = {
+            'events': '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
+            'non-public': '6b48156e2887ac486283a0d4a2f94b1d2ad4b1ac4dd7e19f2fc7e01dafe67700@group.calendar.google.com', 
+            'tbd': '7b77eba3cf2e9f4e0407d62c3acd2540170b31554d1698b71ea7eb3a11d58306@group.calendar.google.com',
+            'theater-1': '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com',
+            'theater-2': 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
+        };
+
+        // Calendar colors to match the scheduler
+        const CALENDAR_COLORS = {
+            'events': '%23E91E63',        // Pink
+            'non-public': '%23FF9800',   // Orange  
+            'tbd': '%232196F3',          // Blue
+            'theater-1': '%23607D8B',    // Blue Grey
+            'theater-2': '%234CAF50'     // Green
+        };
+
+        function buildCalendarUrl(sundayStart = true) {
+            const wkst = sundayStart ? '1' : '2'; // 1=Sunday, 2=Monday
+            
+            let url = 'https://calendar.google.com/calendar/embed?';
+            
+            // Add each calendar with its color
+            Object.entries(CALENDAR_IDS).forEach(([key, calendarId]) => {
+                url += `src=${encodeURIComponent(calendarId)}&`;
+                url += `color=${CALENDAR_COLORS[key]}&`;
+            });
+            
+            // Calendar settings
+            url += `wkst=${wkst}&`;           // Week start day
+            url += 'mode=MONTH&';            // Month view
+            url += 'showTitle=0&';           // Hide title
+            url += 'showNav=1&';             // Show navigation
+            url += 'showDate=1&';            // Show date
+            url += 'showPrint=0&';           // Hide print button
+            url += 'showCalendars=1&';       // Show calendar list
+            url += 'showTz=0&';              // Hide timezone
+            url += 'bgcolor=%23ffffff&';     // White background
+            url += 'ctz=America%2FNew_York'; // Eastern timezone
+            
+            return url;
+        }
+
+        function updateCalendar() {
+            const toggle = document.getElementById('weekToggle');
+            const frame = document.getElementById('calendarFrame');
+            const loading = document.getElementById('loading');
+            const sundayLabel = document.getElementById('sundayLabel');
+            const mondayLabel = document.getElementById('mondayLabel');
+            
+            const sundayStart = !toggle.checked;
+            
+            // Update labels
+            if (sundayStart) {
+                sundayLabel.className = 'active';
+                mondayLabel.className = 'inactive';
+            } else {
+                sundayLabel.className = 'inactive'; 
+                mondayLabel.className = 'active';
+            }
+            
+            // Show loading
+            loading.style.display = 'flex';
+            frame.style.display = 'none';
+            
+            // Update calendar URL
+            const calendarUrl = buildCalendarUrl(sundayStart);
+            frame.src = calendarUrl;
+            
+            // Hide loading after frame loads
+            frame.onload = function() {
+                setTimeout(() => {
+                    loading.style.display = 'none';
+                    frame.style.display = 'block';
+                }, 500);
+            };
+            
+            // Save preference
+            localStorage.setItem('tsl_calendar_sunday_start', sundayStart.toString());
+        }
+
+        function init() {
+            const toggle = document.getElementById('weekToggle');
+            
+            // Load saved preference (default to Sunday start)
+            const savedPreference = localStorage.getItem('tsl_calendar_sunday_start');
+            const sundayStart = savedPreference === null ? true : savedPreference === 'true';
+            
+            toggle.checked = !sundayStart;
+            
+            // Add event listener
+            toggle.addEventListener('change', updateCalendar);
+            
+            // Initial load
+            updateCalendar();
+            
+            console.log('TSL Staff Calendar View initialized');
+        }
+
+        // Start when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
