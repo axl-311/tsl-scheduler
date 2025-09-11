@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Time & Space Calendar</title>
+    <title>TSL Theater Calendar</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
@@ -119,9 +119,8 @@
             border-radius: 50%;
         }
 
-        .events { background: #ef4444; }
-        .theater1 { background: #3b82f6; }
-        .theater2 { background: #10b981; }
+        .special-events { background: #ef4444; }
+        .movies { background: #3b82f6; }
 
         .calendar-grid {
             display: grid;
@@ -129,6 +128,7 @@
             gap: 1px;
             background: #e5e5e5;
             border-radius: 8px;
+            border: 2px solid #d1d5db;
             overflow: hidden;
             margin-bottom: 48px;
         }
@@ -180,14 +180,19 @@
             color: #1a1a1a;
             margin-bottom: 2px;
             font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: block;
         }
 
-        .event.theater1 {
+        .event:hover {
+            background: #f1f5f9;
+            transform: translateX(2px);
+        }
+
+        .event.movies {
             border-left-color: #3b82f6;
-        }
-
-        .event.theater2 {
-            border-left-color: #10b981;
         }
 
         .event-time {
@@ -273,7 +278,7 @@
     <div class="calendar-container">
         <header class="header">
             <div class="brand">
-                <h1>Time & Space Limited Calendar</h1>
+                <h1>TSL Theater</h1>
                 <span class="status">Live</span>
             </div>
             
@@ -288,16 +293,12 @@
                 
                 <div class="legend">
                     <div class="legend-item">
-                        <div class="legend-dot events"></div>
-                        <span>TSL Events</span>
+                        <div class="legend-dot special-events"></div>
+                        <span>Special Events</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-dot theater1"></div>
-                        <span>Theater 1</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-dot theater2"></div>
-                        <span>Theater 2</span>
+                        <div class="legend-dot movies"></div>
+                        <span>Movies</span>
                     </div>
                 </div>
             </div>
@@ -332,16 +333,16 @@
         // TSL Calendar IDs - Production Configuration (PUBLIC ONLY)
         const CALENDARS = {
             '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com': { 
-                name: 'TSL Events', 
-                class: 'events' 
+                name: 'Special Events', 
+                class: 'special-events' 
             },
             '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com': { 
-                name: 'Theater 1', 
-                class: 'theater1' 
+                name: 'Movies', 
+                class: 'movies' 
             },
             'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com': { 
-                name: 'Theater 2', 
-                class: 'theater2' 
+                name: 'Movies', 
+                class: 'movies' 
             }
         };
 
@@ -501,8 +502,18 @@
                 });
 
                 dayEvents.forEach(event => {
-                    const eventElement = document.createElement('div');
+                    const eventElement = document.createElement('a');
                     eventElement.className = `event ${event.calendarType}`;
+                    
+                    // Set the link target
+                    if (event.htmlLink) {
+                        eventElement.href = event.htmlLink;
+                        eventElement.target = '_blank';
+                        eventElement.rel = 'noopener noreferrer';
+                    } else {
+                        eventElement.href = '#';
+                        eventElement.onclick = (e) => e.preventDefault();
+                    }
                     
                     let eventTime = '';
                     if (event.start.dateTime) {
