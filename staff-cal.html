@@ -224,15 +224,17 @@
                 url += `color=${CALENDAR_COLORS[key]}&`;
             });
             
-            // Calendar settings
+            // Calendar settings for larger day cells
             url += `wkst=${wkst}&`;           // Week start day
             url += 'mode=MONTH&';            // Month view
+            url += 'height=800&';            // Increased height for bigger day cells
             url += 'showTitle=0&';           // Hide title
             url += 'showNav=1&';             // Show navigation
             url += 'showDate=1&';            // Show date
             url += 'showPrint=0&';           // Hide print button
             url += 'showCalendars=1&';       // Show calendar list
             url += 'showTz=0&';              // Hide timezone
+            url += 'details=1&';             // Show more event details
             url += 'bgcolor=%23ffffff&';     // White background
             url += 'ctz=America%2FNew_York'; // Eastern timezone
             
