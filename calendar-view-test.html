@@ -119,9 +119,9 @@
             border-radius: 50%;
         }
 
-        .events { background: #3b82f6; }
-        .theater1 { background: #10b981; }
-        .theater2 { background: #f59e0b; }
+        .events { background: #ef4444; }
+        .theater1 { background: #3b82f6; }
+        .theater2 { background: #10b981; }
 
         .calendar-grid {
             display: grid;
@@ -213,6 +213,16 @@
             font-size: 13px;
         }
 
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 24px 0;
+            font-size: 14px;
+        }
+
         @media (max-width: 768px) {
             .calendar-container {
                 padding: 24px 16px;
@@ -294,7 +304,7 @@
         </header>
 
         <div id="loadingMessage" class="loading">
-            Loading events...
+            Initializing calendar...
         </div>
 
         <div class="calendar-grid" id="calendarGrid" style="display: none;">
@@ -313,17 +323,26 @@
     </div>
 
     <script>
-        // Google Calendar Configuration
+        // Google Calendar API Configuration
         const CLIENT_ID = '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
         const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
-        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
-        const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
+        const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
+        const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
 
-        // Calendar IDs (PUBLIC ONLY)
+        // TSL Calendar IDs - Production Configuration (PUBLIC ONLY)
         const CALENDARS = {
-            'tsl.events@gmail.com': { name: 'TSL Events', class: 'events' },
-            'tsl.theater1@gmail.com': { name: 'Theater 1', class: 'theater1' },
-            'tsl.theater2@gmail.com': { name: 'Theater 2', class: 'theater2' }
+            '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com': { 
+                name: 'TSL Events', 
+                class: 'events' 
+            },
+            '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com': { 
+                name: 'Theater 1', 
+                class: 'theater1' 
+            },
+            'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com': { 
+                name: 'Theater 2', 
+                class: 'theater2' 
+            }
         };
 
         let gapi;
@@ -332,27 +351,45 @@
         // Initialize Google API
         async function initializeGapi() {
             try {
-                await new Promise((resolve) => {
+                // Load Google API script
+                await new Promise((resolve, reject) => {
                     const script = document.createElement('script');
                     script.src = 'https://apis.google.com/js/api.js';
                     script.onload = resolve;
+                    script.onerror = reject;
                     document.head.appendChild(script);
                 });
 
                 gapi = window.gapi;
-                await gapi.load('client', async () => {
-                    await gapi.client.init({
-                        apiKey: API_KEY,
-                        discoveryDocs: [DISCOVERY_DOC],
-                    });
-                    
-                    document.getElementById('loadingMessage').textContent = 'Loading calendar...';
-                    await loadCalendar();
+                
+                // Initialize the API client
+                await new Promise((resolve) => {
+                    gapi.load('client', resolve);
                 });
+
+                await gapi.client.init({
+                    apiKey: API_KEY,
+                    discoveryDocs: DISCOVERY_DOCS,
+                });
+                
+                console.log('Google Calendar API initialized successfully');
+                document.getElementById('loadingMessage').textContent = 'Loading events...';
+                await loadCalendar();
+                
             } catch (error) {
                 console.error('Error initializing Google API:', error);
-                document.getElementById('loadingMessage').textContent = 'Error loading calendar. Please refresh the page.';
+                showError('Failed to initialize Google Calendar API. Please check your internet connection and refresh the page.');
             }
+        }
+
+        // Show error message
+        function showError(message) {
+            const loadingElement = document.getElementById('loadingMessage');
+            loadingElement.innerHTML = `
+                <div class="error-message">
+                    ${message}
+                </div>
+            `;
         }
 
         // Load calendar events
@@ -361,28 +398,36 @@
                 const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
                 const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
                 
-                // Extend to show full weeks
+                // Extend to show full weeks (Monday to Sunday)
                 const startDate = new Date(startOfMonth);
-                startDate.setDate(startDate.getDate() - startOfMonth.getDay() + 1); // Start from Monday
+                const startDay = startOfMonth.getDay();
+                const daysToSubtract = startDay === 0 ? 6 : startDay - 1; // Adjust for Monday start
+                startDate.setDate(startDate.getDate() - daysToSubtract);
                 
                 const endDate = new Date(endOfMonth);
-                const daysToAdd = 7 - endOfMonth.getDay();
+                const endDay = endOfMonth.getDay();
+                const daysToAdd = endDay === 0 ? 0 : 7 - endDay;
                 endDate.setDate(endDate.getDate() + daysToAdd);
 
                 const allEvents = [];
+                let successfulCalendars = 0;
 
                 // Fetch events from all calendars
                 for (const [calendarId, config] of Object.entries(CALENDARS)) {
                     try {
+                        console.log(`Loading calendar: ${config.name}`);
+                        
                         const response = await gapi.client.calendar.events.list({
                             calendarId: calendarId,
                             timeMin: startDate.toISOString(),
                             timeMax: endDate.toISOString(),
                             singleEvents: true,
                             orderBy: 'startTime',
+                            maxResults: 250
                         });
 
                         if (response.result.items) {
+                            console.log(`Found ${response.result.items.length} events in ${config.name}`);
                             response.result.items.forEach(event => {
                                 allEvents.push({
                                     ...event,
@@ -390,12 +435,22 @@
                                     calendarName: config.name
                                 });
                             });
+                            successfulCalendars++;
                         }
                     } catch (error) {
-                        console.warn(`Could not load calendar ${calendarId}:`, error);
+                        console.warn(`Could not load calendar ${config.name}:`, error);
+                        if (error.status === 404) {
+                            console.warn(`Calendar ${config.name} not found or not public`);
+                        }
                     }
                 }
 
+                if (successfulCalendars === 0) {
+                    showError('No calendars could be loaded. Please check that the calendars are public and the IDs are correct.');
+                    return;
+                }
+
+                console.log(`Total events loaded: ${allEvents.length}`);
                 renderCalendar(startDate, endDate, allEvents);
                 updateMonthDisplay();
                 
@@ -404,7 +459,7 @@
                 
             } catch (error) {
                 console.error('Error loading calendar:', error);
-                document.getElementById('loadingMessage').textContent = 'Error loading events.';
+                showError('Error loading calendar events. Please try refreshing the page.');
             }
         }
 
@@ -412,7 +467,7 @@
         function renderCalendar(startDate, endDate, events) {
             const grid = document.getElementById('calendarGrid');
             
-            // Clear existing day cells
+            // Clear existing day cells (keep headers)
             const dayCells = grid.querySelectorAll('.day-cell');
             dayCells.forEach(cell => cell.remove());
 
@@ -438,6 +493,13 @@
                     return eventDate.toDateString() === date.toDateString();
                 });
 
+                // Sort events by time
+                dayEvents.sort((a, b) => {
+                    const timeA = new Date(a.start.dateTime || a.start.date);
+                    const timeB = new Date(b.start.dateTime || b.start.date);
+                    return timeA - timeB;
+                });
+
                 dayEvents.forEach(event => {
                     const eventElement = document.createElement('div');
                     eventElement.className = `event ${event.calendarType}`;
@@ -452,8 +514,10 @@
                         });
                     }
 
+                    const eventTitle = event.summary || 'Untitled Event';
+                    
                     eventElement.innerHTML = `
-                        <div>${event.summary || 'Untitled Event'}</div>
+                        <div>${eventTitle}</div>
                         ${eventTime ? `<div class="event-time">${eventTime}</div>` : ''}
                     `;
                     
@@ -475,16 +539,22 @@
         // Navigation functions
         function previousMonth() {
             currentDate.setMonth(currentDate.getMonth() - 1);
+            document.getElementById('loadingMessage').style.display = 'flex';
+            document.getElementById('calendarGrid').style.display = 'none';
             loadCalendar();
         }
 
         function nextMonth() {
             currentDate.setMonth(currentDate.getMonth() + 1);
+            document.getElementById('loadingMessage').style.display = 'flex';
+            document.getElementById('calendarGrid').style.display = 'none';
             loadCalendar();
         }
 
         function goToToday() {
             currentDate = new Date();
+            document.getElementById('loadingMessage').style.display = 'flex';
+            document.getElementById('calendarGrid').style.display = 'none';
             loadCalendar();
         }
 
@@ -493,8 +563,11 @@
         document.getElementById('nextBtn').addEventListener('click', nextMonth);
         document.getElementById('todayBtn').addEventListener('click', goToToday);
 
-        // Initialize
-        initializeGapi();
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Page loaded, initializing calendar...');
+            initializeGapi();
+        });
     </script>
 </body>
 </html>
