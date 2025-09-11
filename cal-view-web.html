@@ -330,11 +330,15 @@
         const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
 
+        // Calendar IDs - Update these if needed
         const CALENDARS = {
-            main: 'a4t9cebgn3nvcdqbvqpkm1p5fc@group.calendar.google.com',
-            theater1: 'bqhf6n6chtvr1e8dqcfs8v3gi4@group.calendar.google.com',
-            theater2: 'cr2kbqovfnm3d55vpjgkmnbj5k@group.calendar.google.com'
+            main: 'a4t9cebgn3nvcdqbvqpkm1p5fc@group.calendar.google.com',     // TSL Events
+            theater1: 'bqhf6n6chtvr1e8dqcfs8v3gi4@group.calendar.google.com', // TSL Theater 1
+            theater2: 'cr2kbqovfnm3d55vpjgkmnbj5k@group.calendar.google.com'  // TSL Theater 2
         };
+
+        // Debug: Log calendar IDs on load
+        console.log('Calendar Configuration:', CALENDARS);
 
         // State
         let currentDate = new Date();
@@ -348,6 +352,13 @@
 
         async function initializeAPI() {
             try {
+                // Check if running locally (file://)
+                if (window.location.protocol === 'file:') {
+                    updateAuthStatus('Local file detected');
+                    await initializeWithoutAuth();
+                    return;
+                }
+
                 await new Promise((resolve) => {
                     window.gapi.load('client', resolve);
                 });
@@ -369,8 +380,113 @@
             } catch (error) {
                 console.error('API initialization failed:', error);
                 updateAuthStatus('Failed');
-                showAuthButton();
+                await initializeWithoutAuth();
             }
+        }
+
+        async function initializeWithoutAuth() {
+            updateAuthStatus('Loading without auth...');
+            
+            try {
+                await new Promise((resolve) => {
+                    window.gapi.load('client', resolve);
+                });
+
+                await window.gapi.client.init({
+                    apiKey: API_KEY,
+                    discoveryDocs: DISCOVERY_DOCS,
+                });
+
+                updateAuthStatus('API key only');
+                await loadCalendarDataWithFetch();
+
+            } catch (error) {
+                console.error('Fallback initialization failed:', error);
+                updateAuthStatus('All methods failed');
+                renderLocalFileMessage();
+            }
+        }
+
+        async function loadCalendarDataWithFetch() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            const startDate = new Date(year, month, 1);
+            const endDate = new Date(year, month + 1, 0);
+            
+            const timeMin = startDate.toISOString();
+            const timeMax = endDate.toISOString();
+
+            let allEvents = [];
+            let loadedCount = 0;
+
+            updateAuthStatus('Loading via fetch...');
+
+            for (const [type, calendarId] of Object.entries(CALENDARS)) {
+                try {
+                    console.log(`Fetching ${type} calendar: ${calendarId}`);
+                    
+                    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
+                        `key=${API_KEY}&timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`;
+                    
+                    const response = await fetch(url);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const events = data.items || [];
+                        
+                        console.log(`✓ Loaded ${events.length} events from ${type}`);
+                        
+                        events.forEach(event => {
+                            event.calendarType = type;
+                            allEvents.push(event);
+                        });
+                        
+                        loadedCount++;
+                    } else {
+                        console.error(`✗ HTTP ${response.status} for ${type}:`, await response.text());
+                    }
+
+                } catch (error) {
+                    console.error(`✗ Fetch error for ${type}:`, error);
+                }
+            }
+
+            console.log(`Fetch loading complete: ${loadedCount}/3 calendars loaded`);
+            updateAuthStatus(`${loadedCount}/3 calendars loaded`);
+            
+            if (loadedCount === 0) {
+                renderLocalFileMessage();
+            } else {
+                renderCalendar(allEvents);
+            }
+        }
+
+        function renderLocalFileMessage() {
+            const calendar = document.getElementById('calendar');
+            calendar.innerHTML = `
+                <div class="loading">
+                    <div style="margin-bottom: 16px;">⚠️ Local File Limitation</div>
+                    <div style="font-size: 12px; line-height: 1.4; max-width: 300px; margin: 0 auto 16px;">
+                        Google Calendar API requires a web server. To fix this:
+                    </div>
+                    <div style="font-size: 11px; text-align: left; margin-bottom: 16px;">
+                        <strong>Option 1: Simple Local Server</strong><br>
+                        1. Install Python<br>
+                        2. Open terminal/command prompt<br>
+                        3. Navigate to your HTML file folder<br>
+                        4. Run: <code>python -m http.server 8000</code><br>
+                        5. Open: <code>http://localhost:8000</code>
+                    </div>
+                    <div style="font-size: 11px; text-align: left;">
+                        <strong>Option 2: Upload to Web Server</strong><br>
+                        Upload the HTML file to your website hosting
+                    </div>
+                    <button class="auth-btn" onclick="window.location.reload()" style="margin-top: 16px;">
+                        Retry
+                    </button>
+                </div>
+            `;
         }
 
         function handleAuthResponse(response) {
