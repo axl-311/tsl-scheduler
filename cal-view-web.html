@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSL Theater Calendar</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fafafa;
+            color: #333;
+            line-height: 1.4;
+            overflow-x: hidden;
+        }
+
+        .calendar-container {
+            max-width: 100vw;
+            min-height: 100vh;
+            padding: 20px;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 300;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .month-nav {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .nav-btn {
+            background: none;
+            border: 1px solid #ddd;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover {
+            background: #f5f5f5;
+        }
+
+        .current-month {
+            font-size: 1.1rem;
+            font-weight: 500;
+            min-width: 150px;
+            text-align: center;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            height: calc(100vh - 140px);
+        }
+
+        .day-header {
+            background: #2c3e50;
+            color: white;
+            padding: 8px 4px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .day-cell {
+            background: white;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            min-height: 80px;
+            position: relative;
+        }
+
+        .day-number {
+            font-size: 11px;
+            font-weight: 500;
+            color: #666;
+            margin-bottom: 2px;
+            text-align: right;
+        }
+
+        .day-cell.other-month {
+            background: #f8f8f8;
+            color: #ccc;
+        }
+
+        .day-cell.today {
+            background: #e3f2fd;
+        }
+
+        .day-cell.today .day-number {
+            color: #1976d2;
+            font-weight: 600;
+        }
+
+        .event {
+            background: var(--event-color, #4CAF50);
+            color: white;
+            padding: 2px 4px;
+            margin: 1px 0;
+            border-radius: 2px;
+            font-size: 9px;
+            line-height: 1.2;
+            cursor: pointer;
+            text-decoration: none;
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .event:hover {
+            transform: scale(1.02);
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .event.theater1 {
+            --event-color: #FF6B6B;
+        }
+
+        .event.theater2 {
+            --event-color: #4ECDC4;
+        }
+
+        .event.main {
+            --event-color: #45B7D1;
+        }
+
+        .event-time {
+            font-weight: 500;
+            display: block;
+        }
+
+        .event-title {
+            opacity: 0.9;
+            display: block;
+        }
+
+        .trailer-btn {
+            position: absolute;
+            right: 2px;
+            top: 2px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            border: none;
+            border-radius: 50%;
+            width: 14px;
+            height: 14px;
+            font-size: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .event:hover .trailer-btn {
+            opacity: 1;
+        }
+
+        .legend {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-size: 11px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 3px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .calendar-container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 1.4rem;
+            }
+            
+            .day-cell {
+                min-height: 60px;
+                padding: 2px;
+            }
+            
+            .event {
+                font-size: 8px;
+                padding: 1px 2px;
+            }
+            
+            .legend {
+                position: static;
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="calendar-container">
+        <div class="header">
+            <h1>TSL Theater</h1>
+            <div class="month-nav">
+                <button class="nav-btn" onclick="changeMonth(-1)">‹ Prev</button>
+                <div class="current-month" id="currentMonth"></div>
+                <button class="nav-btn" onclick="changeMonth(1)">Next ›</button>
+            </div>
+        </div>
+
+        <div class="calendar-grid" id="calendarGrid">
+            <div class="loading">Loading events...</div>
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #45B7D1;"></div>
+            <span>TSL Events</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #FF6B6B;"></div>
+            <span>Theater 1</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #4ECDC4;"></div>
+            <span>Theater 2</span>
+        </div>
+    </div>
+
+    <script>
+        // Google Calendar API Configuration
+        const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
+        const CALENDAR_IDS = {
+            'main': 'a4t9cebgn3nvcdqbvqpkm1p5fc@group.calendar.google.com', // TSL Events
+            'theater1': 'bqhf6n6chtvr1e8dqcfs8v3gi4@group.calendar.google.com', // TSL Theater 1
+            'theater2': 'cr2kbqovfnm3d55vpjgkmnbj5k@group.calendar.google.com'  // TSL Theater 2
+        };
+
+        let currentDate = new Date();
+
+        async function loadEvents() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            // Get first and last day of the month
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            
+            const timeMin = firstDay.toISOString();
+            const timeMax = lastDay.toISOString();
+
+            try {
+                const allEvents = [];
+                
+                // Load events from all 3 public calendars
+                for (const [calendarType, calendarId] of Object.entries(CALENDAR_IDS)) {
+                    const response = await fetch(
+                        `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?` +
+                        `key=${API_KEY}&timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`
+                    );
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const events = data.items.map(event => ({
+                            ...event,
+                            calendarType
+                        }));
+                        allEvents.push(...events);
+                    }
+                }
+
+                renderCalendar(allEvents);
+            } catch (error) {
+                console.error('Error loading events:', error);
+                document.getElementById('calendarGrid').innerHTML = 
+                    '<div class="loading">Unable to load events</div>';
+            }
+        }
+
+        function renderCalendar(events) {
+            const grid = document.getElementById('calendarGrid');
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            // Update month display
+            document.getElementById('currentMonth').textContent = 
+                new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+            // Clear grid
+            grid.innerHTML = '';
+
+            // Add day headers
+            const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayHeaders.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'day-header';
+                header.textContent = day;
+                grid.appendChild(header);
+            });
+
+            // Calculate calendar days
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Generate calendar days
+            for (let i = 0; i < 42; i++) {
+                const date = new Date(startDate);
+                date.setDate(date.getDate() + i);
+
+                const dayCell = document.createElement('div');
+                dayCell.className = 'day-cell';
+                
+                if (date.getMonth() !== month) {
+                    dayCell.classList.add('other-month');
+                }
+                
+                if (date.getTime() === today.getTime()) {
+                    dayCell.classList.add('today');
+                }
+
+                // Add day number
+                const dayNumber = document.createElement('div');
+                dayNumber.className = 'day-number';
+                dayNumber.textContent = date.getDate();
+                dayCell.appendChild(dayNumber);
+
+                // Add events for this day
+                const dayEvents = events.filter(event => {
+                    const eventDate = new Date(event.start.dateTime || event.start.date);
+                    return eventDate.toDateString() === date.toDateString();
+                });
+
+                dayEvents.forEach(event => {
+                    const eventEl = createEventElement(event);
+                    dayCell.appendChild(eventEl);
+                });
+
+                grid.appendChild(dayCell);
+            }
+        }
+
+        function createEventElement(event) {
+            const eventEl = document.createElement('a');
+            eventEl.className = `event ${event.calendarType}`;
+            eventEl.href = extractWebsiteUrl(event.description) || '#';
+            eventEl.target = '_blank';
+            
+            // Format time
+            const startTime = event.start.dateTime ? 
+                new Date(event.start.dateTime).toLocaleTimeString('en-US', { 
+                    hour: 'numeric', 
+                    minute: '2-digit',
+                    hour12: true 
+                }).replace(/:\d{2}/, '') : '';
+
+            eventEl.innerHTML = `
+                <span class="event-time">${startTime}</span>
+                <span class="event-title">${event.summary}</span>
+            `;
+
+            // Add trailer button if trailer URL exists
+            const trailerUrl = extractTrailerUrl(event.description);
+            if (trailerUrl) {
+                const trailerBtn = document.createElement('button');
+                trailerBtn.className = 'trailer-btn';
+                trailerBtn.innerHTML = '▶';
+                trailerBtn.title = 'Watch Trailer';
+                trailerBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.open(trailerUrl, '_blank');
+                };
+                eventEl.appendChild(trailerBtn);
+            }
+
+            return eventEl;
+        }
+
+        function extractWebsiteUrl(description) {
+            if (!description) return null;
+            const urlMatch = description.match(/https?:\/\/[^\s<>"]+/i);
+            return urlMatch ? urlMatch[0] : null;
+        }
+
+        function extractTrailerUrl(description) {
+            if (!description) return null;
+            const trailerMatch = description.match(/trailer[:\s]*https?:\/\/[^\s<>"]+/i);
+            return trailerMatch ? trailerMatch[0].replace(/^trailer[:\s]*/i, '') : null;
+        }
+
+        function changeMonth(direction) {
+            currentDate.setMonth(currentDate.getMonth() + direction);
+            loadEvents();
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') changeMonth(-1);
+            if (e.key === 'ArrowRight') changeMonth(1);
+        });
+
+        // Initialize
+        loadEvents();
+        
+        // Refresh every 10 minutes
+        setInterval(loadEvents, 600000);
+    </script>
+</body>
+</html>
