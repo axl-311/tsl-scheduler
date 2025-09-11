@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Schedule Maker 2000 - v1.0</title>
+    <title>TSL Schedule Maker 2000 - v1.1</title>
     <meta name="description" content="Theater scheduling application for Time & Space Limited">
     <meta name="author" content="TSL">
     <style>
@@ -691,7 +691,7 @@
     <div class="app-container">
         <div class="header">
             <div>
-                <h1>TSL Schedule Maker 2000<span class="version-badge">v1.0</span></h1>
+                <h1>TSL Schedule Maker 2000<span class="version-badge">v1.1</span></h1>
             </div>
             <button id="authButton" class="auth-button">
                 Connect Google Calendar
@@ -860,8 +860,14 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     <script>
         /*
-         * TSL Schedule Maker 2000 - Version 1.0
+         * TSL Schedule Maker 2000 - Version 1.1
          * Theater scheduling application for Time & Space Limited
+         * 
+         * NEW FIXES IN v1.1:
+         * - Fixed calendar switching with proper deletion from old calendars
+         * - Enhanced TBD workflow with theater metadata preservation
+         * - Improved push accuracy to match scheduler display exactly
+         * - Better metadata handling in Google Calendar extended properties
          * 
          * Features:
          * - Google Calendar integration (5 TSL calendars)
@@ -1046,7 +1052,47 @@
             showToast(`Added "${title}" to library`);
         }
 
-        // Google Calendar Integration - Fixed Description Handling
+        // TBD Functions - FIXED to preserve theater metadata
+        function convertToTBD(eventId) {
+            const event = scheduledEvents.find(e => e.id == eventId);
+            
+            if (!event) {
+                showToast('Event not found');
+                return;
+            }
+            
+            if (event.calendar === 'tbd') {
+                // Restore from TBD - use preserved theater info
+                const originalCalendar = event.originalCalendar || 'events';
+                event.calendar = originalCalendar;
+                
+                // If it was a theater event, restore to correct theater based on preserved info
+                if (originalCalendar === 'theater-1' || originalCalendar === 'theater-2') {
+                    // Use preserved theater or current theater position
+                    const targetTheater = event.preservedTheater !== undefined ? event.preservedTheater : event.theater;
+                    event.calendar = targetTheater === 0 ? 'theater-1' : 'theater-2';
+                }
+                
+                delete event.originalCalendar;
+                delete event.preservedTheater;
+                showToast(`Restored "${event.title}" to ${event.calendar}`);
+            } else {
+                // Convert to TBD - preserve current theater info
+                event.originalCalendar = event.calendar;
+                
+                // Preserve theater position for theater events
+                if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
+                    event.preservedTheater = event.theater;
+                }
+                
+                event.calendar = 'tbd';
+                showToast(`Changed "${event.title}" to TBD`);
+            }
+            
+            renderEventsForCurrentWeek();
+        }
+
+        // Google Calendar Integration - ENHANCED with proper calendar switching
         async function pushToGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
@@ -1118,6 +1164,7 @@
             }
         }
 
+        // ENHANCED createGoogleCalendarEvent with better calendar switching
         async function createGoogleCalendarEvent(scheduleEvent) {
             const calendarId = CALENDAR_IDS[scheduleEvent.calendar];
             if (!calendarId) {
@@ -1132,15 +1179,10 @@
             
             // Clean up description - remove attribution lines but preserve URLs and other content
             let cleanDescription = scheduleEvent.description || '';
-            
-            // Remove lines that start with or contain only attribution text
             cleanDescription = cleanDescription.replace(/^.*Scheduled via.*$/gmi, '');
             cleanDescription = cleanDescription.replace(/^.*Created by.*$/gmi, '');
-            
-            // Clean up extra whitespace and empty lines
             cleanDescription = cleanDescription.replace(/\n\s*\n/g, '\n').trim();
             
-            // Build final description with single clean attribution
             const finalDescription = cleanDescription ? 
                 `${cleanDescription}\n\nScheduled via TSL Schedule Maker 2000` : 
                 'Scheduled via TSL Schedule Maker 2000';
@@ -1162,31 +1204,43 @@
                         'tsl-scheduler': 'true',
                         'tsl-theater': scheduleEvent.theater.toString(),
                         'tsl-original-calendar': scheduleEvent.originalCalendar || scheduleEvent.calendar,
-                        'tsl-created': new Date().toISOString()
+                        'tsl-preserved-theater': scheduleEvent.preservedTheater !== undefined ? scheduleEvent.preservedTheater.toString() : '',
+                        'tsl-created': new Date().toISOString(),
+                        'tsl-version': '1.1'
                     }
                 }
             };
             
-            // Smart calendar switching - delete from old calendar if moved
-            if (scheduleEvent.googleEventId && scheduleEvent.originalCalendar && scheduleEvent.originalCalendar !== scheduleEvent.calendar) {
-                console.log(`Event moved from ${scheduleEvent.originalCalendar} to ${scheduleEvent.calendar}, will delete old and create new`);
-                
-                const originalCalendarId = CALENDAR_IDS[scheduleEvent.originalCalendar];
-                if (originalCalendarId) {
+            // Determine if calendar change is needed
+            const currentCalendar = scheduleEvent.calendar;
+            const lastPushedCalendar = scheduleEvent.lastPushedCalendar || scheduleEvent.originalCalendar;
+            const calendarChanged = lastPushedCalendar && lastPushedCalendar !== currentCalendar;
+            
+            console.log(`Event: ${scheduleEvent.title}`);
+            console.log(`Current calendar: ${currentCalendar}, Last pushed: ${lastPushedCalendar}, Changed: ${calendarChanged}`);
+            
+            // If calendar changed, delete from old calendar first
+            if (calendarChanged && scheduleEvent.googleEventId) {
+                const oldCalendarId = CALENDAR_IDS[lastPushedCalendar];
+                if (oldCalendarId && oldCalendarId !== calendarId) {
                     try {
-                        await deleteGoogleCalendarEvent(originalCalendarId, scheduleEvent.googleEventId);
-                        console.log(`✓ Deleted old event from ${scheduleEvent.originalCalendar} calendar`);
+                        console.log(`Deleting from old calendar: ${lastPushedCalendar}`);
+                        await deleteGoogleCalendarEvent(oldCalendarId, scheduleEvent.googleEventId);
+                        console.log(`✓ Deleted from ${lastPushedCalendar} calendar`);
+                        // Reset googleEventId since we deleted the old event
+                        scheduleEvent.googleEventId = null;
                     } catch (error) {
-                        console.log(`Could not delete old event (may already be gone): ${error.message}`);
+                        console.log(`Could not delete from old calendar: ${error.message}`);
+                        // Continue with creation anyway
+                        scheduleEvent.googleEventId = null;
                     }
                 }
-                
-                scheduleEvent.googleEventId = null;
             }
             
-            // Try to update existing event in same calendar
-            if (scheduleEvent.googleEventId) {
+            // Try to update existing event in current calendar
+            if (scheduleEvent.googleEventId && !calendarChanged) {
                 try {
+                    console.log(`Attempting to update existing event in ${currentCalendar}`);
                     const response = await fetch(
                         `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${scheduleEvent.googleEventId}`,
                         {
@@ -1200,10 +1254,12 @@
                     );
                     
                     if (response.ok) {
+                        const updatedEvent = await response.json();
+                        scheduleEvent.lastPushedCalendar = currentCalendar;
                         console.log(`✓ Updated existing event: ${scheduleEvent.title}`);
-                        return await response.json();
+                        return updatedEvent;
                     } else if (response.status === 404) {
-                        console.log(`Event not found in current calendar, creating new: ${scheduleEvent.title}`);
+                        console.log(`Event not found, will create new: ${scheduleEvent.title}`);
                         scheduleEvent.googleEventId = null;
                     } else {
                         throw new Error(`Update failed: ${response.status} ${response.statusText}`);
@@ -1215,6 +1271,7 @@
             }
             
             // Create new event
+            console.log(`Creating new event in ${currentCalendar}`);
             const response = await fetch(
                 `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
                 {
@@ -1234,10 +1291,11 @@
             
             const createdEvent = await response.json();
             
+            // Update event metadata
             scheduleEvent.googleEventId = createdEvent.id;
-            scheduleEvent.originalCalendar = scheduleEvent.calendar;
+            scheduleEvent.lastPushedCalendar = currentCalendar;
             
-            console.log(`✓ Created new event: ${scheduleEvent.title}`);
+            console.log(`✓ Created new event in ${currentCalendar}: ${scheduleEvent.title}`);
             return createdEvent;
         }
 
@@ -1261,7 +1319,7 @@
         function saveSchedule() {
             try {
                 const scheduleData = {
-                    version: '1.0',
+                    version: '1.1',
                     savedAt: new Date().toISOString(),
                     currentWeekStart: currentWeekStart.toISOString(),
                     libraryEvents: libraryEvents,
@@ -1435,7 +1493,7 @@
             };
         }
 
-        // Database Rebuild from Google Calendar
+        // ENHANCED import function to preserve theater metadata
         async function importFromGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
@@ -1517,11 +1575,20 @@
                                 duration = Math.round((end - start) / 60000);
                             }
 
+                            // Extract theater metadata from extended properties
+                            const extProps = event.extendedProperties?.private || {};
+                            const preservedTheater = extProps['tsl-preserved-theater'] ? 
+                                parseInt(extProps['tsl-preserved-theater']) : undefined;
+                            const originalCalendar = extProps['tsl-original-calendar'] || calendarKey;
+
                             const eventData = {
                                 id: event.id,
                                 title: event.summary || 'Untitled Event',
                                 duration: duration,
                                 calendar: calendarKey,
+                                originalCalendar: originalCalendar,
+                                preservedTheater: preservedTheater,
+                                lastPushedCalendar: calendarKey,
                                 description: event.description || '',
                                 location: event.location || '',
                                 googleEventId: event.id,
@@ -1763,28 +1830,6 @@
         }
 
         // Event Management Functions
-        function convertToTBD(eventId) {
-            const event = scheduledEvents.find(e => e.id == eventId);
-            
-            if (!event) {
-                showToast('Event not found');
-                return;
-            }
-            
-            if (event.calendar === 'tbd') {
-                const originalCalendar = event.originalCalendar || 'events';
-                event.calendar = originalCalendar;
-                delete event.originalCalendar;
-                showToast(`Restored "${event.title}" to ${originalCalendar}`);
-            } else {
-                event.originalCalendar = event.calendar;
-                event.calendar = 'tbd';
-                showToast(`Changed "${event.title}" to TBD`);
-            }
-            
-            renderEventsForCurrentWeek();
-        }
-
         function editEvent(eventId) {
             const event = scheduledEvents.find(e => e.id == eventId) || 
                          libraryEvents.find(e => e.id == eventId);
@@ -2108,6 +2153,7 @@
             }
         }
 
+        // ENHANCED drop handler to preserve theater info for TBD events
         function handleDrop(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -2139,12 +2185,13 @@
                 scheduledDate.setHours(0, 0, 0, 0);
                 
                 let scheduledEvent;
+                const targetTheater = parseInt(this.dataset.theater);
                 
                 if (source === 'library') {
                     scheduledEvent = {
                         ...event,
                         day: parseInt(this.dataset.day),
-                        theater: parseInt(this.dataset.theater),
+                        theater: targetTheater,
                         startHour: actualHour,
                         startMinute: minute,
                         actualDate: scheduledDate,
@@ -2170,7 +2217,7 @@
                     scheduledEvent = {
                         ...event,
                         day: parseInt(this.dataset.day),
-                        theater: parseInt(this.dataset.theater),
+                        theater: targetTheater,
                         startHour: actualHour,
                         startMinute: minute,
                         actualDate: scheduledDate,
@@ -2180,9 +2227,18 @@
                     scheduledEvents.push(scheduledEvent);
                 }
                 
+                // Smart calendar assignment based on event type and theater
                 if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
-                    scheduledEvent.calendar = this.dataset.theater === '0' ? 'theater-1' : 'theater-2';
+                    // Theater events go to the theater they're dropped on
+                    scheduledEvent.calendar = targetTheater === 0 ? 'theater-1' : 'theater-2';
+                } else if (event.calendar === 'tbd' && event.preservedTheater !== undefined) {
+                    // TBD events with preserved theater info - update to correct theater
+                    scheduledEvent.calendar = targetTheater === 0 ? 'theater-1' : 'theater-2';
+                    // Keep the TBD calendar but update preserved theater
+                    scheduledEvent.calendar = 'tbd';
+                    scheduledEvent.preservedTheater = targetTheater;
                 } else {
+                    // Non-theater events keep their calendar type
                     scheduledEvent.calendar = event.calendar;
                 }
                 
@@ -2202,7 +2258,7 @@
 
         // Application Initialization
         function init() {
-            console.log('Initializing TSL Schedule Maker 2000 v1.0...');
+            console.log('Initializing TSL Schedule Maker 2000 v1.1...');
             
             generateDaysColumns();
             updateWeekDisplay();
@@ -2275,7 +2331,7 @@
             }, 1000);
             
             renderLibrary();
-            console.log('TSL Schedule Maker 2000 v1.0 initialized successfully');
+            console.log('TSL Schedule Maker 2000 v1.1 initialized successfully');
         }
 
         // Start the application
