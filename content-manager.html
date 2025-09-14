@@ -1346,6 +1346,12 @@
             const formFields = document.querySelectorAll('#formFields input, #formFields textarea');
             formFields.forEach(field => {
                 field.value = '';
+                
+                // Handle image fields
+                if (getFieldType(field.dataset.column) === 'image-upload') {
+                    const column = field.dataset.column;
+                    removeImage(column);
+                }
             });
             
             document.getElementById('extractionPreview').classList.add('hidden');
