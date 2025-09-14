@@ -697,61 +697,22 @@
             }
         }
 
-        async function loadTableSchemas() {
-            const tables = ['movies', 'events', 'galleries'];
-            
-            for (const table of tables) {
-                try {
-                    // Get first row to understand column structure
-                    const { data, error } = await supabase.from(table).select('*').limit(1);
-                    if (error) {
-                        console.warn(`Table ${table} not found or accessible:`, error);
-                        continue;
-                    }
-                    
-                    if (data && data.length > 0) {
-                        const columns = Object.keys(data[0]);
-                        tableSchemas[table] = columns;
-                        
-                        // Detect likely title field
-                        titleFields[table] = detectTitleField(columns);
-                    } else {
-                        // Get schema from empty table
-                        try {
-                            const { data: schemaData, error: schemaError } = await supabase
-                                .from(table)
-                                .select('*')
-                                .limit(0);
-                            
-                            if (!schemaError) {
-                                // This is a hack - we'll try to insert empty data to get column errors
-                                const { error: insertError } = await supabase
-                                    .from(table)
-                                    .insert({})
-                                    .select();
-                                
-                                if (insertError && insertError.message) {
-                                    // Parse column names from error message
-                                    const match = insertError.message.match(/column "(\w+)"/g);
-                                    if (match) {
-                                        const columns = match.map(m => m.replace(/column "|"/g, ''));
-                                        tableSchemas[table] = columns;
-                                        titleFields[table] = detectTitleField(columns);
-                                    }
-                                }
-                            }
-                        } catch (e) {
-                            console.warn(`Could not determine schema for empty table ${table}`);
-                        }
-                    }
-                } catch (error) {
-                    console.warn(`Error loading schema for ${table}:`, error);
-                }
-            }
-            
-            console.log('Loaded schemas:', tableSchemas);
-            console.log('Title fields:', titleFields);
-        }
+       async function loadTableSchemas() {
+    // Use your actual table structures from Supabase
+    tableSchemas = {
+        movies: ['id', 'title', 'director', 'runtime_minutes', 'release_year', 'language', 'distributor', 'logline', 'synopsis', 'critics_quote', 'trailer_url', 'simpletix_embed_code', 'poster_url', 'web_graphics_url', 'created_at', 'updated_at'],
+        events: ['id', 'event_name', 'event_type', 'presenter', 'duration_minutes', 'description', 'critics_quote', 'simpletix_embed_code', 'content_type', 'poster_url', 'web_graphics_url', 'created_at', 'updated_at'],
+        galleries: ['id', 'exhibition_title', 'artist', 'art_medium', 'gallery_space', 'description', 'content_type', 'poster_url', 'web_graphics_url', 'created_at', 'updated_at']
+    };
+    
+    titleFields = {
+        movies: 'title',
+        events: 'event_name', 
+        galleries: 'exhibition_title'
+    };
+    
+    console.log('Using fixed schemas:', tableSchemas);
+}
 
         function detectTitleField(columns) {
             // Priority order for title field detection
