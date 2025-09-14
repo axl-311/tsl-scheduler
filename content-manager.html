@@ -960,7 +960,7 @@
             
             const fixedText = fixSpacing(text);
             const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-            const cleanText = fixedText.replace(/\s+/g, ' ').trim();
+            const cleanedText = fixedText.replace(/\s+/g, ' ').trim();
             
             const extracted = {
                 title: '',
@@ -1041,7 +1041,7 @@
             ];
             
             for (const pattern of directorPatterns) {
-                const match = cleanText.match(pattern);
+                const match = cleanedText.match(pattern);
                 if (match) {
                     extracted.director = match[1].trim();
                     break;
@@ -1058,7 +1058,7 @@
             ];
             
             for (const pattern of runtimePatterns) {
-                const match = cleanText.match(pattern);
+                const match = cleanedText.match(pattern);
                 if (match) {
                     const runtime = parseInt(match[1]);
                     if (runtime > 40 && runtime < 300) { // Reasonable movie length
@@ -1077,7 +1077,7 @@
             ];
             
             for (const pattern of yearPatterns) {
-                const match = cleanText.match(pattern);
+                const match = cleanedText.match(pattern);
                 if (match) {
                     const year = parseInt(match[1]);
                     if (year >= 1900 && year <= 2030) {
@@ -1097,7 +1097,7 @@
             ];
             
             for (const pattern of langPatterns) {
-                const match = cleanText.match(pattern);
+                const match = cleanedText.match(pattern);
                 if (match) {
                     const lang = match[1].trim();
                     if (lang.length > 2 && !lang.match(/^(FINAL|PRESS|NOTES)$/i)) {
@@ -1116,7 +1116,7 @@
             ];
             
             for (const pattern of distPatterns) {
-                const match = cleanText.match(pattern);
+                const match = cleanedText.match(pattern);
                 if (match) {
                     let dist = match[1].trim();
                     // Clean up distributor name
@@ -1136,7 +1136,7 @@
             ];
             
             for (const pattern of loglinePatterns) {
-                const match = cleanText.match(pattern);
+                const match = cleanedText.match(pattern);
                 if (match) {
                     let logline = fixSpacing(match[1]);
                     // Remove labels
@@ -1156,7 +1156,7 @@
             ];
             
             for (const pattern of synopsisPatterns) {
-                const match = cleanText.match(pattern);
+                const match = cleanedText.match(pattern);
                 if (match) {
                     let synopsis = fixSpacing(match[1]);
                     // Clean up
@@ -1195,7 +1195,7 @@
             ];
             
             for (const pattern of quotePatterns) {
-                const match = cleanText.match(pattern);
+                const match = cleanedText.match(pattern);
                 if (match) {
                     extracted.criticsQuote = match[0].trim();
                     break;
