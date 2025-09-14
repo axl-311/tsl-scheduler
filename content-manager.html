@@ -960,6 +960,7 @@
             
             const fixedText = fixSpacing(text);
             const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+            const cleanText = fixedText.replace(/\s+/g, ' ').trim();
             
             const extracted = {
                 title: '',
@@ -973,97 +974,153 @@
                 criticsQuote: ''
             };
             
-            // Look for "A Savage Art" or similar title patterns
+            // TITLE EXTRACTION - Enhanced for press kit formats
             const titlePatterns = [
+                // All caps titles (common in press kits)
+                /^([A-Z][A-Z\s&]+)$/m,
+                /^"([^"]+)"$/m,  // Titles in quotes
+                /\*\*([^*]+)\*\*/,  // Bold markdown titles
+                // Specific patterns
                 /\bA\s+Savage\s+Art\b/i,
-                /\bA\s+Savage\s+Ar\s+t\b/i,  // Handle spacing issue
-                /^([A-Z][A-Za-z\s]+)$/m  // Title on its own line
+                /\bDEATH\s*&\s*TAXES\b/i,
+                /\bRABBIT\s+TRAP\b/i,
+                /\bRIEFENSTAHL\b/i,
+                // After common headers
+                /(?:PRESENTS?|RELEASE)\s+([A-Z][A-Za-z\s&]+?)(?:\n|Written|Directed|A\s+Film)/i,
+                // Title patterns with "A Film"
+                /^([^.]+?)\s+A\s+Film\s+by/im
             ];
             
             for (const pattern of titlePatterns) {
                 const match = fixedText.match(pattern);
                 if (match) {
-                    extracted.title = fixSpacing(match[0].trim());
-                    break;
+                    let title = match[1] || match[0];
+                    title = fixSpacing(title).trim();
+                    // Validate it's a title
+                    if (title && 
+                        title.length > 2 && 
+                        title.length < 100 &&
+                        !title.match(/^(LOGLINE|SYNOPSIS|PRESS|FINAL|DISTRIBUTOR|CONTACT|CAST|CREW)/i)) {
+                        extracted.title = title.replace(/\s+/g, ' ').trim();
+                        break;
+                    }
                 }
             }
             
-            // If no title found yet, check first few lines
+            // If no title found, look in first 20 lines for something that looks like a title
             if (!extracted.title) {
-                for (let i = 0; i < Math.min(10, lines.length); i++) {
+                for (let i = 0; i < Math.min(20, lines.length); i++) {
                     const line = fixSpacing(lines[i]);
-                    // Skip common headers and metadata
-                    if (line && !line.match(/^(THE|LOGLINE|SYNOPSIS)/i) && 
-                        !line.match(/press\s*kit/i) && 
-                        !line.match(/^\d{4}/) &&
+                    
+                    // Check if this could be a title
+                    if (line && 
+                        line.length > 2 && 
+                        line.length < 80 &&
+                        (line === line.toUpperCase() || // All caps
+                         line.match(/^[A-Z]/) || // Starts with capital
+                         line.match(/^"[^"]+"$/)) && // In quotes
+                        !line.match(/^(MAGNET|FINAL|PRESS|NOTES|CONTACT|DISTRIBUTOR|PUBLICITY|CAST|CREW|SYNOPSIS|LOGLINE)/i) &&
                         !line.includes('@') &&
-                        line.length > 2 && line.length < 50) {
+                        !line.match(/^\d{4}/) &&
+                        !line.match(/\.(com|org|net)$/i)) {
                         extracted.title = line;
                         break;
                     }
                 }
             }
             
-            // Extract director - multiple patterns
+            // DIRECTOR EXTRACTION - Multiple patterns
             const directorPatterns = [
-                /(?:Directed\s+by|Director|A\s+film\s+by|Filmmaker|By)\s*:?\s*([A-Z][a-zA-Z\s]+?)(?:\n|$|,|\.|Produced)/i,
-                /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*(?:Director|directs)/i,
-                /Bill\s+Banowsky/i  // Specific pattern for this director
+                /(?:Written\s+(?:and|&)\s+)?Directed\s+by\s+([A-Z][a-zA-Z\s]+?)(?:\n|$|\.|\||Running)/i,
+                /(?:A\s+Film\s+by|Director)\s*:?\s*([A-Z][a-zA-Z\s]+?)(?:\n|$|\.|\||Running)/i,
+                /(?:FILMED\s+AND\s+DIRECTED\s+BY|DIRECTED\s+BY)\s+([A-Z][a-zA-Z\s]+?)(?:\n|$|PRODUCED)/i,
+                /Director\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i,
+                /([A-Z][a-z]+\s+[A-Z][a-z]+)\s+\((?:Director|Writer[/-]Director)\)/i,
+                // Specific names if other patterns fail
+                /\b(Bill\s+Banowsky|Bryn\s+Chainey|Andres\s+Veiel|Justin\s+Schein)\b/i
             ];
             
             for (const pattern of directorPatterns) {
-                const match = fixedText.match(pattern);
+                const match = cleanText.match(pattern);
                 if (match) {
-                    extracted.director = match[1] ? match[1].trim() : match[0].trim();
+                    extracted.director = match[1].trim();
                     break;
                 }
             }
             
-            // Extract year - look for 4-digit years
-            const yearMatch = fixedText.match(/\b(19\d{2}|20\d{2})\b/);
-            if (yearMatch) {
-                extracted.year = yearMatch[1];
+            // RUNTIME EXTRACTION
+            const runtimePatterns = [
+                /(\d{2,3})\s*(?:min(?:ute)?s?|m)\b/i,
+                /Running\s+Time\s*:?\s*(\d{2,3})/i,
+                /Duration\s*:?\s*(\d{2,3})/i,
+                /\|\s*(\d{2,3})\s*minutes?\s*\|/i,
+                /\b(\d{2,3})\s+mins?\s*\|/i
+            ];
+            
+            for (const pattern of runtimePatterns) {
+                const match = cleanText.match(pattern);
+                if (match) {
+                    const runtime = parseInt(match[1]);
+                    if (runtime > 40 && runtime < 300) { // Reasonable movie length
+                        extracted.runtime = match[1];
+                        break;
+                    }
+                }
             }
             
-            // Extract runtime - look for minutes
-            const runtimeMatch = fixedText.match(/(\d{2,3})\s*(?:min|minutes|m)\b/i) ||
-                                 fixedText.match(/\b(\d{2,3})\b.*(?:min|minutes)/i);
-            if (runtimeMatch) {
-                extracted.runtime = runtimeMatch[1];
+            // YEAR EXTRACTION
+            const yearPatterns = [
+                /\|\s*(19\d{2}|20\d{2})\s*\|/,
+                /\b(19\d{2}|20\d{2})\s*\|/,
+                /(?:Year|Released?|Date)\s*:?\s*(19\d{2}|20\d{2})/i,
+                /\b(2024|2025|2023|2022)\b/ // Recent years
+            ];
+            
+            for (const pattern of yearPatterns) {
+                const match = cleanText.match(pattern);
+                if (match) {
+                    const year = parseInt(match[1]);
+                    if (year >= 1900 && year <= 2030) {
+                        extracted.year = match[1];
+                        break;
+                    }
+                }
             }
             
-            // Extract language - be more specific
+            // LANGUAGE EXTRACTION
             const langPatterns = [
-                /(?:Language|Languages?)\s*:?\s*([A-Za-z]+)/i,
-                /\d{4}\s*\/\s*\d+m?\s*\/\s*([A-Za-z]+)/i,  // Year / Runtime / Language format
-                /\b(English|Spanish|French|German|Italian|Japanese|Chinese|Korean)\b/i
+                /\|\s*([A-Za-z]+)\s+(?:with|w\/)\s+English\s+subtitles/i,
+                /\|\s*(English|Spanish|French|German|Italian|Japanese|Chinese|Korean|Portuguese)\b/i,
+                /Language\s*:?\s*([A-Za-z]+)/i,
+                /\d{4}\s*\/\s*\d+m?\s*\/\s*([A-Za-z]+)/i,
+                /\|\s*([A-Z]+(?:\s+[A-Z]+)?)\s*$/m  // Country code at end of line
             ];
             
             for (const pattern of langPatterns) {
-                const match = fixedText.match(pattern);
+                const match = cleanText.match(pattern);
                 if (match) {
                     const lang = match[1].trim();
-                    // Don't accept single letters
-                    if (lang.length > 1) {
+                    if (lang.length > 2 && !lang.match(/^(FINAL|PRESS|NOTES)$/i)) {
                         extracted.language = lang;
                         break;
                     }
                 }
             }
             
-            // Extract distributor - clean up contact names
+            // DISTRIBUTOR EXTRACTION
             const distPatterns = [
-                /(?:Distributor|Distribution|Distributed\s+by)\s*:?\s*([A-Za-z\s]+?(?:Pictures|Films|Entertainment|Studios|Releasing))/i,
-                /\b(Magnolia\s+Pictures|Sony\s+Pictures|Warner\s+Bros|Universal|Paramount|Disney|Netflix|Amazon\s+Studios|A24)\b/i,
-                /(?:Sales|World\s+Sales)\s*:?\s*([A-Za-z\s]+?)(?:\n|Contact|$)/i
+                /(?:Distributor|Distribution|Distributed\s+by)\s*:?\s*([A-Za-z][A-Za-z\s]+?(?:Pictures|Films|Entertainment|Studios|Releasing|Features))/i,
+                /\b(Magnolia\s+Pictures|Sony\s+Pictures|Warner\s+Bros|Universal|Paramount|Disney|Netflix|Amazon\s+Studios|A24|Kino\s+Lorber|IFC\s+Films|Neon)\b/i,
+                /(?:AN?\s+)?([A-Z0-9]+(?:\s+[A-Z]+)*)\s+(?:THEATRICAL\s+)?RELEASE/i,
+                /Contact\s*:?\s*([A-Za-z\s]+?(?:Pictures|Films))/i
             ];
             
             for (const pattern of distPatterns) {
-                const match = fixedText.match(pattern);
+                const match = cleanText.match(pattern);
                 if (match) {
                     let dist = match[1].trim();
-                    // Remove contact names if they got included
-                    dist = dist.split(/(?:Contact|George|Rebecca|Louis)/i)[0].trim();
+                    // Clean up distributor name
+                    dist = dist.replace(/(?:Contact|George|Rebecca|Louis|Distributor).*/i, '').trim();
                     if (dist) {
                         extracted.distributor = dist;
                         break;
@@ -1071,45 +1128,74 @@
                 }
             }
             
-            // Extract logline (single sentence)
+            // LOGLINE EXTRACTION
             const loglinePatterns = [
-                /(?:LOGLINE|Logline)\s*:?\s*([^.]+\.)/i,
-                /Patrick\s+Oliphant\s+was\s+a\s+giant\s+slayer\./i
+                /(?:LOG\s*LINE|Logline)\s*:?\s*([^.]+\.)(?:\s|$)/i,
+                /(?:SHORT\s+SYNOPSIS|One[\-\s]liner?)\s*:?\s*([^.]+\.)/i,
+                /^([^.]{50,200}\.)(?:\s|$)/m  // First sentence if reasonable length
             ];
             
             for (const pattern of loglinePatterns) {
-                const match = fixedText.match(pattern);
+                const match = cleanText.match(pattern);
                 if (match) {
-                    extracted.logline = fixSpacing(match[1] || match[0]).replace('LOGLINE', '').trim();
-                    break;
+                    let logline = fixSpacing(match[1]);
+                    // Remove labels
+                    logline = logline.replace(/^(LOGLINE|LOG\s*LINE)\s*/i, '').trim();
+                    if (logline.length > 20) {
+                        extracted.logline = logline;
+                        break;
+                    }
                 }
             }
             
-            // Extract synopsis - clean it up
-            const synopsisStart = fixedText.indexOf('Patrick Oliphant was a giant slayer');
-            if (synopsisStart !== -1) {
-                let synopsis = fixedText.substring(synopsisStart);
-                // Cut off at common end markers
-                synopsis = synopsis.split(/(?:CREDITS|CAST|DIRECTOR|PRODUCER|TECHNICAL|ABOUT THE|FILMMAKER)/i)[0];
-                // Remove LOGLINE prefix if present
-                synopsis = synopsis.replace(/^LOGLINE\s*/i, '');
-                // Clean up spacing issues
-                synopsis = fixSpacing(synopsis);
-                // Limit length
-                if (synopsis.length > 2000) {
-                    synopsis = synopsis.substring(0, 2000) + '...';
+            // SYNOPSIS EXTRACTION
+            const synopsisPatterns = [
+                /(?:SYNOPSIS|Synopsis)\s*:?\s*([\s\S]{100,}?)(?:\n\n|DIRECTOR|CAST|CREDITS|ABOUT|$)/i,
+                /(?:FILM\s+SUMMARY|Description)\s*:?\s*([\s\S]{100,}?)(?:\n\n|$)/i,
+                /(?:About\s+the\s+Film|Story|Plot)\s*:?\s*([\s\S]{100,}?)(?:\n\n|Credits|Cast|$)/i
+            ];
+            
+            for (const pattern of synopsisPatterns) {
+                const match = cleanText.match(pattern);
+                if (match) {
+                    let synopsis = fixSpacing(match[1]);
+                    // Clean up
+                    synopsis = synopsis.split(/(?:CREDITS|CAST|DIRECTOR'S\s+STATEMENT|ABOUT\s+THE)/i)[0];
+                    synopsis = synopsis.replace(/^(SYNOPSIS|LOGLINE)\s*/i, '').trim();
+                    
+                    if (synopsis.length > 100) {
+                        // Limit length
+                        if (synopsis.length > 2000) {
+                            synopsis = synopsis.substring(0, 2000) + '...';
+                        }
+                        extracted.synopsis = synopsis;
+                        break;
+                    }
                 }
-                extracted.synopsis = synopsis.trim();
             }
             
-            // Extract critics quote
+            // If no synopsis found, look for substantial paragraphs
+            if (!extracted.synopsis) {
+                const paragraphs = text.split(/\n\n+/).filter(p => {
+                    const wordCount = p.split(/\s+/).length;
+                    return wordCount > 50 && wordCount < 500 && 
+                           !p.match(/^(CAST|CREDITS|DIRECTOR|PRODUCER|CONTACT)/i);
+                });
+                
+                if (paragraphs.length > 0) {
+                    extracted.synopsis = fixSpacing(paragraphs[0]);
+                }
+            }
+            
+            // CRITICS QUOTE EXTRACTION
             const quotePatterns = [
-                /"([^"]{20,300})"\s*[\-—]\s*([^,\n]+)/g,
-                /"([^"]{20,300})"/
+                /"([^"]{20,300})"\s*[-–—]\s*([^,\n]+)/g,
+                /(?:Reviews?|Critics?|Praise)\s*:?\s*"([^"]+)"/i,
+                /"([^"]{30,300})".*(?:Variety|Hollywood\s+Reporter|Times|Post|Guardian)/i
             ];
             
             for (const pattern of quotePatterns) {
-                const match = fixedText.match(pattern);
+                const match = cleanText.match(pattern);
                 if (match) {
                     extracted.criticsQuote = match[0].trim();
                     break;
