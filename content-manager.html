@@ -1,4 +1,9 @@
-<!DOCTYPE html>
+        function downloadData() {
+            const title = document.getElementById('title').value || 'extracted';
+            const data = {
+                title: document.getElementById('title').value,
+                director: document.getElementById('director').value,
+                runtime_<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1317,6 +1322,25 @@
             URL.revokeObjectURL(url);
         }
 
+        function downloadRawText() {
+            const title = document.getElementById('title').value || 'extracted-text';
+            const rawText = document.getElementById('rawTextContent').textContent;
+            
+            if (!rawText) {
+                showToast('No text to download');
+                return;
+            }
+            
+            const blob = new Blob([rawText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${title}-raw-text.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Text file downloaded');
+        }
+
         async function uploadImage(file, bucket, folder = '') {
             if (!supabase) {
                 throw new Error('Database not connected');
@@ -1535,6 +1559,80 @@
             } catch (error) {
                 console.error('Delete error:', error);
                 showToast('Failed to delete item');
+            }
+        }
+
+        async function downloadContent(id, type) {
+            try {
+                const table = type === 'movie' ? 'movies' : type === 'event' ? 'events' : 'galleries';
+                const { data, error } = await supabase.from(table).select('*').eq('id', id).single();
+                if (error) throw error;
+                
+                let textContent = '';
+                const title = data.title || data.event_name || data.exhibition_title || 'Untitled';
+                
+                textContent += `${title.toUpperCase()}\n`;
+                textContent += '='.repeat(title.length) + '\n\n';
+                
+                if (type === 'movie') {
+                    if (data.director) textContent += `Director: ${data.director}\n`;
+                    if (data.runtime_minutes) textContent += `Runtime: ${data.runtime_minutes} minutes\n`;
+                    if (data.release_year) textContent += `Release Year: ${data.release_year}\n`;
+                    if (data.language) textContent += `Language: ${data.language}\n`;
+                    if (data.distributor) textContent += `Distributor: ${data.distributor}\n`;
+                } else if (type === 'event') {
+                    if (data.presenter) textContent += `Presenter: ${data.presenter}\n`;
+                    if (data.duration_minutes) textContent += `Duration: ${data.duration_minutes} minutes\n`;
+                    if (data.event_year) textContent += `Year: ${data.event_year}\n`;
+                    if (data.event_type) textContent += `Type: ${data.event_type}\n`;
+                    if (data.venue) textContent += `Venue: ${data.venue}\n`;
+                } else if (type === 'gallery') {
+                    if (data.artist) textContent += `Artist: ${data.artist}\n`;
+                    if (data.exhibition_year) textContent += `Year: ${data.exhibition_year}\n`;
+                    if (data.art_medium) textContent += `Medium: ${data.art_medium}\n`;
+                    if (data.gallery_space) textContent += `Gallery: ${data.gallery_space}\n`;
+                }
+                
+                textContent += '\n';
+                
+                if (data.logline) {
+                    textContent += 'LOGLINE\n';
+                    textContent += '-'.repeat(7) + '\n';
+                    textContent += `${data.logline}\n\n`;
+                }
+                
+                if (data.synopsis || data.description) {
+                    textContent += 'SYNOPSIS\n';
+                    textContent += '-'.repeat(8) + '\n';
+                    textContent += `${data.synopsis || data.description}\n\n`;
+                }
+                
+                if (data.critics_quote) {
+                    textContent += 'CRITICS QUOTE\n';
+                    textContent += '-'.repeat(13) + '\n';
+                    textContent += `${data.critics_quote}\n\n`;
+                }
+                
+                if (data.trailer_url) {
+                    textContent += `Trailer: ${data.trailer_url}\n`;
+                }
+                
+                if (data.simpletix_embed_code) {
+                    textContent += `SimpleTix: ${data.simpletix_embed_code}\n`;
+                }
+                
+                const blob = new Blob([textContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${title.replace(/[^a-zA-Z0-9]/g, '-')}.txt`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('Content downloaded as text file');
+                
+            } catch (error) {
+                console.error('Download error:', error);
+                showToast('Failed to download content');
             }
         }
 
