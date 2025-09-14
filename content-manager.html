@@ -724,12 +724,12 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Logline</label>
-                        <textarea id="logline" class="form-input" rows="2"></textarea>
-                    </div>
-                    <div class="form-group">
                         <label class="form-label">Synopsis</label>
                         <textarea id="synopsis" class="form-input" rows="5"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Logline</label>
+                        <textarea id="logline" class="form-input" rows="2"></textarea>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Critics Quote</label>
@@ -849,6 +849,29 @@
             };
             document.getElementById('formTitle').textContent = titleMap[type];
             document.getElementById('saveButtonText').textContent = `Save ${type.charAt(0).toUpperCase() + type.slice(1)} to Database`;
+            
+            // Update form labels based on content type
+            const labels = document.querySelectorAll('.form-label');
+            
+            if (type === 'event') {
+                labels[1].textContent = 'Presenter'; // Director → Presenter
+                labels[2].textContent = 'Duration (minutes)'; // Runtime → Duration
+                labels[3].textContent = 'Event Year'; // Release Year → Event Year
+                labels[4].textContent = 'Event Type'; // Language → Event Type
+                labels[5].textContent = 'Venue'; // Distributor → Venue
+            } else if (type === 'gallery') {
+                labels[1].textContent = 'Artist'; // Director → Artist
+                labels[2].textContent = 'Duration (minutes)'; // Keep for now
+                labels[3].textContent = 'Exhibition Year'; // Release Year → Exhibition Year
+                labels[4].textContent = 'Art Medium'; // Language → Art Medium
+                labels[5].textContent = 'Gallery Space'; // Distributor → Gallery Space
+            } else { // movie
+                labels[1].textContent = 'Director';
+                labels[2].textContent = 'Runtime (minutes)';
+                labels[3].textContent = 'Release Year';
+                labels[4].textContent = 'Language';
+                labels[5].textContent = 'Distributor';
+            }
         }
 
         async function loadContent() {
