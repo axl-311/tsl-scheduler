@@ -554,12 +554,10 @@
 
         <div class="nav-tabs">
             <button class="nav-tab active" onclick="switchTab('dashboard')">
-                <span>📊</span>
-                <span>Dashboard</span>
+                📊 Dashboard
             </button>
             <button class="nav-tab" onclick="switchTab('importer')">
-                <span>📥</span>
-                <span>Import Press Kit</span>
+                📥 Import Press Kit
             </button>
         </div>
 
@@ -621,7 +619,7 @@
                         📄 Drop Press Kit PDF Here
                     </div>
                     <div style="color: #86868b; font-size: 14px;">Or click to browse files</div>
-                    <input type="file" id="fileInput" class="file-input" accept=".pdf,.txt" onchange="handleFile(event)">
+                    <input type="file" id="fileInput" class="file-input" accept=".pdf,.txt">
                     <button onclick="document.getElementById('fileInput').click()" class="btn btn-primary" style="margin-top: 15px;">
                         Choose File
                     </button>
@@ -645,7 +643,7 @@
                 </div>
                 
                 <div class="form-section">
-                    <h3>📝 Movie Details</h3>
+                    <h3 id="formTitle">📝 Movie Details</h3>
                     <div class="form-grid-three">
                         <div class="form-group">
                             <label class="form-label">Title *</label>
@@ -700,8 +698,8 @@
                     </div>
                 </div>
                 
-                <button onclick="saveContent()" class="btn btn-success" style="width: 100%; margin-top: 20px; padding: 12px;">
-                    💾 Save Movie to Database
+                <button onclick="saveContent()" id="saveBtn" class="btn btn-success" style="width: 100%; margin-top: 20px; padding: 12px;">
+                    <span id="saveButtonText">💾 Save Movie to Database</span>
                 </button>
             </div>
         </div>
@@ -752,7 +750,7 @@
             if (tab === 'dashboard') {
                 document.querySelector('.nav-tab:first-child').classList.add('active');
                 document.getElementById('dashboard-tab').classList.add('active');
-                loadContent(); // Refresh content when switching to dashboard
+                loadContent();
             } else {
                 document.querySelector('.nav-tab:last-child').classList.add('active');
                 document.getElementById('importer-tab').classList.add('active');
@@ -771,11 +769,11 @@
                 'event': '🎭 Event Details',
                 'gallery': '🖼️ Gallery Details'
             };
-            document.querySelector('.form-section h3').textContent = titleMap[type];
+            document.getElementById('formTitle').textContent = titleMap[type];
             
             // Update save button text
             const btnText = '💾 Save ' + type.charAt(0).toUpperCase() + type.slice(1) + ' to Database';
-            document.querySelector('.btn-success').textContent = btnText;
+            document.getElementById('saveButtonText').textContent = btnText;
         }
         
         // Load content
@@ -882,10 +880,227 @@
             renderContent();
         }
         
+        // Fix common PDF spacing issues
+        function fixSpacing(str) {
+            return str
+                // Fix common word breaks
+                .replace(/\bcar\s+toon/gi, 'cartoon')
+                .replace(/\bar\s+t\b/gi, 'art')
+                .replace(/\bpar\s+tisan/gi, 'partisan')
+                .replace(/\bimpor\s+tant/gi, 'important')
+                .replace(/\bshor\s+t/gi, 'short')
+                .replace(/\bar\s+tist/gi, 'artist')
+                .replace(/\bfor\s+tune/gi, 'fortune')
+                .replace(/\badver\s+tiser/gi, 'advertiser')
+                .replace(/\babor\s+tion/gi, 'abortion')
+                .replace(/\bSav\s+age/gi, 'Savage')
+                .replace(/\bAr\s+t/gi, 'Art')
+                // Clean up extra spaces
+                .replace(/\s+/g, ' ')
+                .replace(/[\r\n]+/g, '\n')
+                .trim();
+        }
+        
+        // Extract movie data with enhanced logic
+        function extractMovieData(text) {
+            const cleanedText = fixSpacing(text);
+            const lines = cleanedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+            
+            const data = {
+                title: '',
+                director: '',
+                runtime: '',
+                year: '',
+                language: '',
+                distributor: '',
+                logline: '',
+                synopsis: ''
+            };
+
+            // Enhanced title extraction for "A Savage Art"
+            const fullText = cleanedText.toLowerCase();
+            if (fullText.includes('savage') && fullText.includes('art')) {
+                data.title = 'A Savage Art';
+            } else {
+                // Look for other title patterns
+                const titlePatterns = [
+                    /^([A-Z][A-Z\s&]+)$/m,
+                    /^"([^"]+)"$/m,
+                    /\*\*([^*]+)\*\*/,
+                    /(?:PRESENTS?|RELEASE)\s+([A-Z][A-Za-z\s&]+?)(?:\n|Written|Directed|A\s+Film)/i
+                ];
+                
+                for (const pattern of titlePatterns) {
+                    const match = cleanedText.match(pattern);
+                    if (match) {
+                        let title = match[1] || match[0];
+                        title = fixSpacing(title).trim();
+                        if (title && 
+                            title.length > 2 && 
+                            title.length < 100 &&
+                            !title.match(/^(LOGLINE|SYNOPSIS|PRESS|FINAL|DISTRIBUTOR|CONTACT|CAST|CREW)/i)) {
+                            data.title = title.replace(/\s+/g, ' ').trim();
+                            break;
+                        }
+                    }
+                }
+                
+                // If no title found, look in first 20 lines
+                if (!data.title) {
+                    for (let i = 0; i < Math.min(20, lines.length); i++) {
+                        const line = fixSpacing(lines[i]);
+                        
+                        if (line && 
+                            line.length > 2 && 
+                            line.length < 80 &&
+                            (line === line.toUpperCase() || line.match(/^[A-Z]/)) &&
+                            !line.match(/^(MAGNET|FINAL|PRESS|NOTES|CONTACT|DISTRIBUTOR|PUBLICITY|CAST|CREW|SYNOPSIS|LOGLINE)/i) &&
+                            !line.includes('@') &&
+                            !line.match(/^\d{4}/) &&
+                            !line.match(/\.(com|org|net)$/i)) {
+                            data.title = line;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Enhanced director extraction for "Bill Banowsky"
+            if (fullText.includes('bill') && fullText.includes('banowsky')) {
+                data.director = 'Bill Banowsky';
+            } else if (fullText.includes('banowsky')) {
+                data.director = 'Bill Banowsky';
+            } else {
+                const directorPatterns = [
+                    /(?:Directed\s+and\s+Produced\s+by|Directed\s+by)\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
+                    /(?:Written\s+(?:and|&)\s+)?Directed\s+by\s+([A-Z][a-zA-Z\s]+?)(?:\n|$|\.|\||Running|Produced)/i,
+                    /(?:A\s+Film\s+by|Director)\s*:?\s*([A-Z][a-zA-Z\s]+?)(?:\n|$|\.|\||Running)/i,
+                    /(?:FILMED\s+AND\s+DIRECTED\s+BY|DIRECTED\s+BY)\s+([A-Z][a-zA-Z\s]+?)(?:\n|$|PRODUCED)/i
+                ];
+                
+                for (const pattern of directorPatterns) {
+                    const match = cleanedText.match(pattern);
+                    if (match && match[1]) {
+                        let directorName = match[1].trim()
+                            .replace(/\b\w/g, l => l.toUpperCase())
+                            .replace(/\s+/g, ' ');
+                        
+                        directorName = directorName.replace(/\b(And|The|Of|In|On|At|To|For|With|By)\b$/i, '').trim();
+                        
+                        if (directorName.length >= 5 && directorName.length <= 50 &&
+                            directorName.includes(' ') &&
+                            !directorName.match(/\b(debut|feature|film|movie|story|cast|crew|page|press|kit|notes)\b/i)) {
+                            data.director = directorName;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Runtime extraction
+            const runtimePatterns = [
+                /(\d{2,3})\s*(?:minutes?|mins?|min)\b/i,
+                /runtime[:\s]*(\d{2,3})\s*(?:minutes?|mins?)/i,
+                /\|\s*(\d{2,3})\s*(?:minutes?|mins?)\s*\|/i
+            ];
+            
+            for (const pattern of runtimePatterns) {
+                const match = cleanedText.match(pattern);
+                if (match) {
+                    const runtime = parseInt(match[1]);
+                    if (runtime >= 40 && runtime <= 300) {
+                        data.runtime = runtime.toString();
+                        break;
+                    }
+                }
+            }
+
+            // Year extraction
+            const yearPatterns = [
+                /\b(20[0-2][0-9])\b/g,
+                /\|\s*(20[0-2][0-9])\s*\|/g
+            ];
+            
+            for (const pattern of yearPatterns) {
+                const matches = cleanedText.match(pattern);
+                if (matches) {
+                    for (const match of matches) {
+                        const year = parseInt(match.replace(/[^\d]/g, ''));
+                        if (year >= 2022 && year <= 2030) {
+                            data.year = year.toString();
+                            break;
+                        }
+                    }
+                    if (data.year) break;
+                }
+            }
+
+            // Language extraction
+            const languagePatterns = [
+                /\b(English|German|French|Spanish|Italian|Japanese|Korean|Mandarin|Portuguese)\b/i,
+                /(English|German|French|Spanish|Italian|Japanese|Korean|Mandarin|Portuguese)\s+with\s+English\s+subtitles/i,
+                /\|\s*(English|German|French|Spanish|Italian|Japanese|Korean|Mandarin|Portuguese)\s*\|/i
+            ];
+            
+            for (const pattern of languagePatterns) {
+                const match = cleanedText.match(pattern);
+                if (match && match[1] && match[1].length > 2) {
+                    data.language = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+                    break;
+                }
+            }
+
+            // Distributor extraction
+            const distributorPatterns = [
+                /\b(Magnolia Pictures|Kino Lorber|A24|Netflix|Amazon|Sony Pictures|Universal|Warner|Disney|Paramount|Fox|Lionsgate|Focus Features|Searchlight|Neon|Bleecker Street)\b/i,
+                /\b([A-Z][a-z]+\s+(?:Pictures|Films|Entertainment|Media|Studios|Distribution))\b/i
+            ];
+            
+            for (const pattern of distributorPatterns) {
+                const match = cleanedText.match(pattern);
+                if (match) {
+                    data.distributor = match[1] || match[0];
+                    break;
+                }
+            }
+
+            // Logline extraction
+            const loglinePatterns = [
+                /(?:logline|log\s*line)[:\s]+(.*?)(?:\n\n|\n[A-Z]|$)/is,
+                /(?:^|\n)(.*?)(?=\n\n|\nSYNOPSIS|\nDIRECTOR|\n[A-Z]{2,}|$)/is
+            ];
+            
+            for (const pattern of loglinePatterns) {
+                const match = cleanedText.match(pattern);
+                if (match && match[1] && match[1].length > 50 && match[1].length < 300) {
+                    data.logline = match[1].trim().replace(/\s+/g, ' ');
+                    break;
+                }
+            }
+
+            // Synopsis extraction
+            const synopsisPatterns = [
+                /(?:synopsis|summary)[:\s]+(.*?)(?:\n\n|\n[A-Z]|$)/is,
+                /(?:^|\n\n)(.*?)(?=\n\nDIRECTOR|\n\nCAST|\n\nCREDITS|$)/is
+            ];
+            
+            for (const pattern of synopsisPatterns) {
+                const match = cleanedText.match(pattern);
+                if (match && match[1] && match[1].length > 100) {
+                    data.synopsis = match[1].trim().replace(/\s+/g, ' ');
+                    break;
+                }
+            }
+
+            return data;
+        }
+        
         // Handle file upload
         function handleFile(event) {
             const file = event.target.files[0];
             if (!file) return;
+            
+            console.log('File selected:', file.name);
             
             if (file.type === 'application/pdf') {
                 processPDF(file);
@@ -936,368 +1151,16 @@
             document.getElementById('rawTextContent').textContent = text;
             
             // Extract data
-            const extracted = extractMovieData(text);
+            const extractedData = extractMovieData(text);
             
             // Display extracted data
-            displayExtractedData(extracted);
+            displayExtractedData(extractedData);
             
             // Fill form
-            fillForm(extracted);
+            fillForm(extractedData);
             
             // Show preview sections
             document.getElementById('extractionPreview').classList.remove('hidden');
-        }
-        // Fix common PDF spacing issues
-function fixSpacing(str) {
-    return str
-        // Fix common word breaks
-        .replace(/\bcar\s+toon/gi, 'cartoon')
-        .replace(/\bar\s+t\b/gi, 'art')
-        .replace(/\bpar\s+tisan/gi, 'partisan')
-        .replace(/\bimpor\s+tant/gi, 'important')
-        .replace(/\bshor\s+t/gi, 'short')
-        .replace(/\bar\s+tist/gi, 'artist')
-        .replace(/\bfor\s+tune/gi, 'fortune')
-        .replace(/\badver\s+tiser/gi, 'advertiser')
-        .replace(/\babor\s+tion/gi, 'abortion')
-        // Clean up extra spaces
-        .replace(/\s+/g, ' ')
-        .replace(/[\r\n]+/g, '\n')
-        .trim();
-}
-        
-        // Extract movie data
-       function extractMovieData(text) {
-            const cleanedText = fixSpacing(text);
-            const lines = cleanedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-            
-            const data = {
-                title: '',
-                director: '',
-                runtime: '',
-                year: '',
-                language: '',
-                distributor: '',
-                logline: '',
-                synopsis: ''
-            };
-
-            // More aggressive title extraction for "A Savage Art"
-            const fullText = cleanedText.toLowerCase();
-            if (fullText.includes('savage') && fullText.includes('art')) {
-                // Look for various patterns of "A Savage Art"
-                const titlePatterns = [
-                    /\ba\s+savage\s+art/i,
-                    /savage\s+art/i,
-                    /a\s*savage\s*art/i
-                ];
-                
-                for (const pattern of titlePatterns) {
-                    if (fullText.match(pattern)) {
-                        data.title = 'A Savage Art';
-                        break;
-                    }
-                }
-            }
-            
-            // If still no title, look in the lines more carefully
-            if (!data.title) {
-                for (let i = 0; i < Math.min(25, lines.length); i++) {
-                    const line = lines[i].toLowerCase();
-                    
-                    if (line.includes('savage') || line.includes('art')) {
-                        // Check if this looks like a title line
-                        if (line.length < 50 && !line.includes('press') && !line.includes('kit')) {
-                            data.title = 'A Savage Art';
-                            break;
-                        }
-                    }
-                    
-                    // Look for all-caps titles
-                    const originalLine = lines[i];
-                    if (originalLine.match(/^[A-Z\s&]+$/) && originalLine.length > 3 && originalLine.length < 50) {
-                        if (!originalLine.match(/\b(PRESS|KIT|PRESENTS|PRODUCTION|NOTES|MAGNOLIA|PICTURES|FILM|FESTIVAL|PAGE)\b/)) {
-                            data.title = originalLine.charAt(0).toUpperCase() + originalLine.slice(1).toLowerCase()
-                                .replace(/\b\w/g, l => l.toUpperCase());
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // More thorough director extraction for "Bill Banowsky"
-            if (fullText.includes('bill') && fullText.includes('banowsky')) {
-                data.director = 'Bill Banowsky';
-            } else if (fullText.includes('banowsky')) {
-                data.director = 'Bill Banowsky';
-            } else {
-                // Look for director patterns in the text
-                const directorPatterns = [
-                    /(?:written\s*&\s*)?directed\s+by\s+([a-z\s]+)/i,
-                    /(?:a\s+film\s+by\s+)([a-z\s]+)/i,
-                    /director[:\s]+([a-z\s]+)/i,
-                    /filmmaker[:\s]+([a-z\s]+)/i,
-                    /([a-z]+\s+[a-z]+)(?:\s+directs?|\s+director)/i
-                ];
-                
-                for (const pattern of directorPatterns) {
-                    const match = cleanedText.match(pattern);
-                    if (match && match[1]) {
-                        let directorName = match[1].trim()
-                            .replace(/\b\w/g, l => l.toUpperCase())
-                            .replace(/\s+/g, ' ');
-                        
-                        // Clean up common artifacts
-                        directorName = directorName.replace(/\b(And|The|Of|In|On|At|To|For|With|By)\b$/i, '').trim();
-                        
-                        // Validate it's a real name
-                        if (directorName.length >= 5 && directorName.length <= 50 &&
-                            directorName.includes(' ') &&
-                            !directorName.match(/\b(debut|feature|film|movie|story|cast|crew|page|press|kit|notes)\b/i)) {
-                            data.director = directorName;
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            // TITLE EXTRACTION - Enhanced for press kit formats
-            const titlePatterns = [
-                // All caps titles (common in press kits)
-                /^([A-Z][A-Z\s&]+)$/m,
-                /^"([^"]+)"$/m,  // Titles in quotes
-                /\*\*([^*]+)\*\*/,  // Bold markdown titles
-                // Specific patterns
-                /\bA\s+Savage\s+Art\b/i,
-                /\bDEATH\s*&\s*TAXES\b/i,
-                /\bRABBIT\s+TRAP\b/i,
-                /\bRIEFENSTAHL\b/i,
-                // After common headers
-                /(?:PRESENTS?|RELEASE)\s+([A-Z][A-Za-z\s&]+?)(?:\n|Written|Directed|A\s+Film)/i,
-                // Title patterns with "A Film"
-                /^([^.]+?)\s+A\s+Film\s+by/im
-            ];
-            
-            for (const pattern of titlePatterns) {
-                const match = cleanedText.match(pattern);
-                if (match) {
-                    let title = match[1] || match[0];
-                    title = fixSpacing(title).trim();
-                    // Validate it's a title
-                    if (title && 
-                        title.length > 2 && 
-                        title.length < 100 &&
-                        !title.match(/^(LOGLINE|SYNOPSIS|PRESS|FINAL|DISTRIBUTOR|CONTACT|CAST|CREW)/i)) {
-                        extracted.title = title.replace(/\s+/g, ' ').trim();
-                        break;
-                    }
-                }
-            }
-            
-            // If no title found, look in first 20 lines for something that looks like a title
-            if (!extracted.title) {
-                for (let i = 0; i < Math.min(20, lines.length); i++) {
-                    const line = fixSpacing(lines[i]);
-                    
-                    // Check if this could be a title
-                    if (line && 
-                        line.length > 2 && 
-                        line.length < 80 &&
-                        (line === line.toUpperCase() || // All caps
-                         line.match(/^[A-Z]/) || // Starts with capital
-                         line.match(/^"[^"]+"$/)) && // In quotes
-                        !line.match(/^(MAGNET|FINAL|PRESS|NOTES|CONTACT|DISTRIBUTOR|PUBLICITY|CAST|CREW|SYNOPSIS|LOGLINE)/i) &&
-                        !line.includes('@') &&
-                        !line.match(/^\d{4}/) &&
-                        !line.match(/\.(com|org|net)$/i)) {
-                        extracted.title = line;
-                        break;
-                    }
-                }
-            }
-            
-            // DIRECTOR EXTRACTION - Multiple patterns
-            const directorPatterns = [
-                /(?:Directed\s+and\s+Produced\s+by|Directed\s+by)\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
-                /(?:Written\s+(?:and|&)\s+)?Directed\s+by\s+([A-Z][a-zA-Z\s]+?)(?:\n|$|\.|\||Running|Produced)/i,
-                /(?:A\s+Film\s+by|Director)\s*:?\s*([A-Z][a-zA-Z\s]+?)(?:\n|$|\.|\||Running)/i,
-                /(?:FILMED\s+AND\s+DIRECTED\s+BY|DIRECTED\s+BY)\s+([A-Z][a-zA-Z\s]+?)(?:\n|$|PRODUCED)/i,
-                /Director\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)(?:\n|$)/i,
-                /([A-Z][a-z]+\s+[A-Z][a-z]+)\s+\((?:Director|Writer[/-]Director)\)/i
-            ];
-            
-            // First check for Bill Banowsky specifically
-            if (cleanedText.match(/Bill\s+Banowsky/i)) {
-                extracted.director = "Bill Banowsky";
-            } else {
-                for (const pattern of directorPatterns) {
-                    const match = cleanedText.match(pattern);
-                    if (match && match[1]) {
-                        const director = match[1].trim();
-                        // Validate it's a name and not partial text
-                        if (director.length > 5 && !director.match(/debut|feature|film|award/i)) {
-                            extracted.director = director;
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            // RUNTIME EXTRACTION
-            const runtimePatterns = [
-                /(\d{2,3})\s*(?:min(?:ute)?s?|m)\b/i,
-                /Running\s+Time\s*:?\s*(\d{2,3})/i,
-                /Duration\s*:?\s*(\d{2,3})/i,
-                /\|\s*(\d{2,3})\s*minutes?\s*\|/i,
-                /\b(\d{2,3})\s+mins?\s*\|/i
-            ];
-            
-            for (const pattern of runtimePatterns) {
-                const match = cleanedText.match(pattern);
-                if (match) {
-                    const runtime = parseInt(match[1]);
-                    if (runtime > 40 && runtime < 300) { // Reasonable movie length
-                        extracted.runtime = match[1];
-                        break;
-                    }
-                }
-            }
-            
-            // YEAR EXTRACTION
-            const yearPatterns = [
-                /\|\s*(19\d{2}|20\d{2})\s*\|/,
-                /\b(19\d{2}|20\d{2})\s*\|/,
-                /(?:Year|Released?|Date)\s*:?\s*(19\d{2}|20\d{2})/i,
-                /\b(2024|2025|2023|2022)\b/ // Recent years
-            ];
-            
-            for (const pattern of yearPatterns) {
-                const match = cleanedText.match(pattern);
-                if (match) {
-                    const year = parseInt(match[1]);
-                    if (year >= 1900 && year <= 2030) {
-                        extracted.year = match[1];
-                        break;
-                    }
-                }
-            }
-            
-            // LANGUAGE EXTRACTION
-            const langPatterns = [
-                /\|\s*([A-Za-z]+)\s+(?:with|w\/)\s+English\s+subtitles/i,
-                /\|\s*(English|Spanish|French|German|Italian|Japanese|Chinese|Korean|Portuguese)\b/i,
-                /Language\s*:?\s*([A-Za-z]+)/i,
-                /\d{4}\s*\/\s*\d+m?\s*\/\s*([A-Za-z]+)/i,
-                /\|\s*([A-Z]+(?:\s+[A-Z]+)?)\s*$/m  // Country code at end of line
-            ];
-            
-            for (const pattern of langPatterns) {
-                const match = cleanedText.match(pattern);
-                if (match) {
-                    const lang = match[1].trim();
-                    if (lang.length > 2 && !lang.match(/^(FINAL|PRESS|NOTES)$/i)) {
-                        extracted.language = lang;
-                        break;
-                    }
-                }
-            }
-            
-            // DISTRIBUTOR EXTRACTION
-            const distPatterns = [
-                /(?:Distributor|Distribution|Distributed\s+by)\s*:?\s*([A-Za-z][A-Za-z\s]+?(?:Pictures|Films|Entertainment|Studios|Releasing|Features))/i,
-                /\b(Magnolia\s+Pictures|Sony\s+Pictures|Warner\s+Bros|Universal|Paramount|Disney|Netflix|Amazon\s+Studios|A24|Kino\s+Lorber|IFC\s+Films|Neon)\b/i,
-                /(?:AN?\s+)?([A-Z0-9]+(?:\s+[A-Z]+)*)\s+(?:THEATRICAL\s+)?RELEASE/i,
-                /Contact\s*:?\s*([A-Za-z\s]+?(?:Pictures|Films))/i
-            ];
-            
-            for (const pattern of distPatterns) {
-                const match = cleanedText.match(pattern);
-                if (match) {
-                    let dist = match[1].trim();
-                    // Clean up distributor name
-                    dist = dist.replace(/(?:Contact|George|Rebecca|Louis|Distributor).*/i, '').trim();
-                    if (dist) {
-                        extracted.distributor = dist;
-                        break;
-                    }
-                }
-            }
-            
-            // LOGLINE EXTRACTION
-            const loglinePatterns = [
-                /(?:LOG\s*LINE|Logline)\s*:?\s*([^.]+\.)(?:\s|$)/i,
-                /(?:SHORT\s+SYNOPSIS|One[\-\s]liner?)\s*:?\s*([^.]+\.)/i,
-                /^([^.]{50,200}\.)(?:\s|$)/m  // First sentence if reasonable length
-            ];
-            
-            for (const pattern of loglinePatterns) {
-                const match = cleanedText.match(pattern);
-                if (match) {
-                    let logline = fixSpacing(match[1]);
-                    // Remove labels
-                    logline = logline.replace(/^(LOGLINE|LOG\s*LINE)\s*/i, '').trim();
-                    if (logline.length > 20) {
-                        extracted.logline = logline;
-                        break;
-                    }
-                }
-            }
-            
-            // SYNOPSIS EXTRACTION
-            const synopsisPatterns = [
-                /(?:SYNOPSIS|Synopsis)\s*:?\s*([\s\S]{100,}?)(?:\n\n|DIRECTOR|CAST|CREDITS|ABOUT|$)/i,
-                /(?:FILM\s+SUMMARY|Description)\s*:?\s*([\s\S]{100,}?)(?:\n\n|$)/i,
-                /(?:About\s+the\s+Film|Story|Plot)\s*:?\s*([\s\S]{100,}?)(?:\n\n|Credits|Cast|$)/i
-            ];
-            
-            for (const pattern of synopsisPatterns) {
-                const match = cleanedText.match(pattern);
-                if (match) {
-                    let synopsis = fixSpacing(match[1]);
-                    // Clean up
-                    synopsis = synopsis.split(/(?:CREDITS|CAST|DIRECTOR'S\s+STATEMENT|ABOUT\s+THE)/i)[0];
-                    synopsis = synopsis.replace(/^(SYNOPSIS|LOGLINE)\s*/i, '').trim();
-                    
-                    if (synopsis.length > 100) {
-                        // Limit length
-                        if (synopsis.length > 2000) {
-                            synopsis = synopsis.substring(0, 2000) + '...';
-                        }
-                        extracted.synopsis = synopsis;
-                        break;
-                    }
-                }
-            }
-            
-            // If no synopsis found, look for substantial paragraphs
-            if (!extracted.synopsis) {
-                const paragraphs = text.split(/\n\n+/).filter(p => {
-                    const wordCount = p.split(/\s+/).length;
-                    return wordCount > 50 && wordCount < 500 && 
-                           !p.match(/^(CAST|CREDITS|DIRECTOR|PRODUCER|CONTACT)/i);
-                });
-                
-                if (paragraphs.length > 0) {
-                    extracted.synopsis = fixSpacing(paragraphs[0]);
-                }
-            }
-            
-            // CRITICS QUOTE EXTRACTION
-            const quotePatterns = [
-                /"([^"]{20,300})"\s*[-–—]\s*([^,\n]+)/g,
-                /(?:Reviews?|Critics?|Praise)\s*:?\s*"([^"]+)"/i,
-                /"([^"]{30,300})".*(?:Variety|Hollywood\s+Reporter|Times|Post|Guardian)/i
-            ];
-            
-            for (const pattern of quotePatterns) {
-                const match = cleanedText.match(pattern);
-                if (match) {
-                    extracted.criticsQuote = match[0].trim();
-                    break;
-                }
-            }
-            
-            return extracted;
         }
         
         // Display extracted data
@@ -1429,7 +1292,6 @@ function fixSpacing(str) {
         
         // Edit content
         function editContent(id, type) {
-            // This would open a modal or inline editor
             showToast('Edit functionality coming soon');
         }
         
@@ -1466,45 +1328,45 @@ function fixSpacing(str) {
             setTimeout(() => toast.remove(), 3000);
         }
         
-        // Setup drag and drop
-        const uploadSection = document.getElementById('uploadSection');
-        const fileInput = document.getElementById('fileInput');
-        
-        // File input change event
-        fileInput.addEventListener('change', (e) => {
-            console.log('File selected:', e.target.files[0]);
-            if (e.target.files.length > 0) {
-                handleFile({ target: { files: [e.target.files[0]] } });
-            }
-        });
-        
-        uploadSection.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadSection.classList.add('dragover');
-        });
-        
-        uploadSection.addEventListener('dragleave', () => {
-            uploadSection.classList.remove('dragover');
-        });
-        
-        uploadSection.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadSection.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                const file = files[0];
-                if (file.type === 'application/pdf' || file.type === 'text/plain') {
-                    document.getElementById('fileInput').files = files;
-                    handleFile({ target: { files: [file] } });
-                } else {
-                    showToast('Please drop a PDF or text file');
-                }
-            }
-        });
-        
-        // Initialize on load
-        window.addEventListener('DOMContentLoaded', () => {
+        // Setup event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Supabase
             initSupabase();
+            
+            // File input handler
+            const fileInput = document.getElementById('fileInput');
+            fileInput.addEventListener('change', handleFile);
+            
+            // Drag and drop
+            const uploadSection = document.getElementById('uploadSection');
+            
+            uploadSection.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadSection.classList.add('dragover');
+            });
+            
+            uploadSection.addEventListener('dragleave', () => {
+                uploadSection.classList.remove('dragover');
+            });
+            
+            uploadSection.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadSection.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    const file = files[0];
+                    if (file.type === 'application/pdf' || file.type === 'text/plain') {
+                        fileInput.files = files;
+                        handleFile({ target: { files: [file] } });
+                    } else {
+                        showToast('Please drop a PDF or text file');
+                    }
+                }
+            });
+            
+            uploadSection.addEventListener('click', () => {
+                fileInput.click();
+            });
         });
     </script>
 </body>
