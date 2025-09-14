@@ -1164,7 +1164,7 @@
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
                 
-                // Check if this line contains a field label
+                // Check if this line contains a field label (with or without value)
                 const fieldMatch = line.match(/^([A-Za-z\s]+):\s*(.*)$/);
                 
                 if (fieldMatch) {
@@ -1175,7 +1175,7 @@
                     
                     // Start new field
                     const fieldName = fieldMatch[1].toLowerCase().trim();
-                    currentValue = fieldMatch[2];
+                    currentValue = fieldMatch[2]; // This might be empty if value is on next line
                     
                     // Map field names to database columns
                     const fieldMapping = {
@@ -1209,6 +1209,20 @@
                 } else if (currentField && line) {
                     // Continue accumulating value for current field
                     currentValue += (currentValue ? ' ' : '') + line;
+                } else if (currentField && !line) {
+                    // Empty line - we might be done with this field, but let's check next line
+                    // Look ahead to see if next line starts a new field
+                    if (i + 1 < lines.length) {
+                        const nextLine = lines[i + 1].trim();
+                        if (nextLine.match(/^[A-Za-z\s]+:\s*.*$/)) {
+                            // Next line is a new field, so save current one
+                            if (currentValue.trim()) {
+                                data[currentField] = currentValue.trim();
+                                currentField = null;
+                                currentValue = '';
+                            }
+                        }
+                    }
                 }
             }
             
