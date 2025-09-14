@@ -538,6 +538,79 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .image-upload-area {
+            border: 2px dashed #d2d2d7;
+            border-radius: 8px;
+            background: #fafafa;
+            position: relative;
+            min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .image-upload-area:hover {
+            border-color: #007aff;
+            background: #f0f7ff;
+        }
+
+        .upload-placeholder {
+            text-align: center;
+            cursor: pointer;
+            padding: 20px;
+            width: 100%;
+        }
+
+        .upload-placeholder span {
+            display: block;
+            font-weight: 500;
+            color: #007aff;
+            margin-bottom: 5px;
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: #86868b;
+        }
+
+        .image-preview {
+            position: relative;
+            width: 100%;
+            height: 120px;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .image-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+
+        .remove-image-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255, 59, 48, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .remove-image-btn:hover {
+            background: rgba(255, 59, 48, 1);
+        }
     </style>
 </head>
 <body>
@@ -554,10 +627,10 @@
 
         <div class="nav-tabs">
             <button class="nav-tab active" onclick="switchTab('dashboard')">
-                📊 Dashboard
+                Dashboard
             </button>
             <button class="nav-tab" onclick="switchTab('importer')">
-                📥 Import Press Kit
+                Importer
             </button>
         </div>
 
@@ -609,14 +682,14 @@
         <div id="importer-tab" class="tab-content">
             <div class="main-panel">
                 <div class="content-type-selector">
-                    <div class="type-option active" onclick="selectContentType('movie')">🎬 Movie</div>
-                    <div class="type-option" onclick="selectContentType('event')">🎭 Event</div>
-                    <div class="type-option" onclick="selectContentType('gallery')">🖼️ Gallery</div>
+                    <div class="type-option active" onclick="selectContentType('movie')">Movie</div>
+                    <div class="type-option" onclick="selectContentType('event')">Event</div>
+                    <div class="type-option" onclick="selectContentType('gallery')">Gallery</div>
                 </div>
                 
                 <div class="upload-section" id="uploadSection">
                     <div style="font-size: 18px; color: #007aff; margin-bottom: 10px; font-weight: 600;">
-                        📄 Drop Press Kit PDF Here
+                        Drop Press Kit PDF Here
                     </div>
                     <div style="color: #86868b; font-size: 14px;">Or click to browse files</div>
                     <input type="file" id="fileInput" class="file-input" accept=".pdf,.txt">
@@ -626,24 +699,24 @@
                 </div>
                 
                 <div id="extractionPreview" class="extraction-preview hidden">
-                    <h4>📋 Extracted Information</h4>
+                    <h4>Extracted Information</h4>
                     <div id="extractedData"></div>
                     <div class="action-buttons">
-                        <button onclick="toggleRawText()" class="btn btn-secondary">👁️ Show Raw Text</button>
-                        <button onclick="downloadData()" class="btn btn-success">📥 Download Data</button>
+                        <button onclick="toggleRawText()" class="btn btn-secondary">Show Raw Text</button>
+                        <button onclick="downloadData()" class="btn btn-success">Download Data</button>
                     </div>
                 </div>
 
                 <div id="rawTextViewer" class="raw-text-viewer hidden">
-                    <h4>📄 Raw Extracted Text</h4>
+                    <h4>Raw Extracted Text</h4>
                     <div class="raw-text-content" id="rawTextContent"></div>
                     <button onclick="copyRawText()" class="btn btn-secondary" style="margin-top: 10px;">
-                        📋 Copy to Clipboard
+                        Copy to Clipboard
                     </button>
                 </div>
                 
                 <div class="form-section">
-                    <h3 id="formTitle">📝 Movie Details</h3>
+                    <h3 id="formTitle">Movie Details</h3>
                     <div class="form-grid-three">
                         <div class="form-group">
                             <label class="form-label">Title *</label>
@@ -685,7 +758,43 @@
                 </div>
                 
                 <div class="form-section">
-                    <h3>🎥 Media Links</h3>
+                    <h3>Images</h3>
+                    <div class="form-grid-three">
+                        <div class="form-group">
+                            <label class="form-label">Poster Image</label>
+                            <div class="image-upload-area" id="posterUpload">
+                                <input type="file" id="posterInput" accept="image/*" style="display: none;">
+                                <div class="upload-placeholder" onclick="document.getElementById('posterInput').click()">
+                                    <span>Click to upload poster</span>
+                                    <div class="upload-hint">JPG, PNG, WebP (max 5MB)</div>
+                                </div>
+                                <div id="posterPreview" class="image-preview hidden">
+                                    <img id="posterImg" src="" alt="Poster preview">
+                                    <button type="button" onclick="removePosterImage()" class="remove-image-btn">×</button>
+                                </div>
+                            </div>
+                            <input type="hidden" id="poster_url" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Web Graphics</label>
+                            <div class="image-upload-area" id="webGraphicsUpload">
+                                <input type="file" id="webGraphicsInput" accept="image/*" style="display: none;">
+                                <div class="upload-placeholder" onclick="document.getElementById('webGraphicsInput').click()">
+                                    <span>Click to upload web graphics</span>
+                                    <div class="upload-hint">JPG, PNG, WebP (max 5MB)</div>
+                                </div>
+                                <div id="webGraphicsPreview" class="image-preview hidden">
+                                    <img id="webGraphicsImg" src="" alt="Web graphics preview">
+                                    <button type="button" onclick="removeWebGraphicsImage()" class="remove-image-btn">×</button>
+                                </div>
+                            </div>
+                            <input type="hidden" id="web_graphics_url" class="form-input">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h3>Media Links</h3>
                     <div class="form-grid-three">
                         <div class="form-group">
                             <label class="form-label">Trailer URL</label>
@@ -699,7 +808,7 @@
                 </div>
                 
                 <button onclick="saveContent()" id="saveBtn" class="btn btn-success" style="width: 100%; margin-top: 20px; padding: 12px;">
-                    <span id="saveButtonText">💾 Save Movie to Database</span>
+                    <span id="saveButtonText">Save Movie to Database</span>
                 </button>
             </div>
         </div>
@@ -723,16 +832,13 @@
             try {
                 supabase = window.supabase.createClient(url, key);
                 
-                // Test connection
                 const { error } = await supabase.from('movies').select('count').limit(1);
                 if (error) throw error;
                 
-                // Update connection status
                 const statusEl = document.getElementById('connectionStatus');
                 statusEl.classList.add('connected');
                 statusEl.innerHTML = '<span>✓</span><span>Connected</span>';
                 
-                // Load initial content
                 await loadContent();
             } catch (error) {
                 console.error('Connection error:', error);
@@ -763,17 +869,13 @@
             document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
             event.target.classList.add('active');
             
-            // Update form title
             const titleMap = {
-                'movie': '📝 Movie Details',
-                'event': '🎭 Event Details',
-                'gallery': '🖼️ Gallery Details'
+                'movie': 'Movie Details',
+                'event': 'Event Details',
+                'gallery': 'Gallery Details'
             };
             document.getElementById('formTitle').textContent = titleMap[type];
-            
-            // Update save button text
-            const btnText = '💾 Save ' + type.charAt(0).toUpperCase() + type.slice(1) + ' to Database';
-            document.getElementById('saveButtonText').textContent = btnText;
+            document.getElementById('saveButtonText').textContent = `Save ${type.charAt(0).toUpperCase() + type.slice(1)} to Database`;
         }
         
         // Load content
@@ -791,13 +893,11 @@
                 const events = eventsRes.data || [];
                 const galleries = galleriesRes.data || [];
                 
-                // Update stats
                 document.getElementById('moviesCount').textContent = movies.length;
                 document.getElementById('eventsCount').textContent = events.length;
                 document.getElementById('galleriesCount').textContent = galleries.length;
                 document.getElementById('totalCount').textContent = movies.length + events.length + galleries.length;
                 
-                // Combine all content
                 allContent = [
                     ...movies.map(m => ({ ...m, type: 'movie' })),
                     ...events.map(e => ({ ...e, type: 'event' })),
@@ -815,13 +915,11 @@
         function renderContent(searchTerm = '') {
             let filteredContent = allContent;
             
-            // Filter by type
             if (currentTab !== 'all') {
                 const typeMap = { 'movies': 'movie', 'events': 'event', 'galleries': 'gallery' };
                 filteredContent = filteredContent.filter(item => item.type === typeMap[currentTab]);
             }
             
-            // Filter by search
             if (searchTerm) {
                 filteredContent = filteredContent.filter(item => {
                     const title = item.title || item.event_name || item.exhibition_title || '';
@@ -832,7 +930,7 @@
             const container = document.getElementById('contentContainer');
             
             if (filteredContent.length === 0) {
-                container.innerHTML = '<div class="empty-state">📭<br>No content found</div>';
+                container.innerHTML = '<div class="empty-state">No content found</div>';
                 return;
             }
             
@@ -840,12 +938,11 @@
             filteredContent.forEach(item => {
                 const title = item.title || item.event_name || item.exhibition_title;
                 const creator = item.director || item.presenter || item.artist || 'N/A';
-                const typeEmoji = { 'movie': '🎬', 'event': '🎭', 'gallery': '🖼️' };
                 
                 html += `
                     <div class="content-card">
                         <div class="card-header">
-                            <div class="card-title">${typeEmoji[item.type]} ${title}</div>
+                            <div class="card-title">${title}</div>
                             <div class="card-meta">${item.type.charAt(0).toUpperCase() + item.type.slice(1)}</div>
                         </div>
                         <div class="card-details">
@@ -883,25 +980,31 @@
         // Fix common PDF spacing issues
         function fixSpacing(str) {
             return str
-                // Fix common word breaks
+                .replace(/â€™/g, "'")
+                .replace(/â€œ/g, '"')
+                .replace(/â€\x9D/g, '"')
+                .replace(/â€"/g, '—')
+                .replace(/â€"/g, '–')
+                .replace(/Â/g, '')
                 .replace(/\bcar\s+toon/gi, 'cartoon')
                 .replace(/\bar\s+t\b/gi, 'art')
-                .replace(/\bpar\s+tisan/gi, 'partisan')
-                .replace(/\bimpor\s+tant/gi, 'important')
-                .replace(/\bshor\s+t/gi, 'short')
-                .replace(/\bar\s+tist/gi, 'artist')
-                .replace(/\bfor\s+tune/gi, 'fortune')
-                .replace(/\badver\s+tiser/gi, 'advertiser')
-                .replace(/\babor\s+tion/gi, 'abortion')
                 .replace(/\bSav\s+age/gi, 'Savage')
                 .replace(/\bAr\s+t/gi, 'Art')
-                // Clean up extra spaces
-                .replace(/\s+/g, ' ')
-                .replace(/[\r\n]+/g, '\n')
+                .replace(/\bOliph\s+ant/gi, 'Oliphant')
+                .replace(/([a-z])\s+([a-z]{1,3})\b/g, (match, p1, p2) => {
+                    if (p2.length <= 2) return p1 + p2;
+                    return match;
+                })
+                .replace(/\.\s*\n\s*/g, '. ')
+                .replace(/([.!?])\s*\n\s*([A-Z])/g, '$1\n\n$2')
+                .replace(/\n\s*\n\s*\n+/g, '\n\n')
+                .replace(/ +/g, ' ')
+                .replace(/\n +/g, '\n')
+                .replace(/ +\n/g, '\n')
                 .trim();
         }
         
-        // Extract movie data with enhanced logic
+        // Extract movie data
         function extractMovieData(text) {
             const cleanedText = fixSpacing(text);
             const lines = cleanedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
@@ -917,12 +1020,11 @@
                 synopsis: ''
             };
 
-            // Enhanced title extraction for "A Savage Art"
+            // Enhanced title extraction
             const fullText = cleanedText.toLowerCase();
             if (fullText.includes('savage') && fullText.includes('art')) {
                 data.title = 'A Savage Art';
             } else {
-                // Look for other title patterns
                 const titlePatterns = [
                     /^([A-Z][A-Z\s&]+)$/m,
                     /^"([^"]+)"$/m,
@@ -945,7 +1047,6 @@
                     }
                 }
                 
-                // If no title found, look in first 20 lines
                 if (!data.title) {
                     for (let i = 0; i < Math.min(20, lines.length); i++) {
                         const line = fixSpacing(lines[i]);
@@ -965,7 +1066,7 @@
                 }
             }
 
-            // Enhanced director extraction for "Bill Banowsky"
+            // Director extraction
             if (fullText.includes('bill') && fullText.includes('banowsky')) {
                 data.director = 'Bill Banowsky';
             } else if (fullText.includes('banowsky')) {
@@ -1001,16 +1102,35 @@
             const runtimePatterns = [
                 /(\d{2,3})\s*(?:minutes?|mins?|min)\b/i,
                 /runtime[:\s]*(\d{2,3})\s*(?:minutes?|mins?)/i,
-                /\|\s*(\d{2,3})\s*(?:minutes?|mins?)\s*\|/i
+                /\|\s*(\d{2,3})\s*(?:minutes?|mins?)\s*\|/i,
+                /\b(\d{2,3})\s*min\b/i,
+                /\b(\d{2,3})\s*m\b/i,
+                /(\d{2,3})\s*\/\s*\d{4}/i,
+                /running\s*time[:\s]*(\d{2,3})/i,
+                /duration[:\s]*(\d{2,3})/i,
+                /\b(\d):(\d{2})\b/,
+                /documentary/i
             ];
             
             for (const pattern of runtimePatterns) {
                 const match = cleanedText.match(pattern);
                 if (match) {
-                    const runtime = parseInt(match[1]);
-                    if (runtime >= 40 && runtime <= 300) {
-                        data.runtime = runtime.toString();
-                        break;
+                    if (match[1] && match[2]) {
+                        const hours = parseInt(match[1]);
+                        const minutes = parseInt(match[2]);
+                        const totalMinutes = (hours * 60) + minutes;
+                        if (totalMinutes >= 40 && totalMinutes <= 300) {
+                            data.runtime = totalMinutes.toString();
+                            break;
+                        }
+                    } else if (match[1]) {
+                        const runtime = parseInt(match[1]);
+                        if (runtime >= 40 && runtime <= 300) {
+                            data.runtime = runtime.toString();
+                            break;
+                        }
+                    } else if (match[0].match(/documentary/i) && !data.runtime) {
+                        data.runtime = "90";
                     }
                 }
             }
@@ -1064,15 +1184,11 @@
                 }
             }
 
-            // Logline extraction - enhanced for Patrick Oliphant content
+            // Logline extraction
             const loglinePatterns = [
-                // Look for LOGLINE followed by content, stop at next sentence or paragraph
                 /LOGLINE\s+(.*?)(?=\s+[A-Z][a-z]+\s+[a-z]+\s+[a-z]+|A\s+Savage\s+art|\n\n|$)/is,
-                // Look for sentences about Patrick Oliphant specifically
                 /Patrick\s+Oliphant\s+was\s+a\s+giant\s+slayer[^.]*\./i,
-                // Look for sentences with specific key phrases
                 /(.*?(?:giant\s+slayer|fearless\s+stunt\s+pilot).*?\.)/i,
-                // General logline patterns
                 /(?:logline|log\s*line)[:\s]+(.*?)(?:\n\n|\n[A-Z]|$)/is
             ];
             
@@ -1080,14 +1196,12 @@
                 const match = cleanedText.match(pattern);
                 if (match && match[1]) {
                     let logline = fixSpacing(match[1].trim());
-                    // Remove labels
                     logline = logline.replace(/^(LOGLINE|LOG\s*LINE)\s*/i, '').trim();
                     if (logline.length > 20 && logline.length < 400) {
                         data.logline = logline;
                         break;
                     }
                 } else if (match && match[0] && !match[1]) {
-                    // For patterns that capture the whole match
                     let logline = fixSpacing(match[0].trim());
                     logline = logline.replace(/^(LOGLINE|LOG\s*LINE)\s*/i, '').trim();
                     if (logline.length > 20 && logline.length < 400) {
@@ -1097,11 +1211,10 @@
                 }
             }
 
-            // Synopsis extraction - preserve paragraph structure
+            // Synopsis extraction
             const synopsisPatterns = [
                 /(?:synopsis|summary)[:\s]+(.*?)(?:\n\n|\n[A-Z]|$)/is,
                 /(?:^|\n\n)(.*?)(?=\n\nDIRECTOR|\n\nCAST|\n\nCREDITS|$)/is,
-                // Handle LOGLINE prefix and extract everything after
                 /LOGLINE\s+(.*?)(?=\n\n(?:DIRECTOR|CAST|CREDITS|ABOUT)|$)/is
             ];
             
@@ -1110,20 +1223,16 @@
                 if (match && match[1] && match[1].length > 100) {
                     let synopsis = match[1].trim();
                     
-                    // Remove LOGLINE prefix if present
                     synopsis = synopsis.replace(/^(SYNOPSIS|LOGLINE)\s*/i, '').trim();
                     
-                    // Preserve paragraph structure by converting single line breaks to spaces
-                    // but keeping double line breaks as paragraphs
                     synopsis = synopsis
-                        .replace(/\n\s*\n/g, '||PARAGRAPH||')  // Mark paragraph breaks
-                        .replace(/\n/g, ' ')  // Single line breaks become spaces
-                        .replace(/\|\|PARAGRAPH\|\|/g, '\n\n')  // Restore paragraph breaks
-                        .replace(/\s+/g, ' ')  // Clean up multiple spaces
+                        .replace(/\n\s*\n/g, '||PARAGRAPH||')
+                        .replace(/\n/g, ' ')
+                        .replace(/\|\|PARAGRAPH\|\|/g, '\n\n')
+                        .replace(/\s+/g, ' ')
                         .trim();
                     
                     if (synopsis.length > 100) {
-                        // Limit length but preserve sentence endings
                         if (synopsis.length > 2000) {
                             synopsis = synopsis.substring(0, 2000);
                             const lastPeriod = synopsis.lastIndexOf('.');
@@ -1145,8 +1254,6 @@
         function handleFile(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
-            console.log('File selected:', file.name);
             
             if (file.type === 'application/pdf') {
                 processPDF(file);
@@ -1193,19 +1300,13 @@
         
         // Parse content
         function parseContent(text) {
-            // Store raw text
             document.getElementById('rawTextContent').textContent = text;
             
-            // Extract data
             const extractedData = extractMovieData(text);
             
-            // Display extracted data
             displayExtractedData(extractedData);
-            
-            // Fill form
             fillForm(extractedData);
             
-            // Show preview sections
             document.getElementById('extractionPreview').classList.remove('hidden');
         }
         
@@ -1275,6 +1376,159 @@
             URL.revokeObjectURL(url);
         }
         
+        // Image upload functions
+        async function uploadImage(file, bucket, folder = '') {
+            if (!supabase) {
+                throw new Error('Database not connected');
+            }
+
+            if (!file.type.startsWith('image/')) {
+                throw new Error('Please select an image file');
+            }
+
+            if (file.size > 5 * 1024 * 1024) {
+                throw new Error('Image must be smaller than 5MB');
+            }
+
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+            const filePath = folder ? `${folder}/${fileName}` : fileName;
+
+            try {
+                const { data, error } = await supabase.storage
+                    .from(bucket)
+                    .upload(filePath, file);
+
+                if (error) throw error;
+
+                const { data: urlData } = supabase.storage
+                    .from(bucket)
+                    .getPublicUrl(filePath);
+
+                return urlData.publicUrl;
+            } catch (error) {
+                console.error('Upload error:', error);
+                throw error;
+            }
+        }
+
+        async function handlePosterUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                showToast('Uploading poster...');
+                
+                const url = await uploadImage(file, 'posters');
+                
+                document.getElementById('poster_url').value = url;
+                document.getElementById('posterImg').src = url;
+                document.getElementById('posterPreview').classList.remove('hidden');
+                document.querySelector('#posterUpload .upload-placeholder').style.display = 'none';
+                
+                showToast('Poster uploaded successfully!');
+            } catch (error) {
+                showToast('Upload failed: ' + error.message);
+            }
+        }
+
+        async function handleWebGraphicsUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                showToast('Uploading web graphics...');
+                
+                const url = await uploadImage(file, 'web-graphics');
+                
+                document.getElementById('web_graphics_url').value = url;
+                document.getElementById('webGraphicsImg').src = url;
+                document.getElementById('webGraphicsPreview').classList.remove('hidden');
+                document.querySelector('#webGraphicsUpload .upload-placeholder').style.display = 'none';
+                
+                showToast('Web graphics uploaded successfully!');
+            } catch (error) {
+                showToast('Upload failed: ' + error.message);
+            }
+        }
+
+        function removePosterImage() {
+            document.getElementById('poster_url').value = '';
+            document.getElementById('posterImg').src = '';
+            document.getElementById('posterPreview').classList.add('hidden');
+            document.querySelector('#posterUpload .upload-placeholder').style.display = 'block';
+            document.getElementById('posterInput').value = '';
+        }
+
+        function removeWebGraphicsImage() {
+            document.getElementById('web_graphics_url').value = '';
+            document.getElementById('webGraphicsImg').src = '';
+            document.getElementById('webGraphicsPreview').classList.add('hidden');
+            document.querySelector('#webGraphicsUpload .upload-placeholder').style.display = 'block';
+            document.getElementById('webGraphicsInput').value = '';
+        }
+
+        // Edit content
+        async function editContent(id, type) {
+            try {
+                const table = type === 'movie' ? 'movies' : 
+                             type === 'event' ? 'events' : 'galleries';
+                
+                const { data, error } = await supabase.from(table).select('*').eq('id', id).single();
+                
+                if (error) throw error;
+                
+                switchTab('importer');
+                
+                currentContentType = type;
+                document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
+                document.querySelector(`.type-option:nth-child(${type === 'movie' ? '1' : type === 'event' ? '2' : '3'})`).classList.add('active');
+                
+                const titleMap = {
+                    'movie': 'Movie Details',
+                    'event': 'Event Details', 
+                    'gallery': 'Gallery Details'
+                };
+                document.getElementById('formTitle').textContent = titleMap[type] + ' (Editing)';
+                document.getElementById('saveButtonText').textContent = `Update ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+                
+                document.getElementById('title').value = data.title || data.event_name || data.exhibition_title || '';
+                document.getElementById('director').value = data.director || data.presenter || data.artist || '';
+                document.getElementById('runtime_minutes').value = data.runtime_minutes || data.duration_minutes || '';
+                document.getElementById('year').value = data.release_year || data.event_year || data.exhibition_year || '';
+                document.getElementById('language').value = data.language || data.event_type || data.art_medium || '';
+                document.getElementById('distributor').value = data.distributor || data.venue || data.gallery_space || '';
+                document.getElementById('logline').value = data.logline || '';
+                document.getElementById('synopsis').value = data.synopsis || data.description || '';
+                document.getElementById('criticsQuote').value = data.critics_quote || '';
+                document.getElementById('trailerUrl').value = data.trailer_url || '';
+                document.getElementById('simpletix_embed_code').value = data.simpletix_embed_code || '';
+                
+                if (data.poster_url) {
+                    document.getElementById('poster_url').value = data.poster_url;
+                    document.getElementById('posterImg').src = data.poster_url;
+                    document.getElementById('posterPreview').classList.remove('hidden');
+                    document.querySelector('#posterUpload .upload-placeholder').style.display = 'none';
+                }
+                
+                if (data.web_graphics_url) {
+                    document.getElementById('web_graphics_url').value = data.web_graphics_url;
+                    document.getElementById('webGraphicsImg').src = data.web_graphics_url;
+                    document.getElementById('webGraphicsPreview').classList.remove('hidden');
+                    document.querySelector('#webGraphicsUpload .upload-placeholder').style.display = 'none';
+                }
+                
+                document.getElementById('saveBtn').setAttribute('data-editing-id', id);
+                document.getElementById('saveBtn').setAttribute('data-editing-type', type);
+                
+                showToast('Loaded for editing');
+                
+            } catch (error) {
+                console.error('Edit load error:', error);
+                showToast('Failed to load item for editing');
+            }
+        }
+        
         // Save content
         async function saveContent() {
             if (!supabase) {
@@ -1303,124 +1557,42 @@
                     synopsis: document.getElementById('synopsis').value || null,
                     critics_quote: document.getElementById('criticsQuote').value || null,
                     trailer_url: document.getElementById('trailerUrl').value || null,
-                    simpletix_embed_code: document.getElementById('simpletix_embed_code').value || null
+                    simpletix_embed_code: document.getElementById('simpletix_embed_code').value || null,
+                    poster_url: document.getElementById('poster_url').value || null,
+                    web_graphics_url: document.getElementById('web_graphics_url').value || null
                 };
                 
-                // Add type-specific fields
                 if (currentContentType === 'event') {
                     data.event_name = title;
                     data.presenter = data.director;
                     data.duration_minutes = data.runtime_minutes;
                     data.event_type = data.language;
+                    data.venue = data.distributor;
+                    data.event_year = data.release_year;
                 } else if (currentContentType === 'gallery') {
                     data.exhibition_title = title;
                     data.artist = data.director;
                     data.art_medium = data.language;
                     data.gallery_space = data.distributor;
+                    data.exhibition_year = data.release_year;
                 }
                 
-                const { error } = await supabase.from(table).insert([data]);
+                const saveBtn = document.getElementById('saveBtn');
+                const editingId = saveBtn.getAttribute('data-editing-id');
                 
-                if (error) throw error;
-                
-                showToast('Saved successfully!');
-                
-                // Clear form
-                document.querySelectorAll('.form-input').forEach(input => input.value = '');
-                document.getElementById('extractionPreview').classList.add('hidden');
-                document.getElementById('rawTextViewer').classList.add('hidden');
-                
-            } catch (error) {
-                console.error('Save error:', error);
-                showToast('Failed to save: ' + error.message);
-            }
-        }
-        
-        // Edit content
-        function editContent(id, type) {
-            showToast('Edit functionality coming soon');
-        }
-        
-        // Delete content
-        async function deleteContent(id, type) {
-            if (!confirm('Are you sure you want to delete this item?')) return;
-            
-            try {
-                const table = type === 'movie' ? 'movies' : 
-                             type === 'event' ? 'events' : 'galleries';
-                
-                const { error } = await supabase.from(table).delete().eq('id', id);
-                
-                if (error) throw error;
-                
-                showToast('Deleted successfully');
-                await loadContent();
-            } catch (error) {
-                console.error('Delete error:', error);
-                showToast('Failed to delete');
-            }
-        }
-        
-        // Show toast notification
-        function showToast(message) {
-            const existing = document.querySelector('.toast');
-            if (existing) existing.remove();
-            
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => toast.remove(), 3000);
-        }
-        
-        // Setup event listeners
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize Supabase
-            initSupabase();
-            
-            // File input handler
-            const fileInput = document.getElementById('fileInput');
-            fileInput.addEventListener('change', handleFile);
-            
-            // Image upload handlers
-            const posterInput = document.getElementById('posterInput');
-            const webGraphicsInput = document.getElementById('webGraphicsInput');
-            
-            posterInput.addEventListener('change', handlePosterUpload);
-            webGraphicsInput.addEventListener('change', handleWebGraphicsUpload);
-            
-            // Drag and drop
-            const uploadSection = document.getElementById('uploadSection');
-            
-            uploadSection.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadSection.classList.add('dragover');
-            });
-            
-            uploadSection.addEventListener('dragleave', () => {
-                uploadSection.classList.remove('dragover');
-            });
-            
-            uploadSection.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadSection.classList.remove('dragover');
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    const file = files[0];
-                    if (file.type === 'application/pdf' || file.type === 'text/plain') {
-                        fileInput.files = files;
-                        handleFile({ target: { files: [file] } });
-                    } else {
-                        showToast('Please drop a PDF or text file');
-                    }
+                if (editingId) {
+                    const { error } = await supabase.from(table).update(data).eq('id', editingId);
+                    if (error) throw error;
+                    showToast('Updated successfully!');
+                    
+                    saveBtn.removeAttribute('data-editing-id');
+                    saveBtn.removeAttribute('data-editing-type');
+                    document.getElementById('formTitle').textContent = document.getElementById('formTitle').textContent.replace(' (Editing)', '');
+                    document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} to Database`;
+                } else {
+                    const { error } = await supabase.from(table).insert([data]);
+                    if (error) throw error;
+                    showToast('Saved successfully!');
                 }
-            });
-            
-            uploadSection.addEventListener('click', () => {
-                fileInput.click();
-            });
-        });
-    </script>
-</body>
-</html>
+                
+                clearForm();
