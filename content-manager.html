@@ -1079,7 +1079,7 @@ function fixSpacing(str) {
             ];
             
             for (const pattern of titlePatterns) {
-                const match = fixedText.match(pattern);
+                const match = cleanedText.match(pattern);
                 if (match) {
                     let title = match[1] || match[0];
                     title = fixSpacing(title).trim();
