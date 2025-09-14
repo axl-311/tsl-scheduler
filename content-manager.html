@@ -935,26 +935,21 @@ function renderContent(searchTerm = '') {
         const title = item.title || item.event_name || item.exhibition_title;
         const creator = item.director || item.presenter || item.artist || 'N/A';
         
-        html += `
-            <div class="content-card">
-                <div class="card-header">
-                    <div class="card-title">${title}</div>
-                    <div class="card-meta">${item.type.charAt(0).toUpperCase() + item.type.slice(1)}</div>
-                </div>
-                <div class="card-details">
-                    <div class="detail-item">
-                        <span class="detail-label">Creator:</span>
-                        <span class="detail-value">${creator}</span>
-                    </div>
-                </div>
-                <div class="card-actions">
-                    <button class="btn btn-secondary" onclick="editContent('${item.id}', '${item.type}')">Edit</button>
-                    <button class="btn btn-danger" onclick="deleteContent('${item.id}', '${item.type}')">Delete</button>
-                </div>
-            </div>
-        `;
-    });
-    html += '</div>';
+        const webGraphic = item.web_graphics_url ? `<img src="${item.web_graphics_url}" alt="${title}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 15px;">` : '';
+
+html += `
+    <div class="content-card">
+        ${webGraphic}
+        <div class="card-header">
+            <div class="card-title">${title}</div>
+            <div class="card-meta">${item.type.charAt(0).toUpperCase() + item.type.slice(1)}</div>
+        </div>
+        <div class="card-actions">
+            <button class="btn btn-secondary" onclick="editContent('${item.id}', '${item.type}')">Edit</button>
+            <button class="btn btn-danger" onclick="deleteContent('${item.id}', '${item.type}')">Delete</button>
+        </div>
+    </div>
+`;
     
     container.innerHTML = html;
 }
