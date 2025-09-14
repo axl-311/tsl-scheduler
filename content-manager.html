@@ -1156,31 +1156,106 @@
             const cleanedText = fixSpacing(text);
             const data = {};
             
-            const titlePatterns = [
-                /^([A-Z][A-Z\s&]+)$/m,
-                /^"([^"]+)"$/m,
-                /\*\*([^*]+)\*\*/
-            ];
+            // First try structured field extraction (like "Title: The History of Sound")
+            const lines = cleanedText.split('\n');
+            let currentField = null;
+            let currentValue = '';
             
-            for (const pattern of titlePatterns) {
-                const match = cleanedText.match(pattern);
-                if (match) {
-                    let title = match[1] || match[0];
-                    if (title && title.length > 2 && title.length < 100) {
-                        data.title = title.trim();
-                        break;
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                
+                // Check if this line contains a field label
+                const fieldMatch = line.match(/^([A-Za-z\s]+):\s*(.*)$/);
+                
+                if (fieldMatch) {
+                    // Save previous field if we have one
+                    if (currentField && currentValue.trim()) {
+                        data[currentField] = currentValue.trim();
                     }
+                    
+                    // Start new field
+                    const fieldName = fieldMatch[1].toLowerCase().trim();
+                    currentValue = fieldMatch[2];
+                    
+                    // Map field names to database columns
+                    const fieldMapping = {
+                        'title': 'title',
+                        'director': 'director',
+                        'runtime minutes': 'runtime_minutes',
+                        'runtime': 'runtime_minutes',
+                        'release year': 'release_year',
+                        'year': 'release_year',
+                        'language': 'language',
+                        'distributor': 'distributor',
+                        'synopsis': 'synopsis',
+                        'logline': 'logline',
+                        'description': 'synopsis',
+                        'event name': 'event_name',
+                        'event type': 'event_type',
+                        'presenter': 'presenter',
+                        'duration minutes': 'duration_minutes',
+                        'duration': 'duration_minutes',
+                        'exhibition title': 'exhibition_title',
+                        'artist': 'artist',
+                        'art medium': 'art_medium',
+                        'gallery space': 'gallery_space',
+                        'critics quote': 'critics_quote',
+                        'trailer url': 'trailer_url',
+                        'poster url': 'poster_url',
+                        'web graphics url': 'web_graphics_url'
+                    };
+                    
+                    currentField = fieldMapping[fieldName] || null;
+                } else if (currentField && line) {
+                    // Continue accumulating value for current field
+                    currentValue += (currentValue ? ' ' : '') + line;
                 }
             }
             
-            const directorMatch = cleanedText.match(/(?:Directed\s+by|Director)\s*:?\s*([A-Z][a-zA-Z\s]+?)(?:\n|$|\.)/i);
-            if (directorMatch) data.director = directorMatch[1].trim();
+            // Don't forget the last field
+            if (currentField && currentValue.trim()) {
+                data[currentField] = currentValue.trim();
+            }
             
-            const runtimeMatch = cleanedText.match(/(\d{2,3})\s*(?:minutes?|mins?)/i);
-            if (runtimeMatch) data.runtime_minutes = parseInt(runtimeMatch[1]);
+            // If structured extraction didn't work well, fall back to pattern matching
+            if (Object.keys(data).length < 2) {
+                // Original pattern-based extraction as fallback
+                const titlePatterns = [
+                    /^([A-Z][A-Z\s&]+)$/m,
+                    /^"([^"]+)"$/m,
+                    /\*\*([^*]+)\*\*/
+                ];
+                
+                for (const pattern of titlePatterns) {
+                    const match = cleanedText.match(pattern);
+                    if (match) {
+                        let title = match[1] || match[0];
+                        if (title && title.length > 2 && title.length < 100) {
+                            data.title = title.trim();
+                            break;
+                        }
+                    }
+                }
+                
+                const directorMatch = cleanedText.match(/(?:Directed\s+by|Director)\s*:?\s*([A-Z][a-zA-Z\s]+?)(?:\n|$|\.)/i);
+                if (directorMatch) data.director = directorMatch[1].trim();
+                
+                const runtimeMatch = cleanedText.match(/(\d{2,3})\s*(?:minutes?|mins?)/i);
+                if (runtimeMatch) data.runtime_minutes = parseInt(runtimeMatch[1]);
+                
+                const yearMatch = cleanedText.match(/\b(20[0-2][0-9])\b/);
+                if (yearMatch) data.release_year = parseInt(yearMatch[1]);
+            }
             
-            const yearMatch = cleanedText.match(/\b(20[0-2][0-9])\b/);
-            if (yearMatch) data.release_year = parseInt(yearMatch[1]);
+            // Clean up extracted data
+            Object.keys(data).forEach(key => {
+                if (typeof data[key] === 'string') {
+                    data[key] = data[key].trim();
+                    if (data[key] === '') {
+                        delete data[key];
+                    }
+                }
+            });
             
             return data;
         }
