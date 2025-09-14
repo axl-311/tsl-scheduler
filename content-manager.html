@@ -1,856 +1,23 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Content Manager</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #f5f5f7;
-            color: #1d1d1f;
-        }
-
-        .app-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .header {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header h1 {
-            font-size: 24px;
-            font-weight: 600;
-        }
-
-        .version-badge {
-            font-size: 12px;
-            background: #007aff;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 12px;
-            margin-left: 10px;
-            font-weight: 500;
-        }
-
-        .sync-status {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 16px;
-            background: #e8e8e8;
-            border-radius: 20px;
-            font-size: 14px;
-            color: #86868b;
-        }
-
-        .sync-status.connected {
-            background: #e8f5e9;
-            color: #2e7d32;
-        }
-
-        .sync-status.error {
-            background: #fce4ec;
-            color: #c62828;
-        }
-
-        .nav-tabs {
-            background: white;
-            border-radius: 12px;
-            padding: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            display: flex;
-            gap: 10px;
-        }
-
-        .nav-tab {
-            padding: 10px 20px;
-            border: none;
-            background: #f0f0f2;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .nav-tab:hover {
-            background: #e0e0e2;
-        }
-
-        .nav-tab.active {
-            background: #007aff;
-            color: white;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn-primary {
-            background: #007aff;
-            color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            background: #0051d5;
-        }
-
-        .btn-success {
-            background: #34c759;
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: #30a852;
-        }
-
-        .btn-secondary {
-            background: #f0f0f2;
-            color: #1d1d1f;
-        }
-
-        .btn-secondary:hover {
-            background: #e0e0e2;
-        }
-
-        .btn-danger {
-            background: #ff3b30;
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #d70015;
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .stats-section {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-        }
-
-        .stat-card {
-            text-align: center;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .stat-value {
-            font-size: 32px;
-            font-weight: 600;
-            color: #007aff;
-        }
-
-        .stat-label {
-            font-size: 14px;
-            color: #86868b;
-            margin-top: 5px;
-        }
-
-        .controls-bar {
-            background: white;
-            border-radius: 12px;
-            padding: 15px 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-
-        .search-section {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex: 1;
-            max-width: 500px;
-        }
-
-        .search-input {
-            flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #d2d2d7;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #007aff;
-            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
-        }
-
-        .content-tabs {
-            display: flex;
-            gap: 10px;
-        }
-
-        .tab-button {
-            padding: 8px 16px;
-            border: 1px solid #d2d2d7;
-            background: white;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        .tab-button:hover {
-            background: #f0f0f2;
-        }
-
-        .tab-button.active {
-            background: #007aff;
-            color: white;
-            border-color: #007aff;
-        }
-
-        .content-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .content-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .content-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        }
-
-        .card-header {
-            margin-bottom: 12px;
-        }
-
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1d1d1f;
-            margin-bottom: 4px;
-        }
-
-        .card-meta {
-            font-size: 12px;
-            color: #86868b;
-        }
-
-        .card-details {
-            margin-bottom: 15px;
-        }
-
-        .detail-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 6px 0;
-            font-size: 14px;
-            border-bottom: 1px solid #f0f0f2;
-        }
-
-        .detail-label {
-            color: #86868b;
-        }
-
-        .detail-value {
-            color: #1d1d1f;
-            font-weight: 500;
-        }
-
-        .card-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .card-actions .btn {
-            flex: 1;
-            padding: 6px 12px;
-            font-size: 13px;
-        }
-
-        .main-panel {
-            background: white;
-            border-radius: 12px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
-        }
-
-        .content-type-selector {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 30px;
-            justify-content: center;
-        }
-
-        .type-option {
-            padding: 12px 24px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 500;
-            text-align: center;
-            background: white;
-            font-size: 14px;
-        }
-
-        .type-option:hover {
-            border-color: #007aff;
-            background: #f0f7ff;
-        }
-
-        .type-option.active {
-            border-color: #007aff;
-            background: #007aff;
-            color: white;
-        }
-
-        .upload-section {
-            border: 3px dashed #007aff;
-            border-radius: 12px;
-            padding: 40px;
-            text-align: center;
-            background: #f0f7ff;
-            margin-bottom: 30px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .upload-section:hover {
-            border-color: #0051d5;
-            background: #e3f2ff;
-        }
-
-        .upload-section.dragover {
-            border-color: #34c759;
-            background: #e8f5e9;
-        }
-
-        .file-input {
-            display: none;
-        }
-
-        .form-section {
-            background: #f8f9fa;
-            padding: 25px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-        }
-
-        .form-section h3 {
-            color: #1d1d1f;
-            margin-bottom: 20px;
-            font-size: 18px;
-            font-weight: 600;
-            border-bottom: 2px solid #007aff;
-            padding-bottom: 10px;
-        }
-
-        .form-grid-three {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        .form-label {
-            display: block;
-            font-weight: 500;
-            margin-bottom: 6px;
-            color: #1d1d1f;
-            font-size: 14px;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #d2d2d7;
-            border-radius: 8px;
-            font-size: 14px;
-            font-family: inherit;
-            background: white;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: #007aff;
-            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
-        }
-
-        textarea.form-input {
-            resize: vertical;
-            min-height: 100px;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #86868b;
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #323232;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 1000;
-            animation: slideIn 0.3s ease;
-            font-size: 14px;
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateY(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        .extraction-preview {
-            background: #e3f2fd;
-            border: 1px solid #90caf9;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .raw-text-viewer {
-            background: #f8f9fa;
-            border: 1px solid #d2d2d7;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .raw-text-content {
-            background: white;
-            border: 1px solid #d2d2d7;
-            border-radius: 6px;
-            padding: 15px;
-            max-height: 300px;
-            overflow-y: auto;
-            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            color: #333;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #86868b;
-        }
-
-        .spinner {
-            border: 3px solid #f0f0f2;
-            border-top: 3px solid #007aff;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .image-upload-area {
-            border: 2px dashed #d2d2d7;
-            border-radius: 8px;
-            background: #fafafa;
-            position: relative;
-            min-height: 120px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-
-        .image-upload-area:hover {
-            border-color: #007aff;
-            background: #f0f7ff;
-        }
-
-        .upload-placeholder {
-            text-align: center;
-            cursor: pointer;
-            padding: 20px;
-            width: 100%;
-        }
-
-        .upload-placeholder span {
-            display: block;
-            font-weight: 500;
-            color: #007aff;
-            margin-bottom: 5px;
-        }
-
-        .upload-hint {
-            font-size: 12px;
-            color: #86868b;
-        }
-
-        .image-preview {
-            position: relative;
-            width: 100%;
-            height: 120px;
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        .image-preview img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 6px;
-        }
-
-        .remove-image-btn {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            background: rgba(255, 59, 48, 0.9);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            cursor: pointer;
-            font-size: 16px;
-            line-height: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .remove-image-btn:hover {
-            background: rgba(255, 59, 48, 1);
-        }
-    </style>
-</head>
-<body>
-    <div class="app-container">
-        <div class="header">
-            <div>
-                <h1>TSL Content Manager<span class="version-badge">v2.0</span></h1>
-            </div>
-            <div class="sync-status" id="connectionStatus">
-                <span>○</span>
-                <span>Connecting...</span>
-            </div>
-        </div>
-
-        <div class="nav-tabs">
-            <button class="nav-tab active" onclick="switchTab('dashboard')">
-                Dashboard
-            </button>
-            <button class="nav-tab" onclick="switchTab('importer')">
-                Importer
-            </button>
-        </div>
-
-        <!-- Dashboard Tab -->
-        <div id="dashboard-tab" class="tab-content active">
-            <div class="stats-section">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value" id="moviesCount">0</div>
-                        <div class="stat-label">Movies</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="eventsCount">0</div>
-                        <div class="stat-label">Events</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="galleriesCount">0</div>
-                        <div class="stat-label">Galleries</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="totalCount">0</div>
-                        <div class="stat-label">Total Items</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="controls-bar">
-                <div class="search-section">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Search by title...">
-                    <button onclick="searchContent()" class="btn btn-primary">Search</button>
-                </div>
-                <div class="content-tabs">
-                    <button class="tab-button active" onclick="filterContent('all')">All</button>
-                    <button class="tab-button" onclick="filterContent('movies')">Movies</button>
-                    <button class="tab-button" onclick="filterContent('events')">Events</button>
-                    <button class="tab-button" onclick="filterContent('galleries')">Galleries</button>
-                </div>
-            </div>
-
-            <div id="contentContainer">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <div>Loading content...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Importer Tab -->
-        <div id="importer-tab" class="tab-content">
-            <div class="main-panel">
-                <div class="content-type-selector">
-                    <div class="type-option active" onclick="selectContentType('movie')">Movie</div>
-                    <div class="type-option" onclick="selectContentType('event')">Event</div>
-                    <div class="type-option" onclick="selectContentType('gallery')">Gallery</div>
-                </div>
-                
-                <div class="upload-section" id="uploadSection">
-                    <div style="font-size: 18px; color: #007aff; margin-bottom: 10px; font-weight: 600;">
-                        Drop Press Kit PDF Here
-                    </div>
-                    <div style="color: #86868b; font-size: 14px;">Or click to browse files</div>
-                    <input type="file" id="fileInput" class="file-input" accept=".pdf,.txt">
-                    <button onclick="document.getElementById('fileInput').click()" class="btn btn-primary" style="margin-top: 15px;">
-                        Choose File
-                    </button>
-                </div>
-                
-                <div id="extractionPreview" class="extraction-preview hidden">
-                    <h4>Extracted Information</h4>
-                    <div id="extractedData"></div>
-                    <div class="action-buttons">
-                        <button onclick="toggleRawText()" class="btn btn-secondary">Show Raw Text</button>
-                        <button onclick="downloadData()" class="btn btn-success">Download Data</button>
-                    </div>
-                </div>
-
-                <div id="rawTextViewer" class="raw-text-viewer hidden">
-                    <h4>Raw Extracted Text</h4>
-                    <div class="raw-text-content" id="rawTextContent"></div>
-                    <button onclick="copyRawText()" class="btn btn-secondary" style="margin-top: 10px;">
-                        Copy to Clipboard
-                    </button>
-                </div>
-                
-                <div class="form-section">
-                    <h3 id="formTitle">Movie Details</h3>
-                    <div class="form-grid-three">
-                        <div class="form-group">
-                            <label class="form-label">Title *</label>
-                            <input type="text" id="title" class="form-input" />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Director</label>
-                            <input type="text" id="director" class="form-input" />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Runtime (minutes)</label>
-                            <input type="number" id="runtime_minutes" class="form-input" />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Release Year</label>
-                            <input type="number" id="year" class="form-input" />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Language</label>
-                            <input type="text" id="language" class="form-input" />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Distributor</label>
-                            <input type="text" id="distributor" class="form-input" />
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Logline</label>
-                        <textarea id="logline" class="form-input" rows="2"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Synopsis</label>
-                        <textarea id="synopsis" class="form-input" rows="5"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Critics Quote</label>
-                        <textarea id="criticsQuote" class="form-input" rows="2"></textarea>
-                    </div>
-                </div>
-                
-                <div class="form-section">
-                    <h3>Images</h3>
-                    <div class="form-grid-three">
-                        <div class="form-group">
-                            <label class="form-label">Poster Image</label>
-                            <div class="image-upload-area" id="posterUpload">
-                                <input type="file" id="posterInput" accept="image/*" style="display: none;">
-                                <div class="upload-placeholder" onclick="document.getElementById('posterInput').click()">
-                                    <span>Click to upload poster</span>
-                                    <div class="upload-hint">JPG, PNG, WebP (max 5MB)</div>
-                                </div>
-                                <div id="posterPreview" class="image-preview hidden">
-                                    <img id="posterImg" src="" alt="Poster preview">
-                                    <button type="button" onclick="removePosterImage()" class="remove-image-btn">×</button>
-                                </div>
-                            </div>
-                            <input type="hidden" id="poster_url" class="form-input">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Web Graphics</label>
-                            <div class="image-upload-area" id="webGraphicsUpload">
-                                <input type="file" id="webGraphicsInput" accept="image/*" style="display: none;">
-                                <div class="upload-placeholder" onclick="document.getElementById('webGraphicsInput').click()">
-                                    <span>Click to upload web graphics</span>
-                                    <div class="upload-hint">JPG, PNG, WebP (max 5MB)</div>
-                                </div>
-                                <div id="webGraphicsPreview" class="image-preview hidden">
-                                    <img id="webGraphicsImg" src="" alt="Web graphics preview">
-                                    <button type="button" onclick="removeWebGraphicsImage()" class="remove-image-btn">×</button>
-                                </div>
-                            </div>
-                            <input type="hidden" id="web_graphics_url" class="form-input">
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="form-section">
-                    <h3>Media Links</h3>
-                    <div class="form-grid-three">
-                        <div class="form-group">
-                            <label class="form-label">Trailer URL</label>
-                            <input type="url" id="trailerUrl" class="form-input" />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">SimpleTix Embed Code</label>
-                            <input type="text" id="simpletix_embed_code" class="form-input" />
-                        </div>
-                    </div>
-                </div>
-                
-                <button onclick="saveContent()" id="saveBtn" class="btn btn-success" style="width: 100%; margin-top: 20px; padding: 12px;">
-                    <span id="saveButtonText">Save Movie to Database</span>
-                </button>
-            </div>
-        </div>
-    </div>
-<script>
 // TSL Content Manager - Complete JavaScript Code
-// Initialize PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-// Global variables
 let supabase = null;
 let currentContentType = 'movie';
 let currentTab = 'all';
 let allContent = [];
 
-// TSL Content Manager - Complete JavaScript Code
-// Add this script tag before closing </body> tag in Part 1
-
-// Initialize PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-// Global variables
-let supabase = null;
-let currentContentType = 'movie';
-let currentTab = 'all';
-let allContent = [];
-
-// Initialize Supabase
 async function initSupabase() {
     const url = 'https://tnnkfnattwpqqrydsyux.supabase.co';
     const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
     
     try {
         supabase = window.supabase.createClient(url, key);
-        
         const { error } = await supabase.from('movies').select('count').limit(1);
         if (error) throw error;
         
         const statusEl = document.getElementById('connectionStatus');
         statusEl.classList.add('connected');
         statusEl.innerHTML = '<span>✓</span><span>Connected</span>';
-        
         await loadContent();
     } catch (error) {
         console.error('Connection error:', error);
@@ -860,7 +27,6 @@ async function initSupabase() {
     }
 }
 
-// Switch tabs
 function switchTab(tab) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -875,7 +41,6 @@ function switchTab(tab) {
     }
 }
 
-// Select content type
 function selectContentType(type) {
     currentContentType = type;
     document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
@@ -890,7 +55,6 @@ function selectContentType(type) {
     document.getElementById('saveButtonText').textContent = `Save ${type.charAt(0).toUpperCase() + type.slice(1)} to Database`;
 }
 
-// Load content
 async function loadContent() {
     if (!supabase) return;
     
@@ -923,7 +87,6 @@ async function loadContent() {
     }
 }
 
-// Render content
 function renderContent(searchTerm = '') {
     let filteredContent = allContent;
     
@@ -975,13 +138,11 @@ function renderContent(searchTerm = '') {
     container.innerHTML = html;
 }
 
-// Search content
 function searchContent() {
     const searchTerm = document.getElementById('searchInput').value;
     renderContent(searchTerm);
 }
 
-// Filter content
 function filterContent(type) {
     currentTab = type;
     document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
@@ -989,7 +150,6 @@ function filterContent(type) {
     renderContent();
 }
 
-// Fix common PDF spacing issues
 function fixSpacing(str) {
     return str
         .replace(/â€™/g, "'")
@@ -1015,9 +175,7 @@ function fixSpacing(str) {
         .replace(/ +\n/g, '\n')
         .trim();
 }
-
-// Extract movie data
-function extractMovieData(text) {
+                function extractMovieData(text) {
     const cleanedText = fixSpacing(text);
     const lines = cleanedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     
@@ -1032,7 +190,6 @@ function extractMovieData(text) {
         synopsis: ''
     };
 
-    // Enhanced title extraction
     const fullText = cleanedText.toLowerCase();
     if (fullText.includes('savage') && fullText.includes('art')) {
         data.title = 'A Savage Art';
@@ -1049,10 +206,7 @@ function extractMovieData(text) {
             if (match) {
                 let title = match[1] || match[0];
                 title = fixSpacing(title).trim();
-                if (title && 
-                    title.length > 2 && 
-                    title.length < 100 &&
-                    !title.match(/^(LOGLINE|SYNOPSIS|PRESS|FINAL|DISTRIBUTOR|CONTACT|CAST|CREW)/i)) {
+                if (title && title.length > 2 && title.length < 100 && !title.match(/^(LOGLINE|SYNOPSIS|PRESS|FINAL|DISTRIBUTOR|CONTACT|CAST|CREW)/i)) {
                     data.title = title.replace(/\s+/g, ' ').trim();
                     break;
                 }
@@ -1062,15 +216,7 @@ function extractMovieData(text) {
         if (!data.title) {
             for (let i = 0; i < Math.min(20, lines.length); i++) {
                 const line = fixSpacing(lines[i]);
-                
-                if (line && 
-                    line.length > 2 && 
-                    line.length < 80 &&
-                    (line === line.toUpperCase() || line.match(/^[A-Z]/)) &&
-                    !line.match(/^(MAGNET|FINAL|PRESS|NOTES|CONTACT|DISTRIBUTOR|PUBLICITY|CAST|CREW|SYNOPSIS|LOGLINE)/i) &&
-                    !line.includes('@') &&
-                    !line.match(/^\d{4}/) &&
-                    !line.match(/\.(com|org|net)$/i)) {
+                if (line && line.length > 2 && line.length < 80 && (line === line.toUpperCase() || line.match(/^[A-Z]/)) && !line.match(/^(MAGNET|FINAL|PRESS|NOTES|CONTACT|DISTRIBUTOR|PUBLICITY|CAST|CREW|SYNOPSIS|LOGLINE)/i) && !line.includes('@') && !line.match(/^\d{4}/) && !line.match(/\.(com|org|net)$/i)) {
                     data.title = line;
                     break;
                 }
@@ -1078,7 +224,6 @@ function extractMovieData(text) {
         }
     }
 
-    // Director extraction
     if (fullText.includes('bill') && fullText.includes('banowsky')) {
         data.director = 'Bill Banowsky';
     } else if (fullText.includes('banowsky')) {
@@ -1094,15 +239,9 @@ function extractMovieData(text) {
         for (const pattern of directorPatterns) {
             const match = cleanedText.match(pattern);
             if (match && match[1]) {
-                let directorName = match[1].trim()
-                    .replace(/\b\w/g, l => l.toUpperCase())
-                    .replace(/\s+/g, ' ');
-                
+                let directorName = match[1].trim().replace(/\b\w/g, l => l.toUpperCase()).replace(/\s+/g, ' ');
                 directorName = directorName.replace(/\b(And|The|Of|In|On|At|To|For|With|By)\b$/i, '').trim();
-                
-                if (directorName.length >= 5 && directorName.length <= 50 &&
-                    directorName.includes(' ') &&
-                    !directorName.match(/\b(debut|feature|film|movie|story|cast|crew|page|press|kit|notes)\b/i)) {
+                if (directorName.length >= 5 && directorName.length <= 50 && directorName.includes(' ') && !directorName.match(/\b(debut|feature|film|movie|story|cast|crew|page|press|kit|notes)\b/i)) {
                     data.director = directorName;
                     break;
                 }
@@ -1110,7 +249,6 @@ function extractMovieData(text) {
         }
     }
 
-    // Runtime extraction
     const runtimePatterns = [
         /(\d{2,3})\s*(?:minutes?|mins?|min)\b/i,
         /runtime[:\s]*(\d{2,3})\s*(?:minutes?|mins?)/i,
@@ -1147,7 +285,6 @@ function extractMovieData(text) {
         }
     }
 
-    // Year extraction
     const yearPatterns = [
         /\b(20[0-2][0-9])\b/g,
         /\|\s*(20[0-2][0-9])\s*\|/g
@@ -1167,7 +304,6 @@ function extractMovieData(text) {
         }
     }
 
-    // Language extraction
     const languagePatterns = [
         /\b(English|German|French|Spanish|Italian|Japanese|Korean|Mandarin|Portuguese)\b/i,
         /(English|German|French|Spanish|Italian|Japanese|Korean|Mandarin|Portuguese)\s+with\s+English\s+subtitles/i,
@@ -1182,7 +318,6 @@ function extractMovieData(text) {
         }
     }
 
-    // Distributor extraction
     const distributorPatterns = [
         /\b(Magnolia Pictures|Kino Lorber|A24|Netflix|Amazon|Sony Pictures|Universal|Warner|Disney|Paramount|Fox|Lionsgate|Focus Features|Searchlight|Neon|Bleecker Street)\b/i,
         /\b([A-Z][a-z]+\s+(?:Pictures|Films|Entertainment|Media|Studios|Distribution))\b/i
@@ -1196,7 +331,6 @@ function extractMovieData(text) {
         }
     }
 
-    // Logline extraction
     const loglinePatterns = [
         /LOGLINE\s+(.*?)(?=\s+[A-Z][a-z]+\s+[a-z]+\s+[a-z]+|A\s+Savage\s+art|\n\n|$)/is,
         /Patrick\s+Oliphant\s+was\s+a\s+giant\s+slayer[^.]*\./i,
@@ -1223,7 +357,6 @@ function extractMovieData(text) {
         }
     }
 
-    // Synopsis extraction
     const synopsisPatterns = [
         /(?:synopsis|summary)[:\s]+(.*?)(?:\n\n|\n[A-Z]|$)/is,
         /(?:^|\n\n)(.*?)(?=\n\nDIRECTOR|\n\nCAST|\n\nCREDITS|$)/is,
@@ -1234,15 +367,8 @@ function extractMovieData(text) {
         const match = cleanedText.match(pattern);
         if (match && match[1] && match[1].length > 100) {
             let synopsis = match[1].trim();
-            
             synopsis = synopsis.replace(/^(SYNOPSIS|LOGLINE)\s*/i, '').trim();
-            
-            synopsis = synopsis
-                .replace(/\n\s*\n/g, '||PARAGRAPH||')
-                .replace(/\n/g, ' ')
-                .replace(/\|\|PARAGRAPH\|\|/g, '\n\n')
-                .replace(/\s+/g, ' ')
-                .trim();
+            synopsis = synopsis.replace(/\n\s*\n/g, '||PARAGRAPH||').replace(/\n/g, ' ').replace(/\|\|PARAGRAPH\|\|/g, '\n\n').replace(/\s+/g, ' ').trim();
             
             if (synopsis.length > 100) {
                 if (synopsis.length > 2000) {
@@ -1262,7 +388,6 @@ function extractMovieData(text) {
     return data;
 }
 
-// Handle file upload
 function handleFile(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -1276,7 +401,6 @@ function handleFile(event) {
     }
 }
 
-// Process PDF
 async function processPDF(file) {
     try {
         const arrayBuffer = await file.arrayBuffer();
@@ -1298,7 +422,6 @@ async function processPDF(file) {
     }
 }
 
-// Process text file
 async function processTextFile(file) {
     try {
         const text = await file.text();
@@ -1310,19 +433,14 @@ async function processTextFile(file) {
     }
 }
 
-// Parse content
 function parseContent(text) {
     document.getElementById('rawTextContent').textContent = text;
-    
     const extractedData = extractMovieData(text);
-    
     displayExtractedData(extractedData);
     fillForm(extractedData);
-    
     document.getElementById('extractionPreview').classList.remove('hidden');
 }
 
-// Display extracted data
 function displayExtractedData(data) {
     const container = document.getElementById('extractedData');
     let html = '';
@@ -1337,7 +455,6 @@ function displayExtractedData(data) {
     container.innerHTML = html || '<div>No data extracted</div>';
 }
 
-// Fill form
 function fillForm(data) {
     document.getElementById('title').value = data.title || '';
     document.getElementById('director').value = data.director || '';
@@ -1350,13 +467,11 @@ function fillForm(data) {
     document.getElementById('criticsQuote').value = data.criticsQuote || '';
 }
 
-// Toggle raw text
 function toggleRawText() {
     const viewer = document.getElementById('rawTextViewer');
     viewer.classList.toggle('hidden');
 }
 
-// Copy raw text
 function copyRawText() {
     const text = document.getElementById('rawTextContent').textContent;
     navigator.clipboard.writeText(text).then(() => {
@@ -1364,7 +479,6 @@ function copyRawText() {
     });
 }
 
-// Download data
 function downloadData() {
     const title = document.getElementById('title').value || 'extracted';
     const data = {
@@ -1388,16 +502,13 @@ function downloadData() {
     URL.revokeObjectURL(url);
 }
 
-// Image upload functions
 async function uploadImage(file, bucket, folder = '') {
     if (!supabase) {
         throw new Error('Database not connected');
     }
-
     if (!file.type.startsWith('image/')) {
         throw new Error('Please select an image file');
     }
-
     if (file.size > 5 * 1024 * 1024) {
         throw new Error('Image must be smaller than 5MB');
     }
@@ -1407,16 +518,9 @@ async function uploadImage(file, bucket, folder = '') {
     const filePath = folder ? `${folder}/${fileName}` : fileName;
 
     try {
-        const { data, error } = await supabase.storage
-            .from(bucket)
-            .upload(filePath, file);
-
+        const { data, error } = await supabase.storage.from(bucket).upload(filePath, file);
         if (error) throw error;
-
-        const { data: urlData } = supabase.storage
-            .from(bucket)
-            .getPublicUrl(filePath);
-
+        const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
         return urlData.publicUrl;
     } catch (error) {
         console.error('Upload error:', error);
@@ -1430,14 +534,11 @@ async function handlePosterUpload(event) {
 
     try {
         showToast('Uploading poster...');
-        
         const url = await uploadImage(file, 'posters');
-        
         document.getElementById('poster_url').value = url;
         document.getElementById('posterImg').src = url;
         document.getElementById('posterPreview').classList.remove('hidden');
         document.querySelector('#posterUpload .upload-placeholder').style.display = 'none';
-        
         showToast('Poster uploaded successfully!');
     } catch (error) {
         showToast('Upload failed: ' + error.message);
@@ -1450,14 +551,11 @@ async function handleWebGraphicsUpload(event) {
 
     try {
         showToast('Uploading web graphics...');
-        
         const url = await uploadImage(file, 'web-graphics');
-        
         document.getElementById('web_graphics_url').value = url;
         document.getElementById('webGraphicsImg').src = url;
         document.getElementById('webGraphicsPreview').classList.remove('hidden');
         document.querySelector('#webGraphicsUpload .upload-placeholder').style.display = 'none';
-        
         showToast('Web graphics uploaded successfully!');
     } catch (error) {
         showToast('Upload failed: ' + error.message);
@@ -1480,18 +578,13 @@ function removeWebGraphicsImage() {
     document.getElementById('webGraphicsInput').value = '';
 }
 
-// Edit content
 async function editContent(id, type) {
     try {
-        const table = type === 'movie' ? 'movies' : 
-                     type === 'event' ? 'events' : 'galleries';
-        
+        const table = type === 'movie' ? 'movies' : type === 'event' ? 'events' : 'galleries';
         const { data, error } = await supabase.from(table).select('*').eq('id', id).single();
-        
         if (error) throw error;
         
         switchTab('importer');
-        
         currentContentType = type;
         document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
         document.querySelector(`.type-option:nth-child(${type === 'movie' ? '1' : type === 'event' ? '2' : '3'})`).classList.add('active');
@@ -1532,7 +625,6 @@ async function editContent(id, type) {
         
         document.getElementById('saveBtn').setAttribute('data-editing-id', id);
         document.getElementById('saveBtn').setAttribute('data-editing-type', type);
-        
         showToast('Loaded for editing');
         
     } catch (error) {
@@ -1541,7 +633,6 @@ async function editContent(id, type) {
     }
 }
 
-// Save content
 async function saveContent() {
     if (!supabase) {
         showToast('Database not connected');
@@ -1555,8 +646,7 @@ async function saveContent() {
     }
     
     try {
-        const table = currentContentType === 'movie' ? 'movies' : 
-                     currentContentType === 'event' ? 'events' : 'galleries';
+        const table = currentContentType === 'movie' ? 'movies' : currentContentType === 'event' ? 'events' : 'galleries';
         
         const data = {
             title: title,
@@ -1616,30 +706,23 @@ async function saveContent() {
     }
 }
 
-// Delete content
 async function deleteContent(id, type) {
     if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
         return;
     }
     
     try {
-        const table = type === 'movie' ? 'movies' : 
-                     type === 'event' ? 'events' : 'galleries';
-        
+        const table = type === 'movie' ? 'movies' : type === 'event' ? 'events' : 'galleries';
         const { error } = await supabase.from(table).delete().eq('id', id);
-        
         if (error) throw error;
-        
         showToast('Item deleted successfully');
         loadContent();
-        
     } catch (error) {
         console.error('Delete error:', error);
         showToast('Failed to delete item');
     }
 }
 
-// Clear form
 function clearForm() {
     document.getElementById('title').value = '';
     document.getElementById('director').value = '';
@@ -1655,18 +738,13 @@ function clearForm() {
     document.getElementById('poster_url').value = '';
     document.getElementById('web_graphics_url').value = '';
     
-    // Reset image previews
     removePosterImage();
     removeWebGraphicsImage();
-    
-    // Hide extraction preview
     document.getElementById('extractionPreview').classList.add('hidden');
     document.getElementById('rawTextViewer').classList.add('hidden');
 }
 
-// Show toast notification
 function showToast(message) {
-    // Remove existing toast if any
     const existingToast = document.querySelector('.toast');
     if (existingToast) {
         existingToast.remove();
@@ -1682,21 +760,13 @@ function showToast(message) {
     }, 3000);
 }
 
-// Event listeners
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize app
     initSupabase();
-    
-    // File upload handling
     document.getElementById('fileInput').addEventListener('change', handleFile);
-    
-    // Image upload handlers
     document.getElementById('posterInput').addEventListener('change', handlePosterUpload);
     document.getElementById('webGraphicsInput').addEventListener('change', handleWebGraphicsUpload);
     
-    // Drag and drop handling
     const uploadSection = document.getElementById('uploadSection');
-    
     uploadSection.addEventListener('dragover', (e) => {
         e.preventDefault();
         uploadSection.classList.add('dragover');
@@ -1715,7 +785,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (files.length > 0) {
             const file = files[0];
             if (file.type === 'application/pdf' || file.type === 'text/plain') {
-                // Simulate file input change
                 const fileInput = document.getElementById('fileInput');
                 const dataTransfer = new DataTransfer();
                 dataTransfer.items.add(file);
@@ -1727,23 +796,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Click to upload
     uploadSection.addEventListener('click', () => {
         document.getElementById('fileInput').click();
     });
     
-    // Search on Enter key
     document.getElementById('searchInput').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             searchContent();
         }
     });
 });
-
-// Instructions for combining with Part 1:
-// Copy all the JavaScript code above and paste it between <script> tags
-// before the closing </body> tag in Part 1 HTML
-</script>
-    <!-- JavaScript will be added in Part 2 -->
-</body>
-</html>
