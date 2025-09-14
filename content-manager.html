@@ -1097,17 +1097,44 @@
                 }
             }
 
-            // Synopsis extraction
+            // Synopsis extraction - preserve paragraph structure
             const synopsisPatterns = [
                 /(?:synopsis|summary)[:\s]+(.*?)(?:\n\n|\n[A-Z]|$)/is,
-                /(?:^|\n\n)(.*?)(?=\n\nDIRECTOR|\n\nCAST|\n\nCREDITS|$)/is
+                /(?:^|\n\n)(.*?)(?=\n\nDIRECTOR|\n\nCAST|\n\nCREDITS|$)/is,
+                // Handle LOGLINE prefix and extract everything after
+                /LOGLINE\s+(.*?)(?=\n\n(?:DIRECTOR|CAST|CREDITS|ABOUT)|$)/is
             ];
             
             for (const pattern of synopsisPatterns) {
                 const match = cleanedText.match(pattern);
                 if (match && match[1] && match[1].length > 100) {
-                    data.synopsis = match[1].trim().replace(/\s+/g, ' ');
-                    break;
+                    let synopsis = match[1].trim();
+                    
+                    // Remove LOGLINE prefix if present
+                    synopsis = synopsis.replace(/^(SYNOPSIS|LOGLINE)\s*/i, '').trim();
+                    
+                    // Preserve paragraph structure by converting single line breaks to spaces
+                    // but keeping double line breaks as paragraphs
+                    synopsis = synopsis
+                        .replace(/\n\s*\n/g, '||PARAGRAPH||')  // Mark paragraph breaks
+                        .replace(/\n/g, ' ')  // Single line breaks become spaces
+                        .replace(/\|\|PARAGRAPH\|\|/g, '\n\n')  // Restore paragraph breaks
+                        .replace(/\s+/g, ' ')  // Clean up multiple spaces
+                        .trim();
+                    
+                    if (synopsis.length > 100) {
+                        // Limit length but preserve sentence endings
+                        if (synopsis.length > 2000) {
+                            synopsis = synopsis.substring(0, 2000);
+                            const lastPeriod = synopsis.lastIndexOf('.');
+                            if (lastPeriod > 1500) {
+                                synopsis = synopsis.substring(0, lastPeriod + 1);
+                            }
+                            synopsis += '...';
+                        }
+                        data.synopsis = synopsis;
+                        break;
+                    }
                 }
             }
 
