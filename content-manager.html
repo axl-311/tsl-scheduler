@@ -1066,14 +1066,14 @@
 
             // Logline extraction - enhanced for Patrick Oliphant content
             const loglinePatterns = [
-                /(?:logline|log\s*line)[:\s]+(.*?)(?:\n\n|\n[A-Z]|$)/is,
-                /LOGLINE\s+(.*?)(?:\n\n|\nSYNOPSIS|\nDIRECTOR|$)/is,
+                // Look for LOGLINE followed by content, stop at next sentence or paragraph
+                /LOGLINE\s+(.*?)(?=\s+[A-Z][a-z]+\s+[a-z]+\s+[a-z]+|A\s+Savage\s+art|\n\n|$)/is,
                 // Look for sentences about Patrick Oliphant specifically
-                /Patrick\s+Oliphant\s+was\s+([^.]+\.)/i,
-                // Look for first substantial sentence as potential logline
-                /^([^.]{30,200}\.)(?:\s|$)/m,
-                // Look for sentences with "giant slayer", "political cartoonist" etc.
-                /(.*?(?:giant\s+slayer|political\s+cartoonist|fearless\s+stunt\s+pilot).*?\.)/i
+                /Patrick\s+Oliphant\s+was\s+a\s+giant\s+slayer[^.]*\./i,
+                // Look for sentences with specific key phrases
+                /(.*?(?:giant\s+slayer|fearless\s+stunt\s+pilot).*?\.)/i,
+                // General logline patterns
+                /(?:logline|log\s*line)[:\s]+(.*?)(?:\n\n|\n[A-Z]|$)/is
             ];
             
             for (const pattern of loglinePatterns) {
@@ -1081,6 +1081,14 @@
                 if (match && match[1]) {
                     let logline = fixSpacing(match[1].trim());
                     // Remove labels
+                    logline = logline.replace(/^(LOGLINE|LOG\s*LINE)\s*/i, '').trim();
+                    if (logline.length > 20 && logline.length < 400) {
+                        data.logline = logline;
+                        break;
+                    }
+                } else if (match && match[0] && !match[1]) {
+                    // For patterns that capture the whole match
+                    let logline = fixSpacing(match[0].trim());
                     logline = logline.replace(/^(LOGLINE|LOG\s*LINE)\s*/i, '').trim();
                     if (logline.length > 20 && logline.length < 400) {
                         data.logline = logline;
