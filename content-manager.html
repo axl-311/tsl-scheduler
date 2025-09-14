@@ -1383,6 +1383,13 @@
             const fileInput = document.getElementById('fileInput');
             fileInput.addEventListener('change', handleFile);
             
+            // Image upload handlers
+            const posterInput = document.getElementById('posterInput');
+            const webGraphicsInput = document.getElementById('webGraphicsInput');
+            
+            posterInput.addEventListener('change', handlePosterUpload);
+            webGraphicsInput.addEventListener('change', handleWebGraphicsUpload);
+            
             // Drag and drop
             const uploadSection = document.getElementById('uploadSection');
             
