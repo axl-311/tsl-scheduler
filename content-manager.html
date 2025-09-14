@@ -1064,17 +1064,28 @@
                 }
             }
 
-            // Logline extraction
+            // Logline extraction - enhanced for Patrick Oliphant content
             const loglinePatterns = [
                 /(?:logline|log\s*line)[:\s]+(.*?)(?:\n\n|\n[A-Z]|$)/is,
-                /(?:^|\n)(.*?)(?=\n\n|\nSYNOPSIS|\nDIRECTOR|\n[A-Z]{2,}|$)/is
+                /LOGLINE\s+(.*?)(?:\n\n|\nSYNOPSIS|\nDIRECTOR|$)/is,
+                // Look for sentences about Patrick Oliphant specifically
+                /Patrick\s+Oliphant\s+was\s+([^.]+\.)/i,
+                // Look for first substantial sentence as potential logline
+                /^([^.]{30,200}\.)(?:\s|$)/m,
+                // Look for sentences with "giant slayer", "political cartoonist" etc.
+                /(.*?(?:giant\s+slayer|political\s+cartoonist|fearless\s+stunt\s+pilot).*?\.)/i
             ];
             
             for (const pattern of loglinePatterns) {
                 const match = cleanedText.match(pattern);
-                if (match && match[1] && match[1].length > 50 && match[1].length < 300) {
-                    data.logline = match[1].trim().replace(/\s+/g, ' ');
-                    break;
+                if (match && match[1]) {
+                    let logline = fixSpacing(match[1].trim());
+                    // Remove labels
+                    logline = logline.replace(/^(LOGLINE|LOG\s*LINE)\s*/i, '').trim();
+                    if (logline.length > 20 && logline.length < 400) {
+                        data.logline = logline;
+                        break;
+                    }
                 }
             }
 
