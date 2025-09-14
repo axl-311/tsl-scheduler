@@ -626,10 +626,10 @@
         </div>
 
         <div class="nav-tabs">
-            <button class="nav-tab active" onclick="switchTab('dashboard')">
+            <button class="nav-tab active" onclick="switchTab('dashboard', this)">
                 Dashboard
             </button>
-            <button class="nav-tab" onclick="switchTab('importer')">
+            <button class="nav-tab" onclick="switchTab('importer', this)">
                 Importer
             </button>
         </div>
@@ -663,10 +663,10 @@
                     <button onclick="searchContent()" class="btn btn-primary">Search</button>
                 </div>
                 <div class="content-tabs">
-                    <button class="tab-button active" onclick="filterContent('all')">All</button>
-                    <button class="tab-button" onclick="filterContent('movies')">Movies</button>
-                    <button class="tab-button" onclick="filterContent('events')">Events</button>
-                    <button class="tab-button" onclick="filterContent('galleries')">Galleries</button>
+                    <button class="tab-button active" onclick="filterContent('all', this)">All</button>
+                    <button class="tab-button" onclick="filterContent('movies', this)">Movies</button>
+                    <button class="tab-button" onclick="filterContent('events', this)">Events</button>
+                    <button class="tab-button" onclick="filterContent('galleries', this)">Galleries</button>
                 </div>
             </div>
 
@@ -682,9 +682,9 @@
         <div id="importer-tab" class="tab-content">
             <div class="main-panel">
                 <div class="content-type-selector">
-                    <div class="type-option active" onclick="selectContentType('movie')">Movie</div>
-                    <div class="type-option" onclick="selectContentType('event')">Event</div>
-                    <div class="type-option" onclick="selectContentType('gallery')">Gallery</div>
+                    <div class="type-option active" onclick="selectContentType('movie', this)">Movie</div>
+                    <div class="type-option" onclick="selectContentType('event', this)">Event</div>
+                    <div class="type-option" onclick="selectContentType('gallery', this)">Gallery</div>
                 </div>
                 
                 <div class="upload-section" id="uploadSection">
@@ -951,6 +951,7 @@ html += `
     </div>
 `;
     
+    </div>
     container.innerHTML = html;
 }
 
@@ -1558,6 +1559,11 @@ function clearForm() {
     removeWebGraphicsImage();
     document.getElementById('extractionPreview').classList.add('hidden');
     document.getElementById('rawTextViewer').classList.add('hidden');
+    // reset to default movie form
+    document.getElementById('formTitle').textContent = 'Movie Details';
+    document.getElementById('saveButtonText').textContent = 'Save Movie to Database';
+    document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
+    document.querySelector('.type-option:first-child').classList.add('active');
 }
 
 function showToast(message) {
