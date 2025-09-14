@@ -532,13 +532,81 @@
         .schema-info strong {
             color: #856404;
         }
+
+        /* MISSING IMAGE UPLOAD STYLES - ADDED */
+        .image-upload-area {
+            border: 2px dashed #d2d2d7;
+            border-radius: 8px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .image-upload-area:hover {
+            border-color: #007aff;
+            background: #f0f7ff;
+        }
+
+        .upload-placeholder {
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            color: #86868b;
+        }
+
+        .upload-placeholder span {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 5px;
+            color: #1d1d1f;
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: #86868b;
+        }
+
+        .image-preview {
+            position: relative;
+            width: 100%;
+        }
+
+        .image-preview img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+
+        .remove-image-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255, 59, 48, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .remove-image-btn:hover {
+            background: #ff3b30;
+            transform: scale(1.1);
+        }
     </style>
 </head>
 <body>
     <div class="app-container">
         <div class="header">
             <div>
-                <h1>TSL Content Manager<span class="version-badge">v3.0 Dynamic</span></h1>
+                <h1>TSL Content Manager<span class="version-badge">v3.1 Fixed</span></h1>
             </div>
             <div class="sync-status" id="connectionStatus">
                 <span>○</span>
@@ -676,9 +744,6 @@
                 supabase = window.supabase.createClient(url, key);
                 
                 // Test connection and load schemas
-                const { error } = await supabase.from('movies').select('count').limit(1);
-                if (error) throw error;
-                
                 await loadTableSchemas();
                 
                 const statusEl = document.getElementById('connectionStatus');
@@ -697,25 +762,69 @@
             }
         }
 
-       async function loadTableSchemas() {
-    // Use your actual table structures from Supabase
-    tableSchemas = {
-        movies: ['id', 'title', 'director', 'runtime_minutes', 'release_year', 'language', 'distributor', 'logline', 'synopsis', 'critics_quote', 'trailer_url', 'simpletix_embed_code', 'poster_url', 'web_graphics_url', 'created_at', 'updated_at'],
-        events: ['id', 'event_name', 'event_type', 'presenter', 'duration_minutes', 'description', 'critics_quote', 'simpletix_embed_code', 'content_type', 'poster_url', 'web_graphics_url', 'created_at', 'updated_at'],
-        galleries: ['id', 'exhibition_title', 'artist', 'art_medium', 'gallery_space', 'description', 'content_type', 'poster_url', 'web_graphics_url', 'created_at', 'updated_at']
-    };
-    
-    titleFields = {
-        movies: 'title',
-        events: 'event_name', 
-        galleries: 'exhibition_title'
-    };
-    
-    console.log('Using fixed schemas:', tableSchemas);
-}
+        async function loadTableSchemas() {
+            // Check if tables exist and get actual schemas
+            try {
+                const tables = ['movies', 'events', 'galleries'];
+                const schemas = {};
+                const titles = {};
+                
+                for (const table of tables) {
+                    try {
+                        // Try to get the table structure by fetching one record
+                        const { data, error } = await supabase.from(table).select('*').limit(1);
+                        
+                        if (!error && data && data.length > 0) {
+                            schemas[table] = Object.keys(data[0]);
+                        } else if (!error && data && data.length === 0) {
+                            // Table exists but is empty, use default schema
+                            schemas[table] = getDefaultSchema(table);
+                        } else {
+                            console.warn(`Table ${table} not accessible:`, error);
+                            schemas[table] = getDefaultSchema(table);
+                        }
+                        
+                        titles[table] = detectTitleField(schemas[table]);
+                        
+                    } catch (tableError) {
+                        console.warn(`Error accessing ${table}:`, tableError);
+                        schemas[table] = getDefaultSchema(table);
+                        titles[table] = detectTitleField(schemas[table]);
+                    }
+                }
+                
+                tableSchemas = schemas;
+                titleFields = titles;
+                
+                console.log('Loaded schemas:', tableSchemas);
+                console.log('Title fields:', titleFields);
+                
+            } catch (error) {
+                console.error('Schema loading error:', error);
+                // Fallback to default schemas
+                tableSchemas = {
+                    movies: getDefaultSchema('movies'),
+                    events: getDefaultSchema('events'),
+                    galleries: getDefaultSchema('galleries')
+                };
+                titleFields = {
+                    movies: 'title',
+                    events: 'event_name',
+                    galleries: 'exhibition_title'
+                };
+            }
+        }
+
+        function getDefaultSchema(table) {
+            const defaults = {
+                movies: ['id', 'title', 'director', 'runtime_minutes', 'release_year', 'language', 'distributor', 'logline', 'synopsis', 'critics_quote', 'trailer_url', 'simpletix_embed_code', 'poster_url', 'web_graphics_url', 'created_at', 'updated_at'],
+                events: ['id', 'event_name', 'event_type', 'presenter', 'duration_minutes', 'description', 'critics_quote', 'simpletix_embed_code', 'content_type', 'poster_url', 'web_graphics_url', 'created_at', 'updated_at'],
+                galleries: ['id', 'exhibition_title', 'artist', 'art_medium', 'gallery_space', 'description', 'content_type', 'poster_url', 'web_graphics_url', 'created_at', 'updated_at']
+            };
+            return defaults[table] || ['id', 'title', 'description', 'created_at', 'updated_at'];
+        }
 
         function detectTitleField(columns) {
-            // Priority order for title field detection
             const titleCandidates = [
                 'title', 'name', 'event_name', 'exhibition_title', 'movie_title', 
                 'film_title', 'show_title', 'exhibition_name', 'event_title'
@@ -727,7 +836,6 @@
                 }
             }
             
-            // If no obvious title field, use first text-like field
             const textFields = columns.filter(col => 
                 !col.includes('id') && 
                 !col.includes('created_at') && 
@@ -740,6 +848,10 @@
 
         function getFieldType(columnName) {
             const name = columnName.toLowerCase();
+            
+            if (name.includes('poster_url') || name.includes('web_graphics_url') || name.includes('image_url')) {
+                return 'file'; // Changed from 'image-upload' to 'file'
+            }
             
             if (name.includes('year') || name.includes('minutes') || name.includes('duration') || name.includes('runtime') || name.includes('count')) {
                 return 'number';
@@ -783,20 +895,17 @@
                 return;
             }
             
-            // Show schema info
             const schemaInfo = document.getElementById('schemaInfo');
             const schemaDetails = document.getElementById('schemaDetails');
             schemaDetails.textContent = `${currentContentType} table has ${schema.length} columns: ${schema.join(', ')}`;
             schemaInfo.classList.remove('hidden');
             
-            // Update form title
             document.getElementById('formTitle').textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
             document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
             
             const formFields = document.getElementById('formFields');
             let fieldsHTML = '';
             
-            // Filter out system fields
             const userFields = schema.filter(col => 
                 !col.includes('id') && 
                 !col.includes('created_at') && 
@@ -804,21 +913,20 @@
                 col !== 'id'
             );
             
-          // Organize fields by type
-const shortFields = [];
-const longFields = [];
-const imageFields = [];
+            const shortFields = [];
+            const longFields = [];
+            const imageFields = [];
 
-userFields.forEach(column => {
-    const fieldType = getFieldType(column);
-    if (fieldType === 'textarea') {
-        longFields.push(column);
-    } else if (fieldType === 'image-upload') {
-        imageFields.push(column);
-    } else {
-        shortFields.push(column);
-    }
-});
+            userFields.forEach(column => {
+                const fieldType = getFieldType(column);
+                if (fieldType === 'textarea') {
+                    longFields.push(column);
+                } else if (fieldType === 'file') {
+                    imageFields.push(column);
+                } else {
+                    shortFields.push(column);
+                }
+            });
             
             // Generate short fields in grid
             if (shortFields.length > 0) {
@@ -850,48 +958,47 @@ userFields.forEach(column => {
                     </div>
                 `;
             });
-// Generate image upload fields
-if (imageFields.length > 0) {
-    fieldsHTML += '<h4 style="margin: 20px 0 15px 0; color: #1d1d1f;">Images</h4>';
-    fieldsHTML += '<div class="form-grid">';
-    imageFields.forEach(column => {
-        const label = formatFieldLabel(column);
-        
-        fieldsHTML += `
-            <div class="form-group">
-                <label class="form-label">${label}</label>
-                <div class="image-upload-area" id="${column}Upload">
-                    <input type="file" id="${column}Input" accept="image/*" style="display: none;">
-                    <div class="upload-placeholder" onclick="document.getElementById('${column}Input').click()">
-                        <span>Click to upload ${label.toLowerCase()}</span>
-                        <div class="upload-hint">JPG, PNG, WebP (max 5MB)</div>
-                    </div>
-                    <div id="${column}Preview" class="image-preview hidden">
-                        <img id="${column}Img" src="" alt="${label} preview">
-                        <button type="button" onclick="removeImage('${column}')" class="remove-image-btn">×</button>
-                    </div>
-                </div>
-                <input type="hidden" id="${column}" class="form-input" data-column="${column}">
-            </div>
-        `;
-    });
-    fieldsHTML += '</div>';
-}
+
+            // Generate image upload fields
+            if (imageFields.length > 0) {
+                fieldsHTML += '<h4 style="margin: 20px 0 15px 0; color: #1d1d1f;">Images</h4>';
+                fieldsHTML += '<div class="form-grid">';
+                imageFields.forEach(column => {
+                    const label = formatFieldLabel(column);
+                    
+                    fieldsHTML += `
+                        <div class="form-group">
+                            <label class="form-label">${label}</label>
+                            <div class="image-upload-area" id="${column}Upload">
+                                <input type="file" id="${column}Input" accept="image/*" style="display: none;">
+                                <div class="upload-placeholder" onclick="document.getElementById('${column}Input').click()">
+                                    <span>Click to upload ${label.toLowerCase()}</span>
+                                    <div class="upload-hint">JPG, PNG, WebP (max 5MB)</div>
+                                </div>
+                                <div id="${column}Preview" class="image-preview hidden">
+                                    <img id="${column}Img" src="" alt="${label} preview">
+                                    <button type="button" onclick="removeImage('${column}')" class="remove-image-btn">×</button>
+                                </div>
+                            </div>
+                            <input type="hidden" id="${column}" class="form-input" data-column="${column}">
+                        </div>
+                    `;
+                });
+                fieldsHTML += '</div>';
+            }
             
             formFields.innerHTML = fieldsHTML;
             
             // Add event listeners for image uploads
-setTimeout(() => {
-    const imageInputs = document.querySelectorAll('[id$="Input"]');
-    console.log('Found image inputs:', imageInputs.length);
-    imageInputs.forEach(input => {
-        const column = input.id.replace('Input', '');
-        if (column.includes('poster_url') || column.includes('web_graphics_url')) {
-            input.addEventListener('change', (e) => handleImageUpload(e, column));
-            console.log(`Added event listener for ${column}`);
-        }
-    });
-}, 100);
+            setTimeout(() => {
+                const imageInputs = document.querySelectorAll('[id$="Input"]');
+                imageInputs.forEach(input => {
+                    const column = input.id.replace('Input', '');
+                    if (column.includes('poster_url') || column.includes('web_graphics_url') || column.includes('image_url')) {
+                        input.addEventListener('change', (e) => handleImageUpload(e, column));
+                    }
+                });
+            }, 100);
         }
 
         function switchTab(tab, element) {
@@ -924,10 +1031,16 @@ setTimeout(() => {
                 const tables = Object.keys(tableSchemas);
                 
                 for (const table of tables) {
-                    const { data, error } = await supabase.from(table).select('*').order('created_at', { ascending: false });
-                    if (!error && data) {
-                        results[table] = data;
-                    } else {
+                    try {
+                        const { data, error } = await supabase.from(table).select('*').order('created_at', { ascending: false });
+                        if (!error && data) {
+                            results[table] = data;
+                        } else {
+                            console.warn(`Error loading ${table}:`, error);
+                            results[table] = [];
+                        }
+                    } catch (tableError) {
+                        console.warn(`Error accessing ${table}:`, tableError);
                         results[table] = [];
                     }
                 }
@@ -1012,7 +1125,7 @@ setTimeout(() => {
             renderContent();
         }
 
-        // PDF Processing functions (kept same)
+        // PDF Processing functions
         function fixSpacing(str) {
             return str
                 .replace(/â€™/g, "'")
@@ -1040,11 +1153,9 @@ setTimeout(() => {
         }
 
         function extractMovieData(text) {
-            // Simplified extraction that maps to common field names
             const cleanedText = fixSpacing(text);
             const data = {};
             
-            // Try to extract title
             const titlePatterns = [
                 /^([A-Z][A-Z\s&]+)$/m,
                 /^"([^"]+)"$/m,
@@ -1062,7 +1173,6 @@ setTimeout(() => {
                 }
             }
             
-            // Extract other common fields
             const directorMatch = cleanedText.match(/(?:Directed\s+by|Director)\s*:?\s*([A-Z][a-zA-Z\s]+?)(?:\n|$|\.)/i);
             if (directorMatch) data.director = directorMatch[1].trim();
             
@@ -1070,7 +1180,7 @@ setTimeout(() => {
             if (runtimeMatch) data.runtime_minutes = parseInt(runtimeMatch[1]);
             
             const yearMatch = cleanedText.match(/\b(20[0-2][0-9])\b/);
-            if (yearMatch) data.year = parseInt(yearMatch[1]);
+            if (yearMatch) data.release_year = parseInt(yearMatch[1]);
             
             return data;
         }
@@ -1211,7 +1321,6 @@ setTimeout(() => {
                 return;
             }
             
-            // Collect form data
             const data = {};
             const formFields = document.querySelectorAll('#formFields input, #formFields textarea');
             formFields.forEach(field => {
@@ -1219,7 +1328,6 @@ setTimeout(() => {
                 if (column && field.value.trim()) {
                     let value = field.value.trim();
                     
-                    // Convert number fields
                     if (field.type === 'number' && value) {
                         value = parseInt(value) || null;
                     }
@@ -1228,7 +1336,6 @@ setTimeout(() => {
                 }
             });
             
-            // Check if title field is filled
             const titleField = titleFields[currentContentType];
             if (titleField && !data[titleField]) {
                 showToast(`Please enter a ${formatFieldLabel(titleField)}`);
@@ -1240,17 +1347,14 @@ setTimeout(() => {
                 const editingId = saveBtn.getAttribute('data-editing-id');
                 
                 if (editingId) {
-                    // Update existing record
                     const { error } = await supabase.from(currentContentType).update(data).eq('id', editingId);
                     if (error) throw error;
                     showToast('Updated successfully!');
                     
-                    // Clear editing state
                     saveBtn.removeAttribute('data-editing-id');
                     document.getElementById('formTitle').textContent = document.getElementById('formTitle').textContent.replace(' (Editing)', '');
                     document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
                 } else {
-                    // Insert new record
                     const { error } = await supabase.from(currentContentType).insert([data]);
                     if (error) throw error;
                     showToast('Saved successfully!');
@@ -1270,19 +1374,23 @@ setTimeout(() => {
                 const { data, error } = await supabase.from(type).select('*').eq('id', id).single();
                 if (error) throw error;
                 
-                // Switch to importer tab and content type
                 switchTab('importer');
                 await selectContentType(type);
                 
-                // Fill form with data
                 Object.entries(data).forEach(([column, value]) => {
                     const field = document.getElementById(column);
                     if (field && value !== null) {
                         field.value = value;
+                        
+                        // Handle image fields
+                        if (getFieldType(column) === 'file' && value) {
+                            document.getElementById(column + 'Img').src = value;
+                            document.getElementById(column + 'Preview').classList.remove('hidden');
+                            document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
+                        }
                     }
                 });
                 
-                // Set editing state
                 const saveBtn = document.getElementById('saveBtn');
                 saveBtn.setAttribute('data-editing-id', id);
                 document.getElementById('formTitle').textContent += ' (Editing)';
@@ -1323,7 +1431,6 @@ setTimeout(() => {
                 let textContent = `${title.toUpperCase()}\n`;
                 textContent += '='.repeat(title.length) + '\n\n';
                 
-                // Add all fields
                 Object.entries(data).forEach(([column, value]) => {
                     if (value && column !== 'id' && !column.includes('created_at') && !column.includes('updated_at')) {
                         const label = formatFieldLabel(column);
@@ -1351,8 +1458,7 @@ setTimeout(() => {
             formFields.forEach(field => {
                 field.value = '';
                 
-                // Handle image fields
-                if (getFieldType(field.dataset.column) === 'image-upload') {
+                if (getFieldType(field.dataset.column) === 'file') {
                     const column = field.dataset.column;
                     removeImage(column);
                 }
@@ -1378,7 +1484,53 @@ setTimeout(() => {
             }, 3000);
         }
 
-        // Initialize drag and drop
+        // Image upload functions (simplified - no Supabase storage)
+        async function handleImageUpload(event, column) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                showToast('Please select an image file');
+                return;
+            }
+
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('Image must be smaller than 5MB');
+                return;
+            }
+
+            try {
+                // Convert to base64 for local storage (simplified approach)
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const dataUrl = e.target.result;
+                    
+                    // Store the data URL
+                    document.getElementById(column).value = dataUrl;
+                    
+                    // Show preview
+                    document.getElementById(column + 'Img').src = dataUrl;
+                    document.getElementById(column + 'Preview').classList.remove('hidden');
+                    document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
+                    
+                    showToast('Image loaded successfully!');
+                };
+                reader.readAsDataURL(file);
+            } catch (error) {
+                showToast('Error loading image: ' + error.message);
+                console.error('Image upload error:', error);
+            }
+        }
+
+        function removeImage(column) {
+            document.getElementById(column).value = '';
+            document.getElementById(column + 'Img').src = '';
+            document.getElementById(column + 'Preview').classList.add('hidden');
+            document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'block';
+            document.getElementById(column + 'Input').value = '';
+        }
+
+        // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             initSupabase();
             document.getElementById('fileInput').addEventListener('change', handleFile);
@@ -1423,65 +1575,6 @@ setTimeout(() => {
                 }
             });
         });
-        async function uploadImage(file, bucket, folder = '') {
-    if (!supabase) {
-        throw new Error('Database not connected');
-    }
-    if (!file.type.startsWith('image/')) {
-        throw new Error('Please select an image file');
-    }
-    if (file.size > 5 * 1024 * 1024) {
-        throw new Error('Image must be smaller than 5MB');
-    }
-
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-    const filePath = folder ? `${folder}/${fileName}` : fileName;
-
-    try {
-        const { data, error } = await supabase.storage.from(bucket).upload(filePath, file);
-        if (error) throw error;
-        const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
-        return urlData.publicUrl;
-    } catch (error) {
-        console.error('Upload error:', error);
-        throw error;
-    }
-}
-
-async function handleImageUpload(event, column) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    try {
-        showToast('Uploading image...');
-        
-        // Determine bucket based on column name
-        const bucketName = column.includes('poster') ? 'posters' : 'web-graphics';
-        const url = await uploadImage(file, bucketName);
-        
-        // Update hidden input
-        document.getElementById(column).value = url;
-        
-        // Show preview
-        document.getElementById(column + 'Img').src = url;
-        document.getElementById(column + 'Preview').classList.remove('hidden');
-        document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
-        
-        showToast('Image uploaded successfully!');
-    } catch (error) {
-        showToast('Upload failed: ' + error.message);
-        console.error('Image upload error:', error);
-    }
-}
-
-function removeImage(column) {
-    document.getElementById(column).value = '';
-    document.getElementById(column + 'Img').src = '';
-    document.getElementById(column + 'Preview').classList.add('hidden');
-    document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'block';
-    document.getElementById(column + 'Input').value = '';
-}
     </script>
 </body>
 </html>
