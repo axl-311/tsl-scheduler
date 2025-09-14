@@ -804,18 +804,21 @@
                 col !== 'id'
             );
             
-            // Organize fields by type
-            const shortFields = [];
-            const longFields = [];
-            
-            userFields.forEach(column => {
-                const fieldType = getFieldType(column);
-                if (fieldType === 'textarea') {
-                    longFields.push(column);
-                } else {
-                    shortFields.push(column);
-                }
-            });
+          // Organize fields by type
+const shortFields = [];
+const longFields = [];
+const imageFields = [];
+
+userFields.forEach(column => {
+    const fieldType = getFieldType(column);
+    if (fieldType === 'textarea') {
+        longFields.push(column);
+    } else if (fieldType === 'image-upload') {
+        imageFields.push(column);
+    } else {
+        shortFields.push(column);
+    }
+});
             
             // Generate short fields in grid
             if (shortFields.length > 0) {
@@ -847,8 +850,48 @@
                     </div>
                 `;
             });
+// Generate image upload fields
+if (imageFields.length > 0) {
+    fieldsHTML += '<h4 style="margin: 20px 0 15px 0; color: #1d1d1f;">Images</h4>';
+    fieldsHTML += '<div class="form-grid">';
+    imageFields.forEach(column => {
+        const label = formatFieldLabel(column);
+        
+        fieldsHTML += `
+            <div class="form-group">
+                <label class="form-label">${label}</label>
+                <div class="image-upload-area" id="${column}Upload">
+                    <input type="file" id="${column}Input" accept="image/*" style="display: none;">
+                    <div class="upload-placeholder" onclick="document.getElementById('${column}Input').click()">
+                        <span>Click to upload ${label.toLowerCase()}</span>
+                        <div class="upload-hint">JPG, PNG, WebP (max 5MB)</div>
+                    </div>
+                    <div id="${column}Preview" class="image-preview hidden">
+                        <img id="${column}Img" src="" alt="${label} preview">
+                        <button type="button" onclick="removeImage('${column}')" class="remove-image-btn">×</button>
+                    </div>
+                </div>
+                <input type="hidden" id="${column}" class="form-input" data-column="${column}">
+            </div>
+        `;
+    });
+    fieldsHTML += '</div>';
+}
             
             formFields.innerHTML = fieldsHTML;
+            
+            // Add event listeners for image uploads
+setTimeout(() => {
+    const imageInputs = document.querySelectorAll('[id$="Input"]');
+    console.log('Found image inputs:', imageInputs.length);
+    imageInputs.forEach(input => {
+        const column = input.id.replace('Input', '');
+        if (column.includes('poster_url') || column.includes('web_graphics_url')) {
+            input.addEventListener('change', (e) => handleImageUpload(e, column));
+            console.log(`Added event listener for ${column}`);
+        }
+    });
+}, 100);
         }
 
         function switchTab(tab, element) {
