@@ -1373,6 +1373,15 @@
         
         // Setup drag and drop
         const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        
+        // File input change event
+        fileInput.addEventListener('change', (e) => {
+            console.log('File selected:', e.target.files[0]);
+            if (e.target.files.length > 0) {
+                handleFile({ target: { files: [e.target.files[0]] } });
+            }
+        });
         
         uploadSection.addEventListener('dragover', (e) => {
             e.preventDefault();
