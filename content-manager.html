@@ -950,6 +950,17 @@
         
         // Extract movie data
         function extractMovieData(text) {
+            // Clean up common PDF artifacts
+            function cleanText(str) {
+                return str
+                    .replace(/\s+/g, ' ')  // Multiple spaces to single
+                    .replace(/[\r\n]+/g, '\n')  // Normalize line breaks
+                    .trim();
+            }
+            
+            const cleanedText = cleanText(text);
+            const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+            
             const extracted = {
                 title: '',
                 director: '',
@@ -962,22 +973,141 @@
                 criticsQuote: ''
             };
             
-            // Basic extraction patterns
-            const patterns = {
-                title: /Title:\s*(.+)/i,
-                director: /Director:\s*(.+)/i,
-                runtime: /Runtime:\s*(\d+)/i,
-                year: /Year:\s*(\d{4})/i,
-                language: /Language:\s*(.+)/i,
-                distributor: /Distributor:\s*(.+)/i,
-                logline: /Logline:\s*(.+)/i,
-                synopsis: /Synopsis:\s*([\s\S]+?)(?=\n\n|$)/i
-            };
+            // Try to extract title (usually at the top, in caps, or prominent)
+            for (let i = 0; i < Math.min(10, lines.length); i++) {
+                const line = lines[i];
+                // Skip common headers and very short lines
+                if (line && !line.match(/^(THE|A|AN)\s/i) && 
+                    !line.match(/press\s*kit/i) && 
+                    !line.match(/^\d{4}/) &&
+                    line.length > 2 && line.length < 100) {
+                    // Check if it looks like a title (not a sentence)
+                    if (!line.includes('.') || line.endsWith('.')) {
+                        extracted.title = line.replace(/\.$/, '');
+                        break;
+                    }
+                }
+            }
             
-            for (const [key, pattern] of Object.entries(patterns)) {
-                const match = text.match(pattern);
+            // Extract director - multiple patterns
+            const directorPatterns = [
+                /(?:Directed\s+by|Director|A\s+film\s+by|Filmmaker|By)\s*:?\s*([A-Z][a-zA-Z\s]+?)(?:\n|$|,|\.|Produced)/i,
+                /(?:Written\s+and\s+Directed\s+by)\s*:?\s*([A-Z][a-zA-Z\s]+?)(?:\n|$)/i,
+                /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*(?:Director|directs)/i
+            ];
+            
+            for (const pattern of directorPatterns) {
+                const match = cleanedText.match(pattern);
                 if (match) {
-                    extracted[key] = match[1].trim();
+                    extracted.director = match[1].trim();
+                    break;
+                }
+            }
+            
+            // Extract year/runtime/format
+            const formatPatterns = [
+                /(\d{4})\s*[\/|\-]\s*(\d+)\s*(?:min|minutes|m)\s*[\/|\-]\s*([A-Za-z]+)/i,
+                /(\d{4})\s+(\d+)\s*(?:min|minutes|m)/i,
+                /Runtime\s*:?\s*(\d+)\s*(?:min|minutes|m)/i,
+                /Duration\s*:?\s*(\d+)\s*(?:min|minutes|m)/i,
+                /(\d+)\s*(?:min|minutes|m)/i
+            ];
+            
+            // Year patterns
+            const yearMatch = cleanedText.match(/(?:Year|Released?|Date)\s*:?\s*(\d{4})/i) || 
+                              cleanedText.match(/\b(19\d{2}|20\d{2})\b/);
+            if (yearMatch) {
+                extracted.year = yearMatch[1];
+            }
+            
+            // Runtime patterns
+            const runtimeMatch = cleanedText.match(/(\d+)\s*(?:min|minutes|m)\b/i);
+            if (runtimeMatch) {
+                extracted.runtime = runtimeMatch[1];
+            }
+            
+            // Language patterns
+            const langMatch = cleanedText.match(/(?:Language|In)\s*:?\s*([A-Za-z]+)(?:\s|$|\n)/i);
+            if (langMatch) {
+                extracted.language = langMatch[1];
+            }
+            
+            // Distributor patterns
+            const distPatterns = [
+                /(?:Distributor|Distribution|Distributed\s+by)\s*:?\s*([A-Za-z\s]+?)(?:\n|$)/i,
+                /(?:Sales|World\s+Sales)\s*:?\s*([A-Za-z\s]+?)(?:\n|$)/i,
+                /([\w\s]+Pictures|[\w\s]+Films|[\w\s]+Entertainment)/i
+            ];
+            
+            for (const pattern of distPatterns) {
+                const match = cleanedText.match(pattern);
+                if (match) {
+                    extracted.distributor = match[1].trim();
+                    break;
+                }
+            }
+            
+            // Extract logline (usually a single sentence description)
+            const loglinePatterns = [
+                /(?:Logline|Short\s+Synopsis|One[\-\s]liner?)\s*:?\s*([^.]+\.)/i,
+                /(?:About|Summary)\s*:?\s*([^.]+\.)/i
+            ];
+            
+            for (const pattern of loglinePatterns) {
+                const match = cleanedText.match(pattern);
+                if (match) {
+                    extracted.logline = match[1].trim();
+                    break;
+                }
+            }
+            
+            // Extract synopsis (longer description)
+            const synopsisPatterns = [
+                /(?:Synopsis|Description|About\s+the\s+Film|Story|Plot)\s*:?\s*([\s\S]{100,}?)(?:\n\n|Credits|Cast|Director|Producer|Technical|$)/i,
+                /(?:Film\s+Summary)\s*:?\s*([\s\S]{100,}?)(?:\n\n|$)/i
+            ];
+            
+            for (const pattern of synopsisPatterns) {
+                const match = cleanedText.match(pattern);
+                if (match) {
+                    // Clean up the synopsis
+                    let synopsis = match[1].trim();
+                    // Remove if it contains credits or technical info
+                    synopsis = synopsis.split(/(?:Credits|Cast\s+&\s+Crew|Technical|Production)/i)[0];
+                    // Limit length
+                    if (synopsis.length > 2000) {
+                        synopsis = synopsis.substring(0, 2000) + '...';
+                    }
+                    extracted.synopsis = synopsis.trim();
+                    break;
+                }
+            }
+            
+            // If no structured synopsis found, try to get a paragraph
+            if (!extracted.synopsis) {
+                // Find paragraphs that look like descriptions (50+ words)
+                const paragraphs = text.split(/\n\n+/).filter(p => {
+                    const wordCount = p.split(/\s+/).length;
+                    return wordCount > 50 && wordCount < 500 && !p.match(/^(Director|Producer|Cast|Credits)/i);
+                });
+                
+                if (paragraphs.length > 0) {
+                    extracted.synopsis = cleanText(paragraphs[0]);
+                }
+            }
+            
+            // Extract critics quote
+            const quotePatterns = [
+                /"([^"]{20,300})"\s*[\-—]\s*([^,\n]+)/g,  // "Quote" - Source
+                /(?:Reviews?|Critics?|Praise)\s*:?\s*"([^"]+)"/i,
+                /"([^"]{20,300})"/  // Any quote that looks substantial
+            ];
+            
+            for (const pattern of quotePatterns) {
+                const match = cleanedText.match(pattern);
+                if (match) {
+                    extracted.criticsQuote = match[0].trim();
+                    break;
                 }
             }
             
