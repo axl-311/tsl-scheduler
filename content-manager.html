@@ -1380,6 +1380,65 @@
                 }
             });
         });
+        async function uploadImage(file, bucket, folder = '') {
+    if (!supabase) {
+        throw new Error('Database not connected');
+    }
+    if (!file.type.startsWith('image/')) {
+        throw new Error('Please select an image file');
+    }
+    if (file.size > 5 * 1024 * 1024) {
+        throw new Error('Image must be smaller than 5MB');
+    }
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = folder ? `${folder}/${fileName}` : fileName;
+
+    try {
+        const { data, error } = await supabase.storage.from(bucket).upload(filePath, file);
+        if (error) throw error;
+        const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+        return urlData.publicUrl;
+    } catch (error) {
+        console.error('Upload error:', error);
+        throw error;
+    }
+}
+
+async function handleImageUpload(event, column) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+        showToast('Uploading image...');
+        
+        // Determine bucket based on column name
+        const bucketName = column.includes('poster') ? 'posters' : 'web-graphics';
+        const url = await uploadImage(file, bucketName);
+        
+        // Update hidden input
+        document.getElementById(column).value = url;
+        
+        // Show preview
+        document.getElementById(column + 'Img').src = url;
+        document.getElementById(column + 'Preview').classList.remove('hidden');
+        document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
+        
+        showToast('Image uploaded successfully!');
+    } catch (error) {
+        showToast('Upload failed: ' + error.message);
+        console.error('Image upload error:', error);
+    }
+}
+
+function removeImage(column) {
+    document.getElementById(column).value = '';
+    document.getElementById(column + 'Img').src = '';
+    document.getElementById(column + 'Preview').classList.add('hidden');
+    document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'block';
+    document.getElementById(column + 'Input').value = '';
+}
     </script>
 </body>
 </html>
