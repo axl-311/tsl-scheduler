@@ -948,6 +948,25 @@
             document.getElementById('extractionPreview').classList.remove('hidden');
         }
         
+        // Fix common PDF spacing issues
+function fixSpacing(str) {
+    return str
+        // Fix common word breaks
+        .replace(/\bcar\s+toon/gi, 'cartoon')
+        .replace(/\bar\s+t\b/gi, 'art')
+        .replace(/\bpar\s+tisan/gi, 'partisan')
+        .replace(/\bimpor\s+tant/gi, 'important')
+        .replace(/\bshor\s+t/gi, 'short')
+        .replace(/\bar\s+tist/gi, 'artist')
+        .replace(/\bfor\s+tune/gi, 'fortune')
+        .replace(/\badver\s+tiser/gi, 'advertiser')
+        .replace(/\babor\s+tion/gi, 'abortion')
+        // Clean up extra spaces
+        .replace(/\s+/g, ' ')
+        .replace(/[\r\n]+/g, '\n')
+        .trim();
+}
+        
         // Extract movie data
         function extractMovieData(text) {
             // Clean up common PDF artifacts
