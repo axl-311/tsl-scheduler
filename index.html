@@ -1099,16 +1099,19 @@
                 return;
             }
             
-            const currentWeekEvents = scheduledEvents.filter(event => {
+            // Push all events from today forward (no week limitation)
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const eventsToFuture = scheduledEvents.filter(event => {
                 if (event.actualDate) {
-                    const dayOfWeek = calculateDayOfWeek(event.actualDate);
-                    return dayOfWeek >= 0 && dayOfWeek <= 6;
+                    return event.actualDate >= today;
                 }
                 return false;
             });
             
-            if (currentWeekEvents.length === 0) {
-                showToast('No events to push for this week');
+            if (eventsToFuture.length === 0) {
+                showToast('No future events to push');
                 return;
             }
             
@@ -1125,7 +1128,7 @@
             const errors = [];
             
             try {
-                for (const event of currentWeekEvents) {
+                for (const event of eventsToFuture) {
                     try {
                         await createGoogleCalendarEvent(event);
                         successCount++;
