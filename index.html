@@ -1092,7 +1092,7 @@
             renderEventsForCurrentWeek();
         }
 
-        // Google Calendar Integration - ENHANCED with proper calendar switching
+        // Google Calendar Integration - FIXED to push all future events
         async function pushToGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
@@ -1108,6 +1108,14 @@
                     return event.actualDate >= today;
                 }
                 return false;
+            });
+            
+            console.log(`=== PUSH DEBUG INFO ===`);
+            console.log(`Today: ${today.toDateString()}`);
+            console.log(`Total scheduled events: ${scheduledEvents.length}`);
+            console.log(`Future events to push: ${eventsToFuture.length}`);
+            eventsToFuture.forEach(event => {
+                console.log(`- ${event.title} on ${event.actualDate.toDateString()} in ${event.calendar}`);
             });
             
             if (eventsToFuture.length === 0) {
