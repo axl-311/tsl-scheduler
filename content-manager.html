@@ -805,6 +805,10 @@
                 <button onclick="saveContent()" id="saveBtn" class="btn btn-success" style="width: 100%; margin-top: 20px; padding: 12px;">
                     <span id="saveButtonText">Save to Database</span>
                 </button>
+                
+                <button onclick="deleteCurrentItem()" id="deleteBtn" class="btn btn-danger hidden" style="width: 100%; margin-top: 10px; padding: 12px;">
+                    Delete This Item
+                </button>
             </div>
         </div>
     </div>
@@ -1155,6 +1159,14 @@
                 saveBtn.removeAttribute('data-editing-id');
             }
             
+            // Hide delete button when not editing
+            const deleteBtn = document.getElementById('deleteBtn');
+            if (deleteBtn) {
+                deleteBtn.classList.add('hidden');
+                deleteBtn.removeAttribute('data-delete-id');
+                deleteBtn.removeAttribute('data-delete-type');
+            }
+            
             clearDynamicForm();
             
             const formTitle = document.getElementById('formTitle');
@@ -1164,6 +1176,9 @@
                 formTitle.textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
                 saveButtonText.textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
             }
+            
+            // Return to Dashboard after canceling edit
+            switchTab('dashboard', document.querySelector('.nav-tab:first-child'));
         }
 
         async function loadContent() {
@@ -1543,12 +1558,15 @@
                     showToast('Saved successfully!');
                 }
                 
+                // Clear everything
                 cancelEdit();
                 clearDynamicForm();
-                loadContent();
                 
                 document.getElementById('extractionPreview').classList.add('hidden');
                 document.getElementById('rawTextViewer').classList.add('hidden');
+                
+                // Return to Dashboard to see the saved content
+                await switchTab('dashboard', document.querySelector('.nav-tab:first-child'));
                 
             } catch (error) {
                 console.error('Save error:', error);
@@ -1605,11 +1623,49 @@
                 document.getElementById('formTitle').textContent = `Editing ${type.charAt(0).toUpperCase() + type.slice(1).slice(0, -1)}`;
                 document.getElementById('saveButtonText').textContent = `Update ${type.charAt(0).toUpperCase() + type.slice(1).slice(0, -1)}`;
                 
+                // Show delete button when editing
+                const deleteBtn = document.getElementById('deleteBtn');
+                if (deleteBtn) {
+                    deleteBtn.classList.remove('hidden');
+                    deleteBtn.setAttribute('data-delete-id', id);
+                    deleteBtn.setAttribute('data-delete-type', type);
+                }
+                
                 showToast('Loaded for editing');
                 
             } catch (error) {
                 console.error('Edit load error:', error);
                 showToast('Failed to load item for editing');
+            }
+        }
+        
+        async function deleteCurrentItem() {
+            const deleteBtn = document.getElementById('deleteBtn');
+            const id = deleteBtn.getAttribute('data-delete-id');
+            const type = deleteBtn.getAttribute('data-delete-type');
+            
+            if (!id || !type) {
+                showToast('No item selected for deletion');
+                return;
+            }
+            
+            if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const { error } = await supabase.from(type).delete().eq('id', id);
+                if (error) throw error;
+                
+                showToast('Item deleted successfully');
+                
+                // Clear everything and return to dashboard
+                cancelEdit();
+                await switchTab('dashboard', document.querySelector('.nav-tab:first-child'));
+                
+            } catch (error) {
+                console.error('Delete error:', error);
+                showToast('Failed to delete item');
             }
         }
 
