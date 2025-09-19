@@ -1429,6 +1429,8 @@
                     if (response.access_token) {
                         accessToken = response.access_token;
                         updateSigninStatus(true);
+                        // Import from both Google Calendar and Supabase
+                        importFromGoogleCalendar();
                         importFromSupabase();
                     }
                 },
@@ -1472,6 +1474,135 @@
                 } else {
                     showToast('Authentication not ready. Please refresh the page.');
                 }
+            }
+        }
+
+        // Import from Google Calendar
+        async function importFromGoogleCalendar() {
+            if (!accessToken) {
+                showToast('Not authenticated with Google Calendar');
+                return;
+            }
+
+            console.log('=== IMPORTING FROM GOOGLE CALENDAR ===');
+
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.classList.add('syncing');
+            syncStatus.innerHTML = '<span>↻</span><span>Loading events from Google Calendar...</span>';
+            
+            try {
+                // Calculate date range - get 3 months ahead
+                const startDate = new Date();
+                startDate.setHours(0, 0, 0, 0);
+                
+                const endDate = new Date();
+                endDate.setMonth(endDate.getMonth() + 3);
+                endDate.setHours(23, 59, 59, 999);
+                
+                const timeMin = startDate.toISOString();
+                const timeMax = endDate.toISOString();
+                
+                let allEvents = [];
+                
+                // Fetch from all calendars
+                for (const [calendarType, calendarId] of Object.entries(CALENDAR_IDS)) {
+                    try {
+                        const response = await fetch(
+                            `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` + 
+                            `timeMin=${encodeURIComponent(timeMin)}&` +
+                            `timeMax=${encodeURIComponent(timeMax)}&` +
+                            `singleEvents=true&` +
+                            `orderBy=startTime&` +
+                            `maxResults=250`,
+                            {
+                                headers: {
+                                    'Authorization': `Bearer ${accessToken}`,
+                                }
+                            }
+                        );
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.items) {
+                                data.items.forEach(event => {
+                                    if (event.start && event.start.dateTime) {
+                                        const startDateTime = new Date(event.start.dateTime);
+                                        const endDateTime = new Date(event.end.dateTime);
+                                        const duration = Math.round((endDateTime - startDateTime) / 60000);
+                                        
+                                        // Parse webpage URL from description if present
+                                        let webpageUrl = '';
+                                        let supabaseId = '';
+                                        let supabaseTable = '';
+                                        
+                                        if (event.description) {
+                                            // Look for URL in description
+                                            const urlMatch = event.description.match(/(https?:\/\/timeandspace\.org[^\s\n]*)/);
+                                            if (urlMatch) {
+                                                webpageUrl = urlMatch[1];
+                                            }
+                                            
+                                            // Look for Supabase reference
+                                            const supabaseMatch = event.description.match(/(movies|events|galleries):([a-f0-9-]+)/);
+                                            if (supabaseMatch) {
+                                                supabaseTable = supabaseMatch[1];
+                                                supabaseId = supabaseMatch[2];
+                                            }
+                                        }
+                                        
+                                        allEvents.push({
+                                            id: event.id,
+                                            googleEventId: event.id,
+                                            title: event.summary || 'Untitled Event',
+                                            duration: duration,
+                                            calendar: calendarType,
+                                            originalCalendar: calendarType,
+                                            description: event.description || '',
+                                            location: event.location || '',
+                                            startTime: startDateTime,
+                                            endTime: endDateTime,
+                                            webpageUrl: webpageUrl,
+                                            supabaseId: supabaseId,
+                                            supabaseTable: supabaseTable,
+                                            isAllDay: false
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                        console.log(`Loaded ${data?.items?.length || 0} events from ${calendarType}`);
+                    } catch (error) {
+                        console.error(`Error fetching from ${calendarType}:`, error);
+                    }
+                }
+                
+                // Process and add to scheduled events
+                scheduledEvents = [];
+                allEvents.forEach(event => {
+                    const scheduledEvent = convertToScheduledEvent(event);
+                    if (scheduledEvent) {
+                        scheduledEvents.push(scheduledEvent);
+                    }
+                });
+                
+                console.log(`=== GOOGLE CALENDAR IMPORT COMPLETE ===`);
+                console.log(`Total events imported: ${scheduledEvents.length}`);
+                
+                renderEventsForCurrentWeek();
+                updateWeekStats();
+                updateDebugCounts();
+                
+                syncStatus.classList.remove('syncing');
+                syncStatus.classList.add('connected');
+                syncStatus.innerHTML = '<span>✓</span><span>Events loaded from Google Calendar</span>';
+                
+                showToast(`Loaded ${scheduledEvents.length} events from Google Calendar`);
+                
+            } catch (error) {
+                console.error('Google Calendar import failed:', error);
+                syncStatus.classList.remove('syncing');
+                syncStatus.innerHTML = '<span>✗</span><span>Calendar import failed</span>';
+                showToast('Failed to load events from Google Calendar');
             }
         }
 
