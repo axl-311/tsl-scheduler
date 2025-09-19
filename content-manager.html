@@ -1509,6 +1509,49 @@
             console.log('Extracted data:', data);
             return data;
         }
+            
+            // If structured extraction didn't work well, fall back to pattern matching
+            if (Object.keys(data).length < 2) {
+                // Original pattern-based extraction as fallback
+                const titlePatterns = [
+                    /^([A-Z][A-Z\s&]+)$/m,
+                    /^"([^"]+)"$/m,
+                    /\*\*([^*]+)\*\*/
+                ];
+                
+                for (const pattern of titlePatterns) {
+                    const match = cleanedText.match(pattern);
+                    if (match) {
+                        let title = match[1] || match[0];
+                        if (title && title.length > 2 && title.length < 100) {
+                            data.title = title.trim();
+                            break;
+                        }
+                    }
+                }
+                
+                const directorMatch = cleanedText.match(/(?:Directed\s+by|Director)\s*:?\s*([A-Z][a-zA-Z\s]+?)(?:\n|$|\.)/i);
+                if (directorMatch) data.director = directorMatch[1].trim();
+                
+                const runtimeMatch = cleanedText.match(/(\d{2,3})\s*(?:minutes?|mins?)/i);
+                if (runtimeMatch) data.runtime_minutes = parseInt(runtimeMatch[1]);
+                
+                const yearMatch = cleanedText.match(/\b(20[0-2][0-9])\b/);
+                if (yearMatch) data.release_year = parseInt(yearMatch[1]);
+            }
+            
+            // Clean up extracted data
+            Object.keys(data).forEach(key => {
+                if (typeof data[key] === 'string') {
+                    data[key] = data[key].trim();
+                    if (data[key] === '') {
+                        delete data[key];
+                    }
+                }
+            });
+            
+            return data;
+        }
 
         function handleFile(event) {
             const file = event.target.files[0];
@@ -1719,8 +1762,16 @@
                 // Store current editing item
                 currentEditingItem = data;
                 
-                switchTab('importer');
-                await selectContentType(type);
+                // Switch to importer tab
+                await switchTab('importer');
+                
+                // Select content type WITHOUT clearing (we'll handle this differently)
+                currentContentType = type;
+                document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
+                document.querySelector(`.type-option:nth-child(${type === 'movies' ? 1 : type === 'events' ? 2 : 3})`).classList.add('active');
+                
+                // Generate form
+                await generateDynamicForm();
                 
                 // Show editing indicator
                 const indicator = document.getElementById('editingIndicator');
@@ -1729,7 +1780,7 @@
                 document.getElementById('editingItemTitle').textContent = title;
                 indicator.classList.add('active');
                 
-                // Fill form with data
+                // Fill form with data AFTER form is generated
                 Object.entries(data).forEach(([column, value]) => {
                     const field = document.getElementById(column);
                     if (field && value !== null) {
@@ -1737,13 +1788,20 @@
                         
                         // Handle image fields
                         if (getFieldType(column) === 'file' && value) {
-                            document.getElementById(column + 'Img').src = value;
-                            document.getElementById(column + 'Preview').classList.remove('hidden');
-                            document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
+                            const imgElement = document.getElementById(column + 'Img');
+                            const previewElement = document.getElementById(column + 'Preview');
+                            const placeholderElement = document.querySelector(`#${column}Upload .upload-placeholder`);
+                            
+                            if (imgElement && previewElement && placeholderElement) {
+                                imgElement.src = value;
+                                previewElement.classList.remove('hidden');
+                                placeholderElement.style.display = 'none';
+                            }
                         }
                     }
                 });
                 
+                // Set editing mode on save button
                 const saveBtn = document.getElementById('saveBtn');
                 saveBtn.setAttribute('data-editing-id', id);
                 document.getElementById('formTitle').textContent = `Editing ${type.charAt(0).toUpperCase() + type.slice(1).slice(0, -1)}`;
