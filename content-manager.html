@@ -1157,10 +1157,10 @@
             document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
             if (element) element.classList.add('active');
             
-            // Clear form but DON'T switch tabs - stay in Add New
+            // Clear form but stay in Add New
             clearDynamicForm();
             
-            // Cancel any editing state
+            // Reset editing state without changing tabs
             currentEditingItem = null;
             const indicator = document.getElementById('editingIndicator');
             if (indicator) {
@@ -1175,9 +1175,26 @@
             const deleteBtn = document.getElementById('deleteBtn');
             if (deleteBtn) {
                 deleteBtn.classList.add('hidden');
+                deleteBtn.removeAttribute('data-delete-id');
+                deleteBtn.removeAttribute('data-delete-type');
+            }
+            
+            // Reset form titles
+            const formTitle = document.getElementById('formTitle');
+            const saveButtonText = document.getElementById('saveButtonText');
+            
+            if (formTitle && saveButtonText) {
+                formTitle.textContent = `${type.charAt(0).toUpperCase() + type.slice(1)} Details`;
+                saveButtonText.textContent = `Save ${type.charAt(0).toUpperCase() + type.slice(1).slice(0, -1)} to Database`;
             }
             
             await generateDynamicForm();
+            
+            // Explicitly ensure we stay in Add New tab
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.nav-tab:nth-child(2)').classList.add('active'); // Add New tab
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById('importer-tab').classList.add('active');
         }
 
         function cancelEdit() {
