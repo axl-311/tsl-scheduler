@@ -1205,6 +1205,7 @@
                 throw new Error(`No calendar ID found for type: ${scheduleEvent.calendar}`);
             }
             
+            // Don't clear valid Google IDs - preserve them for updates
             if (scheduleEvent.googleEventId && !isValidGoogleEventId(scheduleEvent.googleEventId)) {
                 console.log(`✨ Clearing invalid googleEventId for ${scheduleEvent.title}`);
                 scheduleEvent.googleEventId = null;
@@ -1220,15 +1221,12 @@
             let standardizedDescription = '';
             
             if (scheduleEvent.webpageUrl) {
-                // Use the clean URL from database
                 standardizedDescription = scheduleEvent.webpageUrl;
                 console.log(`🔗 v1.8: Using webpage URL for ${scheduleEvent.title}: ${standardizedDescription}`);
             } else if (scheduleEvent.supabaseId && scheduleEvent.supabaseTable) {
-                // Fallback to ID reference if no webpage URL
                 standardizedDescription = `${scheduleEvent.supabaseTable}:${scheduleEvent.supabaseId}`;
                 console.log(`📝 Fallback to ID reference for ${scheduleEvent.title}`);
             } else {
-                // Manual events or rentals
                 let cleanDesc = (scheduleEvent.description || '').trim();
                 const urlMatch = cleanDesc.match(/(https?:\/\/)?timeandspace\.org\/[^\s]*/);
                 if (urlMatch) {
@@ -1267,24 +1265,10 @@
                 }
             };
             
-            const currentCalendar = scheduleEvent.calendar;
-            const lastPushedCalendar = scheduleEvent.lastPushedCalendar || scheduleEvent.originalCalendar;
-            const calendarChanged = lastPushedCalendar && lastPushedCalendar !== currentCalendar;
-            
-            if (calendarChanged && scheduleEvent.googleEventId) {
-                const oldCalendarId = CALENDAR_IDS[lastPushedCalendar];
-                if (oldCalendarId && oldCalendarId !== calendarId) {
-                    try {
-                        await deleteGoogleCalendarEvent(oldCalendarId, scheduleEvent.googleEventId);
-                        scheduleEvent.googleEventId = null;
-                    } catch (error) {
-                        scheduleEvent.googleEventId = null;
-                    }
-                }
-            }
-            
-            if (scheduleEvent.googleEventId && !calendarChanged) {
+            // Try to update existing event first
+            if (scheduleEvent.googleEventId) {
                 try {
+                    console.log(`Attempting to update existing event: ${scheduleEvent.title} (${scheduleEvent.googleEventId})`);
                     const response = await fetch(
                         `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${scheduleEvent.googleEventId}`,
                         {
@@ -1299,39 +1283,50 @@
                     
                     if (response.ok) {
                         const updatedEvent = await response.json();
-                        scheduleEvent.lastPushedCalendar = currentCalendar;
+                        console.log(`✓ Updated existing event: ${scheduleEvent.title}`);
                         return updatedEvent;
+                    } else if (response.status === 404) {
+                        console.log(`Event not found in Google Calendar, will create new: ${scheduleEvent.title}`);
+                        scheduleEvent.googleEventId = null;
                     } else {
+                        const errorText = await response.text();
+                        console.log(`Update failed (${response.status}), will create new: ${errorText}`);
                         scheduleEvent.googleEventId = null;
                     }
                 } catch (error) {
+                    console.log(`Update failed, will create new event: ${error.message}`);
                     scheduleEvent.googleEventId = null;
                 }
             }
             
-            const response = await fetch(
-                `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(eventData)
+            // Create new event only if update failed or no ID exists
+            if (!scheduleEvent.googleEventId) {
+                console.log(`Creating new event: ${scheduleEvent.title} in ${scheduleEvent.calendar}`);
+                const response = await fetch(
+                    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(eventData)
+                    }
+                );
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => null);
+                    throw new Error(`API Error ${response.status}: ${errorData?.error?.message || response.statusText}`);
                 }
-            );
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
-                throw new Error(`API Error ${response.status}: ${errorData?.error?.message || response.statusText}`);
+                
+                const createdEvent = await response.json();
+                
+                // Update the event with the new Google ID
+                scheduleEvent.googleEventId = createdEvent.id;
+                
+                console.log(`✓ Created new event: ${scheduleEvent.title} with ID: ${createdEvent.id}`);
+                return createdEvent;
             }
-            
-            const createdEvent = await response.json();
-            
-            scheduleEvent.googleEventId = createdEvent.id;
-            scheduleEvent.lastPushedCalendar = currentCalendar;
-            
-            return createdEvent;
         }
 
         async function deleteGoogleCalendarEvent(calendarId, eventId) {
