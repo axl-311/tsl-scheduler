@@ -869,89 +869,39 @@
             }
         }
 
-       async function loadTableSchemas() {
-    try {
-        const tables = ['movies', 'events', 'galleries'];
-        const schemas = {};
-        const titles = {};
-        
-        for (const table of tables) {
+        async function loadTableSchemas() {
             try {
-                console.log(`Detecting schema for ${table}...`);
+                const tables = ['movies', 'events', 'galleries'];
+                const schemas = {};
+                const titles = {};
                 
-                // Try to query information_schema directly - most reliable method
-                const { data: columnData, error: columnError } = await supabase
-                    .from('information_schema.columns')
-                    .select('column_name')
-                    .eq('table_name', table)
-                    .eq('table_schema', 'public')
-                    .order('ordinal_position');
-                
-                if (!columnError && columnData && columnData.length > 0) {
-                    schemas[table] = columnData.map(col => col.column_name);
-                    console.log(`✓ Schema from information_schema for ${table}:`, schemas[table]);
-                } else {
-                    console.log(`information_schema failed for ${table}, trying data query...`);
-                    
-                    // Fallback: Try to get one row of data (works if table has data)
-                    const { data: sampleData, error: sampleError } = await supabase
-                        .from(table)
-                        .select('*')
-                        .limit(1)
-                        .maybeSingle();
-                    
-                    if (!sampleError && sampleData) {
-                        schemas[table] = Object.keys(sampleData);
-                        console.log(`✓ Schema from sample data for ${table}:`, schemas[table]);
-                    } else {
-                        // Last resort: Try an insert attempt to get error message with column info
-                        console.log(`${table} appears empty, trying insert detection...`);
+                for (const table of tables) {
+                    try {
+                        // Simple approach: try to get sample data, fallback to default if empty
+                        const { data, error } = await supabase.from(table).select('*').limit(1);
                         
-                        const { error: insertError } = await supabase
-                            .from(table)
-                            .insert({})
-                            .select();
-                        
-                        if (insertError && insertError.message) {
-                            // Parse error message for column hints
-                            console.log(`Insert error for ${table}:`, insertError.message);
+                        if (!error && data && data.length > 0) {
+                            schemas[table] = Object.keys(data[0]);
+                        } else if (!error && data && data.length === 0) {
+                            // Table exists but empty - use your actual schema for events
+                            if (table === 'events') {
+                                schemas[table] = ['id', 'event_name', 'presented_by', 'duration_minutes', 'description', 'critic_quotes', 'simpletix_embed_code', 'content_type', 'created_at', 'updated_at', 'poster_url', 'web_graphics_url', 'webpage_url'];
+                            } else {
+                                schemas[table] = getDefaultSchema(table);
+                            }
+                        } else {
+                            console.warn(`Table ${table} not accessible:`, error);
+                            schemas[table] = getDefaultSchema(table);
                         }
                         
-                        throw new Error(`Could not detect schema for empty table ${table}`);
+                        titles[table] = detectTitleField(schemas[table]);
+                        
+                    } catch (tableError) {
+                        console.warn(`Error accessing ${table}:`, tableError);
+                        schemas[table] = getDefaultSchema(table);
+                        titles[table] = detectTitleField(schemas[table]);
                     }
                 }
-                
-                titles[table] = detectTitleField(schemas[table]);
-                
-            } catch (tableError) {
-                console.warn(`⚠️ Error detecting schema for ${table}:`, tableError.message);
-                console.log(`Using default schema for ${table}`);
-                schemas[table] = getDefaultSchema(table);
-                titles[table] = detectTitleField(schemas[table]);
-            }
-        }
-        
-        tableSchemas = schemas;
-        titleFields = titles;
-        console.log('📊 Final loaded schemas:', tableSchemas);
-        console.log('🏷️ Title fields:', titleFields);
-        
-    } catch (error) {
-        console.error('❌ Schema loading error:', error);
-        // Ultimate fallback
-        tableSchemas = {
-            movies: getDefaultSchema('movies'),
-            events: getDefaultSchema('events'),
-            galleries: getDefaultSchema('galleries')
-        };
-        titleFields = {
-            movies: 'title',
-            events: 'event_name',
-            galleries: 'exhibition_title'
-        };
-        console.log('🔄 Using complete fallback schemas');
-    }
-}
                 
                 tableSchemas = schemas;
                 titleFields = titles;
@@ -961,7 +911,7 @@
                 console.error('Schema loading error:', error);
                 tableSchemas = {
                     movies: getDefaultSchema('movies'),
-                    events: getDefaultSchema('events'),
+                    events: ['id', 'event_name', 'presented_by', 'duration_minutes', 'description', 'critic_quotes', 'simpletix_embed_code', 'content_type', 'created_at', 'updated_at', 'poster_url', 'web_graphics_url', 'webpage_url'],
                     galleries: getDefaultSchema('galleries')
                 };
                 titleFields = {
