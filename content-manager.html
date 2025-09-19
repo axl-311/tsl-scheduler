@@ -1693,31 +1693,19 @@
                     if (error) throw error;
                     showToast('Updated successfully!');
                     
-                    // After update, clear editing state
-                    currentEditingItem = null;
-                    saveBtn.removeAttribute('data-editing-id');
-                    const indicator = document.getElementById('editingIndicator');
-                    if (indicator) indicator.classList.remove('active');
-                    const deleteBtn = document.getElementById('deleteBtn');
-                    if (deleteBtn) deleteBtn.classList.add('hidden');
+                    // After update, stay in edit mode so user can continue editing
+                    // Just refresh the form with the updated data
+                    loadContent(); // Update stats
+                    
                 } else {
                     const { error } = await supabase.from(currentContentType).insert([data]);
                     if (error) throw error;
-                    showToast('Saved successfully! Ready to add another.');
+                    showToast('Saved successfully!');
+                    
+                    // After saving new item, return to dashboard to see it in context
+                    clearDynamicForm();
+                    await switchTab('dashboard', document.querySelector('.nav-tab:first-child'));
                 }
-                
-                // Clear form but STAY in Add New mode
-                clearDynamicForm();
-                loadContent(); // Update stats
-                
-                // Reset form titles for new entry
-                document.getElementById('formTitle').textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
-                document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
-                
-                document.getElementById('extractionPreview').classList.add('hidden');
-                document.getElementById('rawTextViewer').classList.add('hidden');
-                
-                // Stay in Add New tab - ready for next entry
                 
             } catch (error) {
                 console.error('Save error:', error);
