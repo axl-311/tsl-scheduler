@@ -1096,12 +1096,26 @@
                 return;
             }
             
+            // Deduplicate events by unique key (title + date + theater)
             const eventMap = new Map();
             scheduledEvents.forEach(event => {
                 if (event.actualDate) {
                     const key = `${event.title}-${event.actualDate.toDateString()}-${event.theater}`;
+                    
+                    // Fix calendar assignment for theater events
+                    if (event.calendar === 'theater' || !event.calendar) {
+                        event.calendar = event.theater === 0 ? 'theater-1' : 'theater-2';
+                    }
+                    
+                    // Keep the event with a valid Google ID if one exists
                     if (!eventMap.has(key)) {
                         eventMap.set(key, event);
+                    } else {
+                        const existing = eventMap.get(key);
+                        // Prefer the one with a valid Google ID
+                        if (event.googleEventId && !existing.googleEventId) {
+                            eventMap.set(key, event);
+                        }
                     }
                 }
             });
@@ -1120,6 +1134,11 @@
             console.log(`Total scheduled events: ${scheduledEvents.length}`);
             console.log(`Unique events after deduplication: ${eventMap.size}`);
             console.log(`Future events to push: ${eventsToFuture.length}`);
+            eventsToFuture.forEach(event => {
+                console.log(`- ${event.title} on ${event.actualDate.toDateString()}`);
+                console.log(`  Calendar: ${event.calendar}, Theater: ${event.theater}`);
+                console.log(`  Google ID: ${event.googleEventId || 'none'}`);
+            });
             
             if (eventsToFuture.length === 0) {
                 showToast('No future events to push');
@@ -1143,11 +1162,11 @@
                     try {
                         await createGoogleCalendarEvent(event);
                         successCount++;
-                        console.log(`✓ Created: ${event.title}`);
+                        console.log(`✓ Processed: ${event.title}`);
                     } catch (error) {
                         errorCount++;
                         errors.push({ event: event.title, error: error.message });
-                        console.error(`✗ Failed to create ${event.title}:`, error);
+                        console.error(`✗ Failed to process ${event.title}:`, error);
                     }
                     
                     await new Promise(resolve => setTimeout(resolve, 100));
@@ -1171,6 +1190,12 @@
             } finally {
                 pushButton.disabled = false;
                 pushButton.textContent = 'Push to Google';
+                
+                // Refresh from Google to get updated IDs
+                setTimeout(() => {
+                    console.log('Refreshing from Google Calendar...');
+                    importFromGoogleCalendar();
+                }, 1000);
             }
         }
 
