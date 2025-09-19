@@ -1869,7 +1869,8 @@
             formFields.forEach(field => {
                 field.value = '';
                 
-                if (getFieldType(field.dataset.column) === 'file') {
+                // Only process image fields if they have a data-column attribute
+                if (field.dataset.column && getFieldType(field.dataset.column) === 'file') {
                     const column = field.dataset.column;
                     removeImage(column);
                 }
