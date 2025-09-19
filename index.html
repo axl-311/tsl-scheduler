@@ -1,11 +1,12 @@
-<!DOCTYPE html>
+<h1>TSL Schedule Maker 2000<span class="version-badge">v1.7</span></h1><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Schedule Maker 2000 - v1.5</title>
+    <title>TSL Schedule Maker 2000 - v1.7</title>
     <meta name="description" content="Theater scheduling application for Time & Space Limited">
     <meta name="author" content="TSL">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -691,7 +692,7 @@
     <div class="app-container">
         <div class="header">
             <div>
-                <h1>TSL Schedule Maker 2000<span class="version-badge">v1.5</span></h1>
+                <h1>TSL Schedule Maker 2000<span class="version-badge">v1.7</span></h1>
             </div>
             <button id="authButton" class="auth-button">
                 Connect Google Calendar
@@ -745,8 +746,8 @@
                     </select>
                 </div>
                 <div id="libraryItems"></div>
-                <button class="import-button" id="importFromGoogle" style="width: 100%; margin-top: 15px;">
-                    Import from Google Calendar
+                <button class="import-button" id="importFromSupabase" style="width: 100%; margin-top: 15px;">
+                    Import from Database
                 </button>
                 <button class="add-event-button" id="addEventButton" style="width: 100%; margin-top: 10px;">
                     Add New Event
@@ -860,44 +861,25 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     <script>
         /*
-         * TSL Schedule Maker 2000 - Version 1.5
+         * TSL Schedule Maker 2000 - Version 1.7
          * Theater scheduling application for Time & Space Limited
          * 
-         * NEW FIXES IN v1.5:
-         * - Aggressive description standardization - strips ALL existing formatting
-         * - Rebuilds descriptions from scratch for consistency
-         * - Special handling for LIT Rentals and non-movie events
-         * - Ensures uniform "Movie: Title / More info: URL" format
+         * NEW FEATURES IN v1.7:
+         * - Supabase integration - library pulls from database (movies, events, galleries)
+         * - Programs flow from Supabase → Scheduler → Google Calendar → Website
+         * - Google Calendar stores minimal data (ID reference) while Supabase holds rich content
+         * - Support for all "programs" (movies, events, galleries) from Supabase
          * 
-         * Features from v1.4:
-         * - Prevent duplicate scheduling when dragging from library multiple times
-         * - Update existing event instead of creating duplicates
-         * - Better deduplication during push to Google Calendar
+         * Architecture:
+         * - Supabase: Source of truth for all program content
+         * - Scheduler: Visual tool for timing/theater assignments
+         * - Google Calendar: Public schedule with program references
+         * - Website: Combines calendar times with Supabase content
          * 
-         * Features from v1.3:
-         * - Standardized movie event descriptions for consistency
-         * - All pushed events now have uniform "Movie: Title / More info: URL" format
-         * 
-         * Features from v1.2:
-         * - Fixed library-dragged events not syncing to Google Calendar
-         * - Clear invalid Google Event IDs from library events before push
-         * - Better detection of fake IDs vs real Google Calendar IDs
-         * 
-         * Features from v1.1:
-         * - Fixed calendar switching with proper deletion from old calendars
-         * - Enhanced TBD workflow with theater metadata preservation
-         * - Improved push accuracy to match scheduler display exactly
-         * - Better metadata handling in Google Calendar extended properties
-         * 
-         * Features:
-         * - Google Calendar integration (5 TSL calendars)
-         * - Drag-and-drop scheduling interface
-         * - Push to Google Calendar with clean description handling
-         * - TBD calendar for planning/staging
-         * - Add custom events to library
-         * - Save/Load functionality
-         * - Event editing and management
-         * - Week navigation
+         * Previous features from v1.6:
+         * - Simplified descriptions to just URLs/IDs for cleaner public calendar
+         * - Deduplication and library sync fixes
+         * - Calendar switching and TBD workflow
          * 
          * Production deployment: https://axl-311.github.io/tsl-scheduler/
          */
@@ -924,6 +906,11 @@
         const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
         const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
+
+        // Supabase Configuration
+        const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
+        let supabase = null;
 
         // TSL Calendar IDs - Production Configuration
         const CALENDAR_IDS = {
@@ -1157,7 +1144,7 @@
                 return false;
             });
             
-            console.log(`=== PUSH DEBUG INFO (v1.5) ===`);
+            console.log(`=== PUSH DEBUG INFO (v1.7) ===`);
             console.log(`Today: ${today.toDateString()}`);
             console.log(`Total scheduled events: ${scheduledEvents.length}`);
             console.log(`Unique events after deduplication: ${eventMap.size}`);
@@ -1244,56 +1231,45 @@
             const endDateTime = new Date(startDateTime);
             endDateTime.setMinutes(endDateTime.getMinutes() + scheduleEvent.duration);
             
-            // v1.5 AGGRESSIVE STANDARDIZATION: Strip ALL formatting and rebuild from scratch
+            // v1.7 SIMPLIFIED DESCRIPTIONS: Supabase ID reference for website integration
             let standardizedDescription = '';
             
-            // Strip out ALL existing formatting
-            let cleanDesc = (scheduleEvent.description || '')
-                .replace(/^Movie:\s*/gmi, '')  // Remove "Movie:" prefix
-                .replace(/^More info:\s*/gmi, '')  // Remove "More info:" prefix  
-                .replace(/^Scheduled via.*$/gmi, '')  // Remove old attributions
-                .replace(/^Created by.*$/gmi, '')  // Remove creator lines
-                .replace(/\n\s*\n/g, '\n')  // Remove empty lines
-                .trim();
-            
-            // Handle theater events with special formatting
-            if (scheduleEvent.calendar === 'theater-1' || scheduleEvent.calendar === 'theater-2') {
-                // Try to extract URL from whatever's left
-                const urlMatch = cleanDesc.match(/(https?:\/\/)?timeandspace\.org\/[^\s]*/);
-                
-                if (urlMatch) {
-                    // Found a URL - use it
-                    const url = urlMatch[0].startsWith('http') ? urlMatch[0] : `https://${urlMatch[0]}`;
-                    standardizedDescription = `Movie: ${scheduleEvent.title}\nMore info: ${url}`;
-                    console.log(`📝 v1.5: Rebuilt description for ${scheduleEvent.title} with existing URL`);
-                } else if (scheduleEvent.title.toLowerCase().includes('rental')) {
-                    // Special handling for rentals - no "Movie:" prefix
-                    standardizedDescription = scheduleEvent.title;
-                    console.log(`📝 v1.5: Special handling for rental: ${scheduleEvent.title}`);
-                } else {
-                    // Build URL from title for movies without URLs
-                    const cleanTitle = scheduleEvent.title
-                        .replace(/\s*\+.*$/, '')  // Remove "+ Q&A" etc
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]+/g, '-')  // Convert to URL slug
-                        .replace(/-+/g, '-')  // Remove multiple dashes
-                        .replace(/^-|-$/g, '');  // Remove leading/trailing dashes
-                    
-                    standardizedDescription = `Movie: ${scheduleEvent.title}\nMore info: https://timeandspace.org/${cleanTitle}/`;
-                    console.log(`📝 v1.5: Built new description for ${scheduleEvent.title} with generated URL`);
-                }
+            // Check if this event has a Supabase reference
+            if (scheduleEvent.supabaseId && scheduleEvent.supabaseTable) {
+                // Use Supabase reference format for website parsing
+                standardizedDescription = `${scheduleEvent.supabaseTable}:${scheduleEvent.supabaseId}`;
+                console.log(`📝 v1.7: Set Supabase reference for ${scheduleEvent.title}`);
             } else {
-                // Non-theater events keep cleaned description
-                standardizedDescription = cleanDesc;
-                if (standardizedDescription) {
-                    console.log(`📝 v1.5: Cleaned description for non-theater event: ${scheduleEvent.title}`);
+                // Fallback for non-Supabase events (like rentals or manual entries)
+                let cleanDesc = (scheduleEvent.description || '')
+                    .replace(/^Movie:\s*/gmi, '')
+                    .replace(/^More info:\s*/gmi, '')  
+                    .replace(/^Scheduled via.*$/gmi, '')
+                    .replace(/^Created by.*$/gmi, '')
+                    .replace(/\n\s*\n/g, '\n')
+                    .trim();
+                
+                // Try to extract URL if present
+                const urlMatch = cleanDesc.match(/(https?:\/\/)?timeandspace\.org\/[^\s]*/);
+                if (urlMatch) {
+                    standardizedDescription = urlMatch[0].startsWith('http') ? urlMatch[0] : `https://${urlMatch[0]}`;
+                } else if (!scheduleEvent.title.toLowerCase().includes('rental')) {
+                    // Generate URL from title as last resort
+                    const cleanTitle = scheduleEvent.title
+                        .replace(/\s*\+.*$/, '')
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/-+/g, '-')
+                        .replace(/^-|-$/g, '');
+                    
+                    standardizedDescription = `https://timeandspace.org/${cleanTitle}/`;
                 }
             }
             
-            // Add the attribution
+            // Add minimal attribution only if there's content
             const finalDescription = standardizedDescription ? 
-                `${standardizedDescription}\n\nScheduled via TSL Schedule Maker 2000` : 
-                'Scheduled via TSL Schedule Maker 2000';
+                `${standardizedDescription}\n\nScheduled via TSL Schedule Maker` : 
+                'Scheduled via TSL Schedule Maker';
             
             const eventData = {
                 summary: scheduleEvent.title,
@@ -1314,7 +1290,9 @@
                         'tsl-original-calendar': scheduleEvent.originalCalendar || scheduleEvent.calendar,
                         'tsl-preserved-theater': scheduleEvent.preservedTheater !== undefined ? scheduleEvent.preservedTheater.toString() : '',
                         'tsl-created': new Date().toISOString(),
-                        'tsl-version': '1.5'
+                        'tsl-version': '1.7',
+                        'tsl-supabase-id': scheduleEvent.supabaseId || '',
+                        'tsl-supabase-table': scheduleEvent.supabaseTable || ''
                     }
                 }
             };
@@ -1423,11 +1401,11 @@
             }
         }
 
-        // Save/Load Functionality - Updated for v1.5
+        // Save/Load Functionality - Updated for v1.7
         function saveSchedule() {
             try {
                 const scheduleData = {
-                    version: '1.5',
+                    version: '1.7',
                     savedAt: new Date().toISOString(),
                     currentWeekStart: currentWeekStart.toISOString(),
                     libraryEvents: libraryEvents,
@@ -1530,7 +1508,8 @@
                     if (response.access_token) {
                         accessToken = response.access_token;
                         updateSigninStatus(true);
-                        importFromGoogle();
+                        // v1.7: Import from Supabase after authentication
+                        importFromSupabase();
                     }
                 },
             });
@@ -1601,149 +1580,121 @@
             };
         }
 
-        // ENHANCED import function to preserve theater metadata
-        async function importFromGoogle() {
-            if (!accessToken) {
-                showToast('Please connect to Google Calendar first');
-                return;
+        // ENHANCED import function from Supabase
+        async function importFromSupabase() {
+            if (!supabase) {
+                // Initialize Supabase client if not already done
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             }
 
-            if (isImporting) {
-                showToast('Import already in progress...');
-                return;
-            }
-
-            isImporting = true;
-            console.log('=== STARTING CLEAN DATABASE REBUILD (v1.5) ===');
+            console.log('=== IMPORTING FROM SUPABASE (v1.7) ===');
 
             const syncStatus = document.getElementById('syncStatus');
             syncStatus.classList.add('syncing');
-            syncStatus.innerHTML = '<span>↻</span><span>Rebuilding database...</span>';
+            syncStatus.innerHTML = '<span>↻</span><span>Loading programs from database...</span>';
             
             try {
-                libraryEvents.length = 0;
-                scheduledEvents.length = 0;
+                // Clear existing library
+                libraryEvents = [];
                 
-                document.querySelectorAll('.event-block').forEach(block => {
-                    if (block.parentNode) {
-                        block.parentNode.removeChild(block);
-                    }
-                });
+                // Fetch all programs from Supabase
+                const [moviesResult, eventsResult, galleriesResult] = await Promise.all([
+                    supabase.from('movies').select('*').order('title'),
+                    supabase.from('events').select('*').order('event_name'),
+                    supabase.from('galleries').select('*').order('exhibition_title')
+                ]);
                 
-                const startOfRange = new Date(currentWeekStart);
-                startOfRange.setDate(startOfRange.getDate() - 14);
-                const endOfRange = new Date(currentWeekStart);
-                endOfRange.setDate(endOfRange.getDate() + 84);
+                let totalPrograms = 0;
                 
-                document.getElementById('debugImportRange').textContent = 
-                    `${startOfRange.toLocaleDateString()} - ${endOfRange.toLocaleDateString()}`;
-
-                let totalLibraryEvents = 0;
-                let totalScheduledEvents = 0;
-                const processedEventIds = new Set();
-
-                for (const [calendarKey, calendarId] of Object.entries(CALENDAR_IDS)) {
-                    try {
-                        console.log(`Fetching events from ${calendarKey} calendar...`);
-                        
-                        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
-                            `timeMin=${startOfRange.toISOString()}&` +
-                            `timeMax=${endOfRange.toISOString()}&` +
-                            `showDeleted=false&` +
-                            `singleEvents=true&` +
-                            `orderBy=startTime&` +
-                            `key=${API_KEY}`;
-
-                        const response = await fetch(url, {
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`
-                            }
+                // Process movies
+                if (moviesResult.data) {
+                    moviesResult.data.forEach(movie => {
+                        libraryEvents.push({
+                            id: `movie-${movie.id}`,
+                            title: movie.title,
+                            duration: movie.runtime_minutes || 120,
+                            calendar: 'theater', // Movies default to theater calendars
+                            originalCalendar: 'theater',
+                            description: '', // Will be set when pushing
+                            location: '',
+                            googleEventId: null,
+                            supabaseId: movie.id,
+                            supabaseTable: 'movies',
+                            programType: 'movie',
+                            startTime: null,
+                            endTime: null,
+                            isAllDay: false
                         });
-
-                        if (!response.ok) {
-                            console.error(`Failed to fetch ${calendarKey}:`, response.status);
-                            continue;
-                        }
-
-                        const data = await response.json();
-                        const events = data.items || [];
-                        
-                        console.log(`Found ${events.length} events in ${calendarKey} calendar`);
-                        
-                        events.forEach(event => {
-                            if (!event.id || processedEventIds.has(event.id)) {
-                                return;
-                            }
-                            processedEventIds.add(event.id);
-                            
-                            let duration = 120;
-                            if (event.start && event.end) {
-                                const start = new Date(event.start.dateTime || event.start.date);
-                                const end = new Date(event.end.dateTime || event.end.date);
-                                duration = Math.round((end - start) / 60000);
-                            }
-
-                            // Extract theater metadata from extended properties
-                            const extProps = event.extendedProperties?.private || {};
-                            const preservedTheater = extProps['tsl-preserved-theater'] ? 
-                                parseInt(extProps['tsl-preserved-theater']) : undefined;
-                            const originalCalendar = extProps['tsl-original-calendar'] || calendarKey;
-
-                            const eventData = {
-                                id: event.id,
-                                title: event.summary || 'Untitled Event',
-                                duration: duration,
-                                calendar: calendarKey,
-                                originalCalendar: originalCalendar,
-                                preservedTheater: preservedTheater,
-                                lastPushedCalendar: calendarKey,
-                                description: event.description || '',
-                                location: event.location || '',
-                                googleEventId: event.id,
-                                startTime: event.start,
-                                endTime: event.end,
-                                isAllDay: !event.start.dateTime
-                            };
-                            
-                            if (event.start && event.start.dateTime) {
-                                const scheduledEvent = convertToScheduledEvent(eventData);
-                                if (scheduledEvent) {
-                                    scheduledEvents.push(scheduledEvent);
-                                    totalScheduledEvents++;
-                                }
-                            } else {
-                                libraryEvents.push(eventData);
-                                totalLibraryEvents++;
-                            }
-                        });
-                        
-                    } catch (error) {
-                        console.error(`Failed to process ${calendarKey} calendar:`, error);
-                    }
+                        totalPrograms++;
+                    });
+                    console.log(`Loaded ${moviesResult.data.length} movies`);
                 }
                 
-                console.log(`=== DATABASE REBUILD COMPLETE (v1.5) ===`);
-                console.log(`Final counts: libraryEvents=${libraryEvents.length}, scheduledEvents=${scheduledEvents.length}`);
+                // Process events
+                if (eventsResult.data) {
+                    eventsResult.data.forEach(event => {
+                        libraryEvents.push({
+                            id: `event-${event.id}`,
+                            title: event.event_name,
+                            duration: event.duration_minutes || 120,
+                            calendar: 'events', // Events go to TSL Events calendar
+                            originalCalendar: 'events',
+                            description: '',
+                            location: '',
+                            googleEventId: null,
+                            supabaseId: event.id,
+                            supabaseTable: 'events',
+                            programType: 'event',
+                            startTime: null,
+                            endTime: null,
+                            isAllDay: false
+                        });
+                        totalPrograms++;
+                    });
+                    console.log(`Loaded ${eventsResult.data.length} events`);
+                }
+                
+                // Process galleries
+                if (galleriesResult.data) {
+                    galleriesResult.data.forEach(gallery => {
+                        libraryEvents.push({
+                            id: `gallery-${gallery.id}`,
+                            title: gallery.exhibition_title,
+                            duration: 0, // Galleries typically don't have duration
+                            calendar: 'events', // Galleries go to events calendar
+                            originalCalendar: 'events',
+                            description: '',
+                            location: gallery.gallery_space || '',
+                            googleEventId: null,
+                            supabaseId: gallery.id,
+                            supabaseTable: 'galleries',
+                            programType: 'gallery',
+                            startTime: null,
+                            endTime: null,
+                            isAllDay: true // Galleries might be all-day events
+                        });
+                        totalPrograms++;
+                    });
+                    console.log(`Loaded ${galleriesResult.data.length} galleries`);
+                }
+                
+                console.log(`=== SUPABASE IMPORT COMPLETE ===`);
+                console.log(`Total programs loaded: ${totalPrograms}`);
                 
                 renderLibrary();
-                renderEventsForCurrentWeek();
-                updateWeekStats();
                 updateDebugCounts();
                 
                 syncStatus.classList.remove('syncing');
                 syncStatus.classList.add('connected');
-                syncStatus.innerHTML = '<span>✓</span><span>Database rebuilt successfully</span>';
+                syncStatus.innerHTML = '<span>✓</span><span>Programs loaded from database</span>';
                 
-                const totalEvents = totalLibraryEvents + totalScheduledEvents;
-                showToast(`Imported ${totalEvents} events (${totalLibraryEvents} library + ${totalScheduledEvents} scheduled)`);
+                showToast(`Loaded ${totalPrograms} programs from database`);
                 
             } catch (error) {
-                console.error('Import failed:', error);
+                console.error('Supabase import failed:', error);
                 syncStatus.classList.remove('syncing');
-                syncStatus.innerHTML = '<span>✗</span><span>Import failed</span>';
-                showToast('Import failed - check console for details');
-            } finally {
-                isImporting = false;
+                syncStatus.innerHTML = '<span>✗</span><span>Database import failed</span>';
+                showToast('Failed to load programs from database');
             }
         }
 
@@ -2322,7 +2273,11 @@
                             actualDate: scheduledDate,
                             id: `scheduled-${Date.now()}-${Math.random()}`,
                             googleEventId: event.googleEventId,
-                            instanceOf: event.googleEventId || event.id
+                            instanceOf: event.googleEventId || event.id,
+                            // v1.7: Preserve Supabase reference
+                            supabaseId: event.supabaseId,
+                            supabaseTable: event.supabaseTable,
+                            programType: event.programType
                         };
                         
                         scheduledEvents.push(scheduledEvent);
@@ -2384,9 +2339,9 @@
 
         // Application Initialization
         function init() {
-            console.log('Initializing TSL Schedule Maker 2000 v1.5...');
-            console.log('✨ Library sync fix applied - invalid Google Event IDs will be cleared');
-            console.log('📝 Aggressive description standardization - rebuilds all descriptions from scratch');
+            console.log('Initializing TSL Schedule Maker 2000 v1.7...');
+            console.log('🗄️ Supabase integration enabled - programs load from database');
+            console.log('📝 Simplified descriptions with Supabase references');
             console.log('🔄 Deduplication enabled - prevents duplicate scheduling');
             
             generateDaysColumns();
@@ -2399,7 +2354,7 @@
             document.getElementById('prevWeek').onclick = () => changeWeek(-1);
             document.getElementById('nextWeek').onclick = () => changeWeek(1);
             document.getElementById('collapseToggle').onclick = toggleCollapse;
-            document.getElementById('importFromGoogle').onclick = importFromGoogle;
+            document.getElementById('importFromSupabase').onclick = importFromSupabase;
             document.getElementById('addEventButton').onclick = openAddEventModal;
             document.getElementById('calendarFilter').onchange = renderLibrary;
             document.getElementById('pushToGoogle').onclick = pushToGoogle;
@@ -2460,7 +2415,7 @@
             }, 1000);
             
             renderLibrary();
-            console.log('TSL Schedule Maker 2000 v1.5 initialized successfully');
+            console.log('TSL Schedule Maker 2000 v1.7 initialized successfully');
         }
 
         // Start the application
