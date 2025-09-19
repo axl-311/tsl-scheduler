@@ -592,7 +592,7 @@
             color: #856404;
         }
 
-        /* MISSING IMAGE UPLOAD STYLES - ADDED */
+        /* Image Upload Styles - Different dimensions for poster vs graphics */
         .image-upload-area {
             border: 2px dashed #d2d2d7;
             border-radius: 8px;
@@ -630,11 +630,31 @@
             width: 100%;
         }
 
-        .image-preview img {
+        /* Poster preview - vertical/portrait */
+        .poster-preview img {
+            width: 100%;
+            height: 280px;
+            object-fit: contain;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+
+        /* Web graphics preview - horizontal/landscape */
+        .graphics-preview img {
             width: 100%;
             height: 150px;
-            object-fit: cover;
+            object-fit: contain;
             border-radius: 6px;
+            background: #f8f9fa;
+        }
+
+        /* Default preview for other images */
+        .image-preview img {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+            border-radius: 6px;
+            background: #f8f9fa;
         }
 
         .remove-image-btn {
@@ -1044,6 +1064,14 @@
                 imageFields.forEach(column => {
                     const label = formatFieldLabel(column);
                     
+                    // Determine preview class based on field type
+                    let previewClass = 'image-preview';
+                    if (column.includes('poster')) {
+                        previewClass = 'image-preview poster-preview';
+                    } else if (column.includes('graphics') || column.includes('graphic')) {
+                        previewClass = 'image-preview graphics-preview';
+                    }
+                    
                     fieldsHTML += `
                         <div class="form-group">
                             <label class="form-label">${label}</label>
@@ -1053,7 +1081,7 @@
                                     <span>Click to upload ${label.toLowerCase()}</span>
                                     <div class="upload-hint">JPG, PNG, WebP (max 5MB)</div>
                                 </div>
-                                <div id="${column}Preview" class="image-preview hidden">
+                                <div id="${column}Preview" class="${previewClass} hidden">
                                     <img id="${column}Img" src="" alt="${label} preview">
                                     <button type="button" onclick="removeImage('${column}')" class="remove-image-btn">×</button>
                                 </div>
@@ -1287,12 +1315,7 @@
             const cleanedText = fixSpacing(text);
             const data = {};
             
-            // Split text into lines and process
-            const lines = cleanedText.split('\n');
-            let currentField = null;
-            let currentValue = '';
-            
-            // Enhanced field mapping to handle variations
+            // Enhanced field mapping to match your database schema
             const fieldMapping = {
                 'title': 'title',
                 'director': 'director',
@@ -1314,61 +1337,123 @@
                 'artist': 'artist',
                 'art medium': 'art_medium',
                 'gallery space': 'gallery_space',
-                'critics quote': 'critic_quotes',  // Note: changed to match your schema
+                'critics quote': 'critic_quotes',
                 'critic quote': 'critic_quotes',
                 'critic quotes': 'critic_quotes',
                 'trailer url': 'trailer_url',
                 'poster url': 'poster_url',
-                'web graphics url': 'web_graphics_url'
+                'web graphics url': 'web_graphics_url',
+                'simpletix embed code': 'simpletix_embed_code'
             };
             
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
+            // Split by common field patterns
+            const fieldPattern = /^([A-Za-z][A-Za-z\s]+?):\s*$/m;
+            const parts = cleanedText.split(fieldPattern);
+            
+            // Process parts (odd indices are field names, even indices are values)
+            for (let i = 1; i < parts.length; i += 2) {
+                const fieldName = parts[i].toLowerCase().trim();
+                let value = parts[i + 1] || '';
                 
-                // Check if this line is a field label
-                const fieldMatch = line.match(/^([A-Za-z\s]+):\s*(.*)$/);
+                // Clean up the value
+                value = value.trim();
                 
-                if (fieldMatch) {
-                    // Save previous field if we have one
-                    if (currentField && currentValue.trim()) {
-                        data[currentField] = currentValue.trim();
+                // Skip if value is marked as not provided
+                if (value.toLowerCase().includes('[not provided]') || 
+                    value.toLowerCase().includes('not provided')) {
+                    continue;
+                }
+                
+                // Map to database field name
+                const dbField = fieldMapping[fieldName];
+                if (dbField && value) {
+                    // Preserve paragraph breaks for long text fields
+                    if (dbField === 'synopsis' || dbField === 'logline' || dbField === 'description') {
+                        // Keep paragraph structure but clean up excessive whitespace
+                        value = value.replace(/\n\n+/g, '\n\n').trim();
                     }
+                    data[dbField] = value;
+                }
+            }
+            
+            // If the above method didn't work well, try line-by-line parsing
+            if (Object.keys(data).length < 3) {
+                const lines = cleanedText.split('\n');
+                let currentField = null;
+                let currentValue = [];
+                let inMultilineField = false;
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
                     
-                    // Start new field
-                    const fieldName = fieldMatch[1].toLowerCase().trim();
-                    currentValue = fieldMatch[2].trim(); // Get value from same line if exists
+                    // Check if this is a field label line
+                    const fieldMatch = line.match(/^([A-Za-z][A-Za-z\s]+?):\s*(.*)$/);
                     
-                    currentField = fieldMapping[fieldName] || null;
-                    
-                    // If value is empty and next line doesn't look like a field, grab it
-                    if (!currentValue && i + 1 < lines.length) {
-                        const nextLine = lines[i + 1].trim();
-                        if (nextLine && !nextLine.match(/^[A-Za-z\s]+:\s*/)) {
-                            currentValue = nextLine;
-                            i++; // Skip the next line since we consumed it
+                    if (fieldMatch) {
+                        // Save previous field if exists
+                        if (currentField && currentValue.length > 0) {
+                            const value = currentValue.join('\n').trim();
+                            if (value && !value.toLowerCase().includes('[not provided]')) {
+                                data[currentField] = value;
+                            }
+                        }
+                        
+                        // Start new field
+                        const fieldName = fieldMatch[1].toLowerCase().trim();
+                        const immediateValue = fieldMatch[2].trim();
+                        
+                        currentField = fieldMapping[fieldName] || null;
+                        currentValue = immediateValue ? [immediateValue] : [];
+                        
+                        // Check if this is a multiline field
+                        inMultilineField = currentField && 
+                            (currentField === 'synopsis' || 
+                             currentField === 'logline' || 
+                             currentField === 'description' ||
+                             currentField === 'critic_quotes');
+                    } else if (currentField) {
+                        // Add to current field value
+                        if (line.trim() || inMultilineField) {
+                            currentValue.push(line);
+                        } else if (!inMultilineField && currentValue.length > 0) {
+                            // Empty line in non-multiline field might signal end
+                            const nextLine = i + 1 < lines.length ? lines[i + 1] : '';
+                            if (nextLine.match(/^[A-Za-z][A-Za-z\s]+?:/)) {
+                                // Next line is a new field, save current
+                                const value = currentValue.join('\n').trim();
+                                if (value && !value.toLowerCase().includes('[not provided]')) {
+                                    data[currentField] = value;
+                                }
+                                currentField = null;
+                                currentValue = [];
+                                inMultilineField = false;
+                            }
                         }
                     }
-                } else if (currentField && line) {
-                    // Continue accumulating value for current field
-                    currentValue += (currentValue ? ' ' : '') + line;
-                } else if (currentField && !line && i + 1 < lines.length) {
-                    // Empty line - check if next line is a new field
-                    const nextLine = lines[i + 1].trim();
-                    if (nextLine.match(/^[A-Za-z\s]+:\s*/)) {
-                        // Next line is a new field, save current
-                        if (currentValue.trim()) {
-                            data[currentField] = currentValue.trim();
-                            currentField = null;
-                            currentValue = '';
-                        }
+                }
+                
+                // Save last field
+                if (currentField && currentValue.length > 0) {
+                    const value = currentValue.join('\n').trim();
+                    if (value && !value.toLowerCase().includes('[not provided]')) {
+                        data[currentField] = value;
                     }
                 }
             }
             
-            // Don't forget the last field
-            if (currentField && currentValue.trim()) {
-                data[currentField] = currentValue.trim();
-            }
+            // Clean up the data
+            Object.keys(data).forEach(key => {
+                if (typeof data[key] === 'string') {
+                    data[key] = data[key].trim();
+                    if (data[key] === '' || data[key].toLowerCase() === '[not provided]') {
+                        delete data[key];
+                    }
+                }
+            });
+            
+            console.log('Extracted data:', data);
+            return data;
+        }
             
             // If structured extraction didn't work well, fall back to pattern matching
             if (Object.keys(data).length < 2) {
