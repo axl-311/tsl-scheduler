@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Schedule Maker 2000 - v1.4</title>
+    <title>TSL Schedule Maker 2000 - v1.5</title>
     <meta name="description" content="Theater scheduling application for Time & Space Limited">
     <meta name="author" content="TSL">
     <style>
@@ -691,7 +691,7 @@
     <div class="app-container">
         <div class="header">
             <div>
-                <h1>TSL Schedule Maker 2000<span class="version-badge">v1.4</span></h1>
+                <h1>TSL Schedule Maker 2000<span class="version-badge">v1.5</span></h1>
             </div>
             <button id="authButton" class="auth-button">
                 Connect Google Calendar
@@ -860,10 +860,16 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     <script>
         /*
-         * TSL Schedule Maker 2000 - Version 1.4
+         * TSL Schedule Maker 2000 - Version 1.5
          * Theater scheduling application for Time & Space Limited
          * 
-         * NEW FIXES IN v1.4:
+         * NEW FIXES IN v1.5:
+         * - Aggressive description standardization - strips ALL existing formatting
+         * - Rebuilds descriptions from scratch for consistency
+         * - Special handling for LIT Rentals and non-movie events
+         * - Ensures uniform "Movie: Title / More info: URL" format
+         * 
+         * Features from v1.4:
          * - Prevent duplicate scheduling when dragging from library multiple times
          * - Update existing event instead of creating duplicates
          * - Better deduplication during push to Google Calendar
@@ -1151,7 +1157,7 @@
                 return false;
             });
             
-            console.log(`=== PUSH DEBUG INFO (v1.4) ===`);
+            console.log(`=== PUSH DEBUG INFO (v1.5) ===`);
             console.log(`Today: ${today.toDateString()}`);
             console.log(`Total scheduled events: ${scheduledEvents.length}`);
             console.log(`Unique events after deduplication: ${eventMap.size}`);
@@ -1238,23 +1244,50 @@
             const endDateTime = new Date(startDateTime);
             endDateTime.setMinutes(endDateTime.getMinutes() + scheduleEvent.duration);
             
-            // v1.3 STANDARDIZATION: Format descriptions consistently for movie events
+            // v1.5 AGGRESSIVE STANDARDIZATION: Strip ALL formatting and rebuild from scratch
             let standardizedDescription = '';
             
-            // Check if there's a timeandspace.org URL in the description
-            const urlMatch = (scheduleEvent.description || '').match(/https?:\/\/timeandspace\.org\/[^\s]*/);
+            // Strip out ALL existing formatting
+            let cleanDesc = (scheduleEvent.description || '')
+                .replace(/^Movie:\s*/gmi, '')  // Remove "Movie:" prefix
+                .replace(/^More info:\s*/gmi, '')  // Remove "More info:" prefix  
+                .replace(/^Scheduled via.*$/gmi, '')  // Remove old attributions
+                .replace(/^Created by.*$/gmi, '')  // Remove creator lines
+                .replace(/\n\s*\n/g, '\n')  // Remove empty lines
+                .trim();
             
-            if (urlMatch) {
-                // Standardize format for movie events with TSL URLs
-                standardizedDescription = `Movie: ${scheduleEvent.title}\nMore info: ${urlMatch[0]}`;
-                console.log(`📝 v1.3: Standardized description for ${scheduleEvent.title}`);
-            } else if (scheduleEvent.description) {
-                // Clean up existing descriptions but keep non-movie content
-                let cleanDescription = scheduleEvent.description;
-                cleanDescription = cleanDescription.replace(/^.*Scheduled via.*$/gmi, '');
-                cleanDescription = cleanDescription.replace(/^.*Created by.*$/gmi, '');
-                cleanDescription = cleanDescription.replace(/\n\s*\n/g, '\n').trim();
-                standardizedDescription = cleanDescription;
+            // Handle theater events with special formatting
+            if (scheduleEvent.calendar === 'theater-1' || scheduleEvent.calendar === 'theater-2') {
+                // Try to extract URL from whatever's left
+                const urlMatch = cleanDesc.match(/(https?:\/\/)?timeandspace\.org\/[^\s]*/);
+                
+                if (urlMatch) {
+                    // Found a URL - use it
+                    const url = urlMatch[0].startsWith('http') ? urlMatch[0] : `https://${urlMatch[0]}`;
+                    standardizedDescription = `Movie: ${scheduleEvent.title}\nMore info: ${url}`;
+                    console.log(`📝 v1.5: Rebuilt description for ${scheduleEvent.title} with existing URL`);
+                } else if (scheduleEvent.title.toLowerCase().includes('rental')) {
+                    // Special handling for rentals - no "Movie:" prefix
+                    standardizedDescription = scheduleEvent.title;
+                    console.log(`📝 v1.5: Special handling for rental: ${scheduleEvent.title}`);
+                } else {
+                    // Build URL from title for movies without URLs
+                    const cleanTitle = scheduleEvent.title
+                        .replace(/\s*\+.*$/, '')  // Remove "+ Q&A" etc
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')  // Convert to URL slug
+                        .replace(/-+/g, '-')  // Remove multiple dashes
+                        .replace(/^-|-$/g, '');  // Remove leading/trailing dashes
+                    
+                    standardizedDescription = `Movie: ${scheduleEvent.title}\nMore info: https://timeandspace.org/${cleanTitle}/`;
+                    console.log(`📝 v1.5: Built new description for ${scheduleEvent.title} with generated URL`);
+                }
+            } else {
+                // Non-theater events keep cleaned description
+                standardizedDescription = cleanDesc;
+                if (standardizedDescription) {
+                    console.log(`📝 v1.5: Cleaned description for non-theater event: ${scheduleEvent.title}`);
+                }
             }
             
             // Add the attribution
@@ -1281,7 +1314,7 @@
                         'tsl-original-calendar': scheduleEvent.originalCalendar || scheduleEvent.calendar,
                         'tsl-preserved-theater': scheduleEvent.preservedTheater !== undefined ? scheduleEvent.preservedTheater.toString() : '',
                         'tsl-created': new Date().toISOString(),
-                        'tsl-version': '1.4'
+                        'tsl-version': '1.5'
                     }
                 }
             };
@@ -1390,11 +1423,11 @@
             }
         }
 
-        // Save/Load Functionality - Updated for v1.4
+        // Save/Load Functionality - Updated for v1.5
         function saveSchedule() {
             try {
                 const scheduleData = {
-                    version: '1.4',
+                    version: '1.5',
                     savedAt: new Date().toISOString(),
                     currentWeekStart: currentWeekStart.toISOString(),
                     libraryEvents: libraryEvents,
@@ -1581,7 +1614,7 @@
             }
 
             isImporting = true;
-            console.log('=== STARTING CLEAN DATABASE REBUILD (v1.4) ===');
+            console.log('=== STARTING CLEAN DATABASE REBUILD (v1.5) ===');
 
             const syncStatus = document.getElementById('syncStatus');
             syncStatus.classList.add('syncing');
@@ -1689,7 +1722,7 @@
                     }
                 }
                 
-                console.log(`=== DATABASE REBUILD COMPLETE (v1.4) ===`);
+                console.log(`=== DATABASE REBUILD COMPLETE (v1.5) ===`);
                 console.log(`Final counts: libraryEvents=${libraryEvents.length}, scheduledEvents=${scheduledEvents.length}`);
                 
                 renderLibrary();
@@ -2351,9 +2384,9 @@
 
         // Application Initialization
         function init() {
-            console.log('Initializing TSL Schedule Maker 2000 v1.4...');
+            console.log('Initializing TSL Schedule Maker 2000 v1.5...');
             console.log('✨ Library sync fix applied - invalid Google Event IDs will be cleared');
-            console.log('📝 Description standardization enabled - all movie events will have consistent formatting');
+            console.log('📝 Aggressive description standardization - rebuilds all descriptions from scratch');
             console.log('🔄 Deduplication enabled - prevents duplicate scheduling');
             
             generateDaysColumns();
@@ -2427,7 +2460,7 @@
             }, 1000);
             
             renderLibrary();
-            console.log('TSL Schedule Maker 2000 v1.4 initialized successfully');
+            console.log('TSL Schedule Maker 2000 v1.5 initialized successfully');
         }
 
         // Start the application
