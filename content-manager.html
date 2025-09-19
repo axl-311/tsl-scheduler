@@ -1172,6 +1172,28 @@
                     }
                 }
                 
+                // If clicking Add New while editing, clear edit state and start fresh
+                if ((tab === 'importer' || tab === 'add-new') && currentEditingItem) {
+                    currentEditingItem = null;
+                    const indicator = document.getElementById('editingIndicator');
+                    if (indicator) indicator.classList.remove('active');
+                    const saveBtn = document.getElementById('saveBtn');
+                    if (saveBtn) saveBtn.removeAttribute('data-editing-id');
+                    const deleteBtn = document.getElementById('deleteBtn');
+                    if (deleteBtn) {
+                        deleteBtn.classList.add('hidden');
+                        deleteBtn.removeAttribute('data-delete-id');
+                        deleteBtn.removeAttribute('data-delete-type');
+                    }
+                    
+                    // Clear the form and regenerate
+                    clearDynamicForm();
+                    
+                    // Reset form titles
+                    document.getElementById('formTitle').textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
+                    document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
+                }
+                
                 // Update tab styles
                 document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
                 if (element) element.classList.add('active');
@@ -1192,9 +1214,7 @@
                     const importerTab = document.getElementById('importer-tab');
                     importerTab.classList.add('active');
                     importerTab.style.display = 'block';
-                    if (!currentEditingItem) {
-                        await generateDynamicForm();
-                    }
+                    await generateDynamicForm();
                 }
             } catch (error) {
                 console.error('Error switching tabs:', error);
