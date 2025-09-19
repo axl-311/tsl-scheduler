@@ -933,7 +933,24 @@
 
         function isValidGoogleEventId(eventId) {
             if (!eventId) return false;
-            return /^[a-z]/i.test(eventId);
+            
+            // Valid Google Calendar event IDs are typically 26+ characters
+            // and contain only alphanumeric characters (can start with numbers!)
+            // They should NOT look like our internal IDs which have prefixes like "scheduled-" or "custom-"
+            
+            // Check if it's one of our internal ID formats (not a Google ID)
+            if (eventId.startsWith('scheduled-') || 
+                eventId.startsWith('custom-') || 
+                eventId.startsWith('existing-') ||
+                eventId.startsWith('movie-') ||
+                eventId.startsWith('event-') ||
+                eventId.startsWith('gallery-')) {
+                return false;
+            }
+            
+            // Google IDs are typically 26+ chars of alphanumeric (no dashes except possibly in specific positions)
+            // and don't have our prefixes
+            return eventId.length >= 20 && /^[a-z0-9]+$/i.test(eventId);
         }
 
         function convertToTheaterHour(actualHour) {
@@ -1100,6 +1117,7 @@
             const eventMap = new Map();
             scheduledEvents.forEach(event => {
                 if (event.actualDate) {
+                    // Create unique key including theater position
                     const key = `${event.title}-${event.actualDate.toDateString()}-${event.theater}`;
                     
                     // Fix calendar assignment for theater events
@@ -1107,14 +1125,20 @@
                         event.calendar = event.theater === 0 ? 'theater-1' : 'theater-2';
                     }
                     
-                    // Keep the event with a valid Google ID if one exists
+                    // Debug Theater 1 events specifically
+                    if (event.theater === 0) {
+                        console.log(`Theater 1 Event: ${event.title} | GoogleID: ${event.googleEventId || 'NONE'} | Calendar: ${event.calendar}`);
+                    }
+                    
+                    // Only add if not already in map (prevent duplicates)
                     if (!eventMap.has(key)) {
                         eventMap.set(key, event);
                     } else {
+                        // If duplicate, prefer the one with a Google ID
                         const existing = eventMap.get(key);
-                        // Prefer the one with a valid Google ID
-                        if (event.googleEventId && !existing.googleEventId) {
+                        if (!existing.googleEventId && event.googleEventId) {
                             eventMap.set(key, event);
+                            console.log(`Replaced duplicate with version that has Google ID: ${event.title}`);
                         }
                     }
                 }
@@ -1618,10 +1642,13 @@
                     }
                 }
                 
-                // Convert unique events to scheduled events
+                        // Convert unique events to scheduled events
                 allEvents.forEach(event => {
                     const scheduledEvent = convertToScheduledEvent(event);
                     if (scheduledEvent) {
+                        // Ensure Google ID is preserved
+                        scheduledEvent.googleEventId = event.googleEventId || event.id;
+                        console.log(`Imported: ${scheduledEvent.title} | Theater: ${scheduledEvent.theater} | Calendar: ${scheduledEvent.calendar} | GoogleID: ${scheduledEvent.googleEventId}`);
                         scheduledEvents.push(scheduledEvent);
                     }
                 });
@@ -2413,33 +2440,38 @@
                     
                     const originalIndex = scheduledEvents.findIndex(e => e.id == originalId);
                     if (originalIndex !== -1) {
+                        // PRESERVE THE GOOGLE ID when moving events!
+                        const originalGoogleId = scheduledEvents[originalIndex].googleEventId;
                         scheduledEvents.splice(originalIndex, 1);
+                        
+                        if (draggedItem && draggedItem.parentNode) {
+                            draggedItem.parentNode.removeChild(draggedItem);
+                        }
+                        
+                        // Determine calendar for moved events
+                        let targetCalendar = event.calendar;
+                        if (event.programType === 'movie' || event.calendar === 'theater' || 
+                            event.calendar === 'theater-1' || event.calendar === 'theater-2') {
+                            // Update theater calendar based on new lane
+                            targetCalendar = targetTheater === 0 ? 'theater-1' : 'theater-2';
+                        }
+                        
+                        scheduledEvent = {
+                            ...event,
+                            day: parseInt(this.dataset.day),
+                            theater: targetTheater,
+                            calendar: targetCalendar,
+                            startHour: actualHour,
+                            startMinute: minute,
+                            actualDate: scheduledDate,
+                            id: originalId,
+                            googleEventId: originalGoogleId || event.googleEventId // PRESERVE Google ID!
+                        };
+                        
+                        console.log(`Moved event: ${scheduledEvent.title} | Theater: ${targetTheater} | GoogleID: ${scheduledEvent.googleEventId || 'NONE'}`);
+                        
+                        scheduledEvents.push(scheduledEvent);
                     }
-                    
-                    if (draggedItem && draggedItem.parentNode) {
-                        draggedItem.parentNode.removeChild(draggedItem);
-                    }
-                    
-                    // Determine calendar for moved events
-                    let targetCalendar = event.calendar;
-                    if (event.programType === 'movie' || event.calendar === 'theater' || 
-                        event.calendar === 'theater-1' || event.calendar === 'theater-2') {
-                        // Update theater calendar based on new lane
-                        targetCalendar = targetTheater === 0 ? 'theater-1' : 'theater-2';
-                    }
-                    
-                    scheduledEvent = {
-                        ...event,
-                        day: parseInt(this.dataset.day),
-                        theater: targetTheater,
-                        calendar: targetCalendar, // Use the updated calendar
-                        startHour: actualHour,
-                        startMinute: minute,
-                        actualDate: scheduledDate,
-                        id: originalId
-                    };
-                    
-                    scheduledEvents.push(scheduledEvent);
                 }
                 
                 renderScheduledEvent(scheduledEvent);
