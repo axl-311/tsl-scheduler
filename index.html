@@ -2305,23 +2305,19 @@
                         id: originalId
                     };
                     
+                    // v1.7: Re-assign calendar when moving between lanes
+                    if (event.programType === 'movie') {
+                        // Movies update their calendar based on new lane
+                        scheduledEvent.calendar = targetTheater === 0 ? 'theater-1' : 'theater-2';
+                        console.log(`v1.7: Moved ${event.title} to ${scheduledEvent.calendar} calendar`);
+                    }
+                    // Events and galleries keep their calendar assignment (always 'events')
+                    
                     scheduledEvents.push(scheduledEvent);
                 }
                 
-                // Smart calendar assignment based on event type and theater
-                if (event.calendar === 'theater-1' || event.calendar === 'theater-2') {
-                    // Theater events go to the theater they're dropped on
-                    scheduledEvent.calendar = targetTheater === 0 ? 'theater-1' : 'theater-2';
-                } else if (event.calendar === 'tbd' && event.preservedTheater !== undefined) {
-                    // TBD events with preserved theater info - update to correct theater
-                    scheduledEvent.calendar = targetTheater === 0 ? 'theater-1' : 'theater-2';
-                    // Keep the TBD calendar but update preserved theater
-                    scheduledEvent.calendar = 'tbd';
-                    scheduledEvent.preservedTheater = targetTheater;
-                } else {
-                    // Non-theater events keep their calendar type
-                    scheduledEvent.calendar = event.calendar;
-                }
+                // Smart calendar assignment based on event type and theater - NO LONGER NEEDED
+                // v1.7 handles this automatically in drop handler based on programType
                 
                 renderScheduledEvent(scheduledEvent);
                 renderLibrary();
