@@ -832,25 +832,80 @@
             const url = 'https://tnnkfnattwpqqrydsyux.supabase.co';
             const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
             
+            console.log('Attempting to connect to Supabase...');
+            
             try {
                 supabase = window.supabase.createClient(url, key);
+                console.log('Supabase client created');
                 
-                // Test connection and load schemas
+                // Test connection with a simple query
+                const { data: testData, error: testError } = await supabase
+                    .from('movies')
+                    .select('count', { count: 'exact', head: true });
+                
+                if (testError) {
+                    console.error('Connection test error:', testError);
+                    
+                    // Try to provide more specific error messages
+                    if (testError.message.includes('relation') || testError.message.includes('does not exist')) {
+                        throw new Error('Tables not found. Please ensure movies, events, and galleries tables exist in Supabase.');
+                    } else if (testError.message.includes('JWT')) {
+                        throw new Error('Authentication error. Please check your Supabase anon key.');
+                    } else {
+                        throw testError;
+                    }
+                }
+                
+                console.log('Connection test successful');
+                
+                // Load schemas
                 await loadTableSchemas();
                 
                 const statusEl = document.getElementById('connectionStatus');
                 statusEl.classList.add('connected');
                 statusEl.innerHTML = '<span>✓</span><span>Connected</span>';
                 
+                console.log('Loading content...');
                 await loadContent();
                 await generateDynamicForm();
                 
+                console.log('Initialization complete');
+                
             } catch (error) {
-                console.error('Connection error:', error);
+                console.error('Connection error details:', error);
+                
                 const statusEl = document.getElementById('connectionStatus');
                 statusEl.classList.add('error');
                 statusEl.innerHTML = '<span>✗</span><span>Connection failed</span>';
-                showToast('Failed to connect to database');
+                
+                // Show more detailed error message
+                let errorMessage = 'Failed to connect to database';
+                if (error.message) {
+                    errorMessage += ': ' + error.message;
+                }
+                
+                showToast(errorMessage);
+                
+                // Show a helpful message in the form area
+                const formFields = document.getElementById('formFields');
+                if (formFields) {
+                    formFields.innerHTML = `
+                        <div class="empty-state" style="padding: 40px; background: #fff3cd; border-radius: 8px;">
+                            <h3 style="color: #856404; margin-bottom: 15px;">Connection Error</h3>
+                            <p style="color: #856404; margin-bottom: 10px;">${errorMessage}</p>
+                            <p style="color: #856404; font-size: 14px;">
+                                Please check:<br>
+                                1. Your Supabase project is active (not paused)<br>
+                                2. The tables (movies, events, galleries) exist<br>
+                                3. RLS (Row Level Security) is disabled or properly configured<br>
+                                4. Your internet connection is working
+                            </p>
+                            <button onclick="location.reload()" class="btn btn-primary" style="margin-top: 20px;">
+                                Retry Connection
+                            </button>
+                        </div>
+                    `;
+                }
             }
         }
 
