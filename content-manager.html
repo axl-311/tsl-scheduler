@@ -1509,37 +1509,7 @@
             console.log('Extracted data:', data);
             return data;
         }
-            
-            // If structured extraction didn't work well, fall back to pattern matching
-            if (Object.keys(data).length < 2) {
-                // Original pattern-based extraction as fallback
-                const titlePatterns = [
-                    /^([A-Z][A-Z\s&]+)$/m,
-                    /^"([^"]+)"$/m,
-                    /\*\*([^*]+)\*\*/
-                ];
                 
-                for (const pattern of titlePatterns) {
-                    const match = cleanedText.match(pattern);
-                    if (match) {
-                        let title = match[1] || match[0];
-                        if (title && title.length > 2 && title.length < 100) {
-                            data.title = title.trim();
-                            break;
-                        }
-                    }
-                }
-                
-                const directorMatch = cleanedText.match(/(?:Directed\s+by|Director)\s*:?\s*([A-Z][a-zA-Z\s]+?)(?:\n|$|\.)/i);
-                if (directorMatch) data.director = directorMatch[1].trim();
-                
-                const runtimeMatch = cleanedText.match(/(\d{2,3})\s*(?:minutes?|mins?)/i);
-                if (runtimeMatch) data.runtime_minutes = parseInt(runtimeMatch[1]);
-                
-                const yearMatch = cleanedText.match(/\b(20[0-2][0-9])\b/);
-                if (yearMatch) data.release_year = parseInt(yearMatch[1]);
-            }
-            
             // Clean up extracted data
             Object.keys(data).forEach(key => {
                 if (typeof data[key] === 'string') {
