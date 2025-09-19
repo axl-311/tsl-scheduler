@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Schedule Maker 2000 - v1.3</title>
+    <title>TSL Schedule Maker 2000 - v1.4</title>
     <meta name="description" content="Theater scheduling application for Time & Space Limited">
     <meta name="author" content="TSL">
     <style>
@@ -691,7 +691,7 @@
     <div class="app-container">
         <div class="header">
             <div>
-                <h1>TSL Schedule Maker 2000<span class="version-badge">v1.3</span></h1>
+                <h1>TSL Schedule Maker 2000<span class="version-badge">v1.4</span></h1>
             </div>
             <button id="authButton" class="auth-button">
                 Connect Google Calendar
@@ -860,10 +860,15 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     <script>
         /*
-         * TSL Schedule Maker 2000 - Version 1.3
+         * TSL Schedule Maker 2000 - Version 1.4
          * Theater scheduling application for Time & Space Limited
          * 
-         * NEW FIXES IN v1.3:
+         * NEW FIXES IN v1.4:
+         * - Prevent duplicate scheduling when dragging from library multiple times
+         * - Update existing event instead of creating duplicates
+         * - Better deduplication during push to Google Calendar
+         * 
+         * Features from v1.3:
          * - Standardized movie event descriptions for consistency
          * - All pushed events now have uniform "Movie: Title / More info: URL" format
          * 
@@ -1115,27 +1120,41 @@
             renderEventsForCurrentWeek();
         }
 
-        // Google Calendar Integration - FIXED to clear invalid IDs
+        // Google Calendar Integration - FIXED to clear invalid IDs and deduplicate
         async function pushToGoogle() {
             if (!accessToken) {
                 showToast('Please connect to Google Calendar first');
                 return;
             }
             
-            // Push all events from today forward (no week limitation)
+            // v1.4: Deduplicate events before pushing
+            const eventMap = new Map();
+            scheduledEvents.forEach(event => {
+                if (event.actualDate) {
+                    const key = `${event.title}-${event.actualDate.toDateString()}-${event.theater}`;
+                    if (!eventMap.has(key)) {
+                        eventMap.set(key, event);
+                    } else {
+                        console.log(`v1.4: Skipping duplicate: ${event.title} on ${event.actualDate.toDateString()}`);
+                    }
+                }
+            });
+            
+            // Push all unique events from today forward (no week limitation)
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
-            const eventsToFuture = scheduledEvents.filter(event => {
+            const eventsToFuture = Array.from(eventMap.values()).filter(event => {
                 if (event.actualDate) {
                     return event.actualDate >= today;
                 }
                 return false;
             });
             
-            console.log(`=== PUSH DEBUG INFO (v1.3) ===`);
+            console.log(`=== PUSH DEBUG INFO (v1.4) ===`);
             console.log(`Today: ${today.toDateString()}`);
             console.log(`Total scheduled events: ${scheduledEvents.length}`);
+            console.log(`Unique events after deduplication: ${eventMap.size}`);
             console.log(`Future events to push: ${eventsToFuture.length}`);
             eventsToFuture.forEach(event => {
                 console.log(`- ${event.title} on ${event.actualDate.toDateString()} in ${event.calendar}`);
@@ -1262,7 +1281,7 @@
                         'tsl-original-calendar': scheduleEvent.originalCalendar || scheduleEvent.calendar,
                         'tsl-preserved-theater': scheduleEvent.preservedTheater !== undefined ? scheduleEvent.preservedTheater.toString() : '',
                         'tsl-created': new Date().toISOString(),
-                        'tsl-version': '1.3'
+                        'tsl-version': '1.4'
                     }
                 }
             };
@@ -1371,11 +1390,11 @@
             }
         }
 
-        // Save/Load Functionality - Updated for v1.3
+        // Save/Load Functionality - Updated for v1.4
         function saveSchedule() {
             try {
                 const scheduleData = {
-                    version: '1.3',
+                    version: '1.4',
                     savedAt: new Date().toISOString(),
                     currentWeekStart: currentWeekStart.toISOString(),
                     libraryEvents: libraryEvents,
@@ -1562,7 +1581,7 @@
             }
 
             isImporting = true;
-            console.log('=== STARTING CLEAN DATABASE REBUILD (v1.3) ===');
+            console.log('=== STARTING CLEAN DATABASE REBUILD (v1.4) ===');
 
             const syncStatus = document.getElementById('syncStatus');
             syncStatus.classList.add('syncing');
@@ -1670,7 +1689,7 @@
                     }
                 }
                 
-                console.log(`=== DATABASE REBUILD COMPLETE (v1.3) ===`);
+                console.log(`=== DATABASE REBUILD COMPLETE (v1.4) ===`);
                 console.log(`Final counts: libraryEvents=${libraryEvents.length}, scheduledEvents=${scheduledEvents.length}`);
                 
                 renderLibrary();
@@ -2244,19 +2263,37 @@
                 const targetTheater = parseInt(this.dataset.theater);
                 
                 if (source === 'library') {
-                    scheduledEvent = {
-                        ...event,
-                        day: parseInt(this.dataset.day),
-                        theater: targetTheater,
-                        startHour: actualHour,
-                        startMinute: minute,
-                        actualDate: scheduledDate,
-                        id: `scheduled-${Date.now()}-${Math.random()}`,
-                        googleEventId: event.googleEventId,
-                        instanceOf: event.googleEventId || event.id
-                    };
+                    // v1.4 FIX: Check for existing scheduled instance of this event
+                    const existingIndex = scheduledEvents.findIndex(e => 
+                        e.title === event.title && 
+                        e.actualDate && 
+                        e.actualDate.toDateString() === scheduledDate.toDateString()
+                    );
                     
-                    scheduledEvents.push(scheduledEvent);
+                    if (existingIndex !== -1) {
+                        // Update existing event instead of creating duplicate
+                        console.log(`v1.4: Updating existing scheduled instance of ${event.title}`);
+                        scheduledEvents[existingIndex].theater = targetTheater;
+                        scheduledEvents[existingIndex].startHour = actualHour;
+                        scheduledEvents[existingIndex].startMinute = minute;
+                        scheduledEvents[existingIndex].day = parseInt(this.dataset.day);
+                        scheduledEvent = scheduledEvents[existingIndex];
+                    } else {
+                        // Create new scheduled event
+                        scheduledEvent = {
+                            ...event,
+                            day: parseInt(this.dataset.day),
+                            theater: targetTheater,
+                            startHour: actualHour,
+                            startMinute: minute,
+                            actualDate: scheduledDate,
+                            id: `scheduled-${Date.now()}-${Math.random()}`,
+                            googleEventId: event.googleEventId,
+                            instanceOf: event.googleEventId || event.id
+                        };
+                        
+                        scheduledEvents.push(scheduledEvent);
+                    }
                     
                 } else if (source === 'grid') {
                     const originalId = event.id;
@@ -2314,9 +2351,10 @@
 
         // Application Initialization
         function init() {
-            console.log('Initializing TSL Schedule Maker 2000 v1.3...');
+            console.log('Initializing TSL Schedule Maker 2000 v1.4...');
             console.log('✨ Library sync fix applied - invalid Google Event IDs will be cleared');
             console.log('📝 Description standardization enabled - all movie events will have consistent formatting');
+            console.log('🔄 Deduplication enabled - prevents duplicate scheduling');
             
             generateDaysColumns();
             updateWeekDisplay();
@@ -2389,7 +2427,7 @@
             }, 1000);
             
             renderLibrary();
-            console.log('TSL Schedule Maker 2000 v1.3 initialized successfully');
+            console.log('TSL Schedule Maker 2000 v1.4 initialized successfully');
         }
 
         // Start the application
