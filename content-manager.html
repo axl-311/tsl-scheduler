@@ -72,6 +72,65 @@
             color: #c62828;
         }
 
+        /* EDITING INDICATOR STYLES */
+        .editing-indicator {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            animation: slideDown 0.3s ease;
+        }
+
+        .editing-indicator.active {
+            display: flex;
+        }
+
+        .editing-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .editing-info .icon {
+            font-size: 20px;
+        }
+
+        .editing-title {
+            font-weight: 600;
+            color: #856404;
+        }
+
+        .cancel-edit-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .cancel-edit-btn:hover {
+            background: #5a6268;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .nav-tabs {
             background: white;
             border-radius: 12px;
@@ -606,7 +665,7 @@
     <div class="app-container">
         <div class="header">
             <div>
-                <h1>TSL Content Manager<span class="version-badge">v3.1 Fixed</span></h1>
+                <h1>TSL Content Manager<span class="version-badge">v4.0 Enhanced</span></h1>
             </div>
             <div class="sync-status" id="connectionStatus">
                 <span>○</span>
@@ -667,8 +726,20 @@
             </div>
         </div>
 
-        <!-- Importer Tab -->
+        <!-- Add New / Importer Tab -->
         <div id="importer-tab" class="tab-content">
+            <!-- Editing Indicator -->
+            <div class="editing-indicator" id="editingIndicator">
+                <div class="editing-info">
+                    <span class="icon">✏️</span>
+                    <div>
+                        <div class="editing-title">Currently Editing: <span id="editingItemTitle"></span></div>
+                        <div style="font-size: 12px; color: #856404;">Changes will update the existing item</div>
+                    </div>
+                </div>
+                <button class="cancel-edit-btn" onclick="cancelEdit()">Cancel Edit</button>
+            </div>
+            
             <div class="main-panel">
                 <div class="content-type-selector">
                     <div class="type-option active" onclick="selectContentType('movies', this)">Movie</div>
@@ -735,6 +806,7 @@
         let allContent = [];
         let tableSchemas = {};
         let titleFields = {};
+        let currentEditingItem = null; // Track currently editing item
 
         async function initSupabase() {
             const url = 'https://tnnkfnattwpqqrydsyux.supabase.co';
@@ -900,8 +972,14 @@
             schemaDetails.textContent = `${currentContentType} table has ${schema.length} columns: ${schema.join(', ')}`;
             schemaInfo.classList.remove('hidden');
             
-            document.getElementById('formTitle').textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
-            document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
+            // Update form title based on editing state
+            if (currentEditingItem) {
+                document.getElementById('formTitle').textContent = `Editing ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)}`;
+                document.getElementById('saveButtonText').textContent = `Update ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)}`;
+            } else {
+                document.getElementById('formTitle').textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
+                document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
+            }
             
             const formFields = document.getElementById('formFields');
             let fieldsHTML = '';
@@ -1002,6 +1080,11 @@
         }
 
         function switchTab(tab, element) {
+            // Clear editing state when switching tabs
+            if (tab === 'dashboard') {
+                cancelEdit();
+            }
+            
             document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             
@@ -1020,7 +1103,30 @@
             document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
             if (element) element.classList.add('active');
             
+            // Clear form when switching content types
+            clearDynamicForm();
+            cancelEdit();
+            
             await generateDynamicForm();
+        }
+
+        function cancelEdit() {
+            currentEditingItem = null;
+            
+            // Hide editing indicator
+            const indicator = document.getElementById('editingIndicator');
+            indicator.classList.remove('active');
+            
+            // Reset save button
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.removeAttribute('data-editing-id');
+            
+            // Clear form
+            clearDynamicForm();
+            
+            // Reset form titles
+            document.getElementById('formTitle').textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
+            document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
         }
 
         async function loadContent() {
@@ -1439,18 +1545,20 @@
                     const { error } = await supabase.from(currentContentType).update(data).eq('id', editingId);
                     if (error) throw error;
                     showToast('Updated successfully!');
-                    
-                    saveBtn.removeAttribute('data-editing-id');
-                    document.getElementById('formTitle').textContent = document.getElementById('formTitle').textContent.replace(' (Editing)', '');
-                    document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
                 } else {
                     const { error } = await supabase.from(currentContentType).insert([data]);
                     if (error) throw error;
                     showToast('Saved successfully!');
                 }
                 
+                // Clear everything after successful save
+                cancelEdit();
                 clearDynamicForm();
                 loadContent();
+                
+                // Hide extraction preview if visible
+                document.getElementById('extractionPreview').classList.add('hidden');
+                document.getElementById('rawTextViewer').classList.add('hidden');
                 
             } catch (error) {
                 console.error('Save error:', error);
@@ -1463,9 +1571,20 @@
                 const { data, error } = await supabase.from(type).select('*').eq('id', id).single();
                 if (error) throw error;
                 
+                // Store current editing item
+                currentEditingItem = data;
+                
                 switchTab('importer');
                 await selectContentType(type);
                 
+                // Show editing indicator
+                const indicator = document.getElementById('editingIndicator');
+                const titleField = titleFields[type];
+                const title = data[titleField] || 'Untitled';
+                document.getElementById('editingItemTitle').textContent = title;
+                indicator.classList.add('active');
+                
+                // Fill form with data
                 Object.entries(data).forEach(([column, value]) => {
                     const field = document.getElementById(column);
                     if (field && value !== null) {
@@ -1482,7 +1601,7 @@
                 
                 const saveBtn = document.getElementById('saveBtn');
                 saveBtn.setAttribute('data-editing-id', id);
-                document.getElementById('formTitle').textContent += ' (Editing)';
+                document.getElementById('formTitle').textContent = `Editing ${type.charAt(0).toUpperCase() + type.slice(1).slice(0, -1)}`;
                 document.getElementById('saveButtonText').textContent = `Update ${type.charAt(0).toUpperCase() + type.slice(1).slice(0, -1)}`;
                 
                 showToast('Loaded for editing');
@@ -1553,8 +1672,14 @@
                 }
             });
             
+            // Clear extraction preview
             document.getElementById('extractionPreview').classList.add('hidden');
             document.getElementById('rawTextViewer').classList.add('hidden');
+            document.getElementById('rawTextContent').textContent = '';
+            document.getElementById('extractedData').innerHTML = '';
+            
+            // Clear file input
+            document.getElementById('fileInput').value = '';
         }
 
         function showToast(message) {
