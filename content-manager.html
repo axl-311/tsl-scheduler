@@ -1079,22 +1079,38 @@
             }, 100);
         }
 
-        function switchTab(tab, element) {
-            // Clear editing state when switching tabs
-            if (tab === 'dashboard') {
-                cancelEdit();
-            }
-            
-            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
-            if (element) element.classList.add('active');
-            
-            if (tab === 'dashboard') {
-                document.getElementById('dashboard-tab').classList.add('active');
-                loadContent();
-            } else if (tab === 'importer') {
-                document.getElementById('importer-tab').classList.add('active');
+        async function switchTab(tab, element) {
+            try {
+                // Clear editing state when switching away from Add New tab
+                if (currentEditingItem && tab === 'dashboard') {
+                    cancelEdit();
+                }
+                
+                // Update tab styles
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                if (element) element.classList.add('active');
+                
+                // Switch to the appropriate tab
+                if (tab === 'dashboard') {
+                    document.getElementById('dashboard-tab').classList.add('active');
+                    await loadContent();
+                } else if (tab === 'importer' || tab === 'add-new') {
+                    document.getElementById('importer-tab').classList.add('active');
+                    // Only regenerate form if not currently editing
+                    if (!currentEditingItem) {
+                        await generateDynamicForm();
+                    }
+                }
+            } catch (error) {
+                console.error('Error switching tabs:', error);
+                // Still switch the tab even if there's an error
+                if (tab === 'dashboard') {
+                    document.getElementById('dashboard-tab').classList.add('active');
+                } else {
+                    document.getElementById('importer-tab').classList.add('active');
+                }
             }
         }
 
@@ -1115,18 +1131,27 @@
             
             // Hide editing indicator
             const indicator = document.getElementById('editingIndicator');
-            indicator.classList.remove('active');
+            if (indicator) {
+                indicator.classList.remove('active');
+            }
             
             // Reset save button
             const saveBtn = document.getElementById('saveBtn');
-            saveBtn.removeAttribute('data-editing-id');
+            if (saveBtn) {
+                saveBtn.removeAttribute('data-editing-id');
+            }
             
             // Clear form
             clearDynamicForm();
             
-            // Reset form titles
-            document.getElementById('formTitle').textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
-            document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
+            // Reset form titles based on current content type
+            const formTitle = document.getElementById('formTitle');
+            const saveButtonText = document.getElementById('saveButtonText');
+            
+            if (formTitle && saveButtonText) {
+                formTitle.textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
+                saveButtonText.textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
+            }
         }
 
         async function loadContent() {
@@ -1262,15 +1287,45 @@
             const cleanedText = fixSpacing(text);
             const data = {};
             
-            // First try structured field extraction (like "Title: The History of Sound")
+            // Split text into lines and process
             const lines = cleanedText.split('\n');
             let currentField = null;
             let currentValue = '';
             
+            // Enhanced field mapping to handle variations
+            const fieldMapping = {
+                'title': 'title',
+                'director': 'director',
+                'runtime minutes': 'runtime_minutes',
+                'runtime': 'runtime_minutes',
+                'release year': 'release_year',
+                'year': 'release_year',
+                'language': 'language',
+                'distributor': 'distributor',
+                'synopsis': 'synopsis',
+                'logline': 'logline',
+                'description': 'synopsis',
+                'event name': 'event_name',
+                'event type': 'event_type',
+                'presenter': 'presenter',
+                'duration minutes': 'duration_minutes',
+                'duration': 'duration_minutes',
+                'exhibition title': 'exhibition_title',
+                'artist': 'artist',
+                'art medium': 'art_medium',
+                'gallery space': 'gallery_space',
+                'critics quote': 'critic_quotes',  // Note: changed to match your schema
+                'critic quote': 'critic_quotes',
+                'critic quotes': 'critic_quotes',
+                'trailer url': 'trailer_url',
+                'poster url': 'poster_url',
+                'web graphics url': 'web_graphics_url'
+            };
+            
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
                 
-                // Check if this line contains a field label (with or without value)
+                // Check if this line is a field label
                 const fieldMatch = line.match(/^([A-Za-z\s]+):\s*(.*)$/);
                 
                 if (fieldMatch) {
@@ -1281,52 +1336,30 @@
                     
                     // Start new field
                     const fieldName = fieldMatch[1].toLowerCase().trim();
-                    currentValue = fieldMatch[2]; // This might be empty if value is on next line
-                    
-                    // Map field names to database columns
-                    const fieldMapping = {
-                        'title': 'title',
-                        'director': 'director',
-                        'runtime minutes': 'runtime_minutes',
-                        'runtime': 'runtime_minutes',
-                        'release year': 'release_year',
-                        'year': 'release_year',
-                        'language': 'language',
-                        'distributor': 'distributor',
-                        'synopsis': 'synopsis',
-                        'logline': 'logline',
-                        'description': 'synopsis',
-                        'event name': 'event_name',
-                        'event type': 'event_type',
-                        'presenter': 'presenter',
-                        'duration minutes': 'duration_minutes',
-                        'duration': 'duration_minutes',
-                        'exhibition title': 'exhibition_title',
-                        'artist': 'artist',
-                        'art medium': 'art_medium',
-                        'gallery space': 'gallery_space',
-                        'critics quote': 'critics_quote',
-                        'trailer url': 'trailer_url',
-                        'poster url': 'poster_url',
-                        'web graphics url': 'web_graphics_url'
-                    };
+                    currentValue = fieldMatch[2].trim(); // Get value from same line if exists
                     
                     currentField = fieldMapping[fieldName] || null;
+                    
+                    // If value is empty and next line doesn't look like a field, grab it
+                    if (!currentValue && i + 1 < lines.length) {
+                        const nextLine = lines[i + 1].trim();
+                        if (nextLine && !nextLine.match(/^[A-Za-z\s]+:\s*/)) {
+                            currentValue = nextLine;
+                            i++; // Skip the next line since we consumed it
+                        }
+                    }
                 } else if (currentField && line) {
                     // Continue accumulating value for current field
                     currentValue += (currentValue ? ' ' : '') + line;
-                } else if (currentField && !line) {
-                    // Empty line - we might be done with this field, but let's check next line
-                    // Look ahead to see if next line starts a new field
-                    if (i + 1 < lines.length) {
-                        const nextLine = lines[i + 1].trim();
-                        if (nextLine.match(/^[A-Za-z\s]+:\s*.*$/)) {
-                            // Next line is a new field, so save current one
-                            if (currentValue.trim()) {
-                                data[currentField] = currentValue.trim();
-                                currentField = null;
-                                currentValue = '';
-                            }
+                } else if (currentField && !line && i + 1 < lines.length) {
+                    // Empty line - check if next line is a new field
+                    const nextLine = lines[i + 1].trim();
+                    if (nextLine.match(/^[A-Za-z\s]+:\s*/)) {
+                        // Next line is a new field, save current
+                        if (currentValue.trim()) {
+                            data[currentField] = currentValue.trim();
+                            currentField = null;
+                            currentValue = '';
                         }
                     }
                 }
@@ -1448,10 +1481,25 @@
         }
 
         function fillDynamicForm(data) {
+            // Clear the form first
+            const formFields = document.querySelectorAll('#formFields input, #formFields textarea');
+            formFields.forEach(field => {
+                if (field.dataset.column !== undefined) {
+                    field.value = '';
+                }
+            });
+            
+            // Debug log to see what we're trying to fill
+            console.log('Attempting to fill form with data:', data);
+            
+            // Fill in the extracted data
             Object.entries(data).forEach(([key, value]) => {
                 const field = document.getElementById(key);
                 if (field && value) {
                     field.value = value;
+                    console.log(`Filled ${key} with value:`, value);
+                } else if (!field && value) {
+                    console.log(`Field not found for ${key}, attempted value:`, value);
                 }
             });
         }
