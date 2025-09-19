@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Schedule Maker 2000 - v1.2</title>
+    <title>TSL Schedule Maker 2000 - v1.3</title>
     <meta name="description" content="Theater scheduling application for Time & Space Limited">
     <meta name="author" content="TSL">
     <style>
@@ -691,7 +691,7 @@
     <div class="app-container">
         <div class="header">
             <div>
-                <h1>TSL Schedule Maker 2000<span class="version-badge">v1.2</span></h1>
+                <h1>TSL Schedule Maker 2000<span class="version-badge">v1.3</span></h1>
             </div>
             <button id="authButton" class="auth-button">
                 Connect Google Calendar
@@ -860,10 +860,14 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     <script>
         /*
-         * TSL Schedule Maker 2000 - Version 1.2
+         * TSL Schedule Maker 2000 - Version 1.3
          * Theater scheduling application for Time & Space Limited
          * 
-         * NEW FIXES IN v1.2:
+         * NEW FIXES IN v1.3:
+         * - Standardized movie event descriptions for consistency
+         * - All pushed events now have uniform "Movie: Title / More info: URL" format
+         * 
+         * Features from v1.2:
          * - Fixed library-dragged events not syncing to Google Calendar
          * - Clear invalid Google Event IDs from library events before push
          * - Better detection of fake IDs vs real Google Calendar IDs
@@ -1129,7 +1133,7 @@
                 return false;
             });
             
-            console.log(`=== PUSH DEBUG INFO (v1.2) ===`);
+            console.log(`=== PUSH DEBUG INFO (v1.3) ===`);
             console.log(`Today: ${today.toDateString()}`);
             console.log(`Total scheduled events: ${scheduledEvents.length}`);
             console.log(`Future events to push: ${eventsToFuture.length}`);
@@ -1215,14 +1219,28 @@
             const endDateTime = new Date(startDateTime);
             endDateTime.setMinutes(endDateTime.getMinutes() + scheduleEvent.duration);
             
-            // Clean up description - remove attribution lines but preserve URLs and other content
-            let cleanDescription = scheduleEvent.description || '';
-            cleanDescription = cleanDescription.replace(/^.*Scheduled via.*$/gmi, '');
-            cleanDescription = cleanDescription.replace(/^.*Created by.*$/gmi, '');
-            cleanDescription = cleanDescription.replace(/\n\s*\n/g, '\n').trim();
+            // v1.3 STANDARDIZATION: Format descriptions consistently for movie events
+            let standardizedDescription = '';
             
-            const finalDescription = cleanDescription ? 
-                `${cleanDescription}\n\nScheduled via TSL Schedule Maker 2000` : 
+            // Check if there's a timeandspace.org URL in the description
+            const urlMatch = (scheduleEvent.description || '').match(/https?:\/\/timeandspace\.org\/[^\s]*/);
+            
+            if (urlMatch) {
+                // Standardize format for movie events with TSL URLs
+                standardizedDescription = `Movie: ${scheduleEvent.title}\nMore info: ${urlMatch[0]}`;
+                console.log(`📝 v1.3: Standardized description for ${scheduleEvent.title}`);
+            } else if (scheduleEvent.description) {
+                // Clean up existing descriptions but keep non-movie content
+                let cleanDescription = scheduleEvent.description;
+                cleanDescription = cleanDescription.replace(/^.*Scheduled via.*$/gmi, '');
+                cleanDescription = cleanDescription.replace(/^.*Created by.*$/gmi, '');
+                cleanDescription = cleanDescription.replace(/\n\s*\n/g, '\n').trim();
+                standardizedDescription = cleanDescription;
+            }
+            
+            // Add the attribution
+            const finalDescription = standardizedDescription ? 
+                `${standardizedDescription}\n\nScheduled via TSL Schedule Maker 2000` : 
                 'Scheduled via TSL Schedule Maker 2000';
             
             const eventData = {
@@ -1244,7 +1262,7 @@
                         'tsl-original-calendar': scheduleEvent.originalCalendar || scheduleEvent.calendar,
                         'tsl-preserved-theater': scheduleEvent.preservedTheater !== undefined ? scheduleEvent.preservedTheater.toString() : '',
                         'tsl-created': new Date().toISOString(),
-                        'tsl-version': '1.2'
+                        'tsl-version': '1.3'
                     }
                 }
             };
@@ -1353,11 +1371,11 @@
             }
         }
 
-        // Save/Load Functionality - Updated for v1.2
+        // Save/Load Functionality - Updated for v1.3
         function saveSchedule() {
             try {
                 const scheduleData = {
-                    version: '1.2',
+                    version: '1.3',
                     savedAt: new Date().toISOString(),
                     currentWeekStart: currentWeekStart.toISOString(),
                     libraryEvents: libraryEvents,
@@ -1544,7 +1562,7 @@
             }
 
             isImporting = true;
-            console.log('=== STARTING CLEAN DATABASE REBUILD (v1.2) ===');
+            console.log('=== STARTING CLEAN DATABASE REBUILD (v1.3) ===');
 
             const syncStatus = document.getElementById('syncStatus');
             syncStatus.classList.add('syncing');
@@ -1652,7 +1670,7 @@
                     }
                 }
                 
-                console.log(`=== DATABASE REBUILD COMPLETE (v1.2) ===`);
+                console.log(`=== DATABASE REBUILD COMPLETE (v1.3) ===`);
                 console.log(`Final counts: libraryEvents=${libraryEvents.length}, scheduledEvents=${scheduledEvents.length}`);
                 
                 renderLibrary();
@@ -2296,8 +2314,9 @@
 
         // Application Initialization
         function init() {
-            console.log('Initializing TSL Schedule Maker 2000 v1.2...');
+            console.log('Initializing TSL Schedule Maker 2000 v1.3...');
             console.log('✨ Library sync fix applied - invalid Google Event IDs will be cleared');
+            console.log('📝 Description standardization enabled - all movie events will have consistent formatting');
             
             generateDaysColumns();
             updateWeekDisplay();
@@ -2370,7 +2389,7 @@
             }, 1000);
             
             renderLibrary();
-            console.log('TSL Schedule Maker 2000 v1.2 initialized successfully');
+            console.log('TSL Schedule Maker 2000 v1.3 initialized successfully');
         }
 
         // Start the application
