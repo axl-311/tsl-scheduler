@@ -152,6 +152,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            position: relative;
         }
 
         .nav-tab:hover {
@@ -162,6 +163,16 @@
             background: #007aff;
             color: white;
         }
+        
+        /* Dropdown menu for Add New */
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 5px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15
 
         .tab-content {
             display: none;
@@ -802,9 +813,15 @@
                     </div>
                 </div>
                 
-                <button onclick="saveContent()" id="saveBtn" class="btn btn-success" style="width: 100%; margin-top: 20px; padding: 12px;">
-                    <span id="saveButtonText">Save to Database</span>
-                </button>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button onclick="saveContent()" id="saveBtn" class="btn btn-success" style="flex: 1; padding: 12px;">
+                        <span id="saveButtonText">Save to Database</span>
+                    </button>
+                    
+                    <button onclick="cancelAndReturnToDashboard()" class="btn btn-secondary" style="flex: 1; padding: 12px;">
+                        Cancel & Return to Dashboard
+                    </button>
+                </div>
                 
                 <button onclick="deleteCurrentItem()" id="deleteBtn" class="btn btn-danger hidden" style="width: 100%; margin-top: 10px; padding: 12px;">
                     Delete This Item
@@ -1140,8 +1157,25 @@
             document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
             if (element) element.classList.add('active');
             
+            // Clear form but DON'T switch tabs - stay in Add New
             clearDynamicForm();
-            cancelEdit();
+            
+            // Cancel any editing state
+            currentEditingItem = null;
+            const indicator = document.getElementById('editingIndicator');
+            if (indicator) {
+                indicator.classList.remove('active');
+            }
+            
+            const saveBtn = document.getElementById('saveBtn');
+            if (saveBtn) {
+                saveBtn.removeAttribute('data-editing-id');
+            }
+            
+            const deleteBtn = document.getElementById('deleteBtn');
+            if (deleteBtn) {
+                deleteBtn.classList.add('hidden');
+            }
             
             await generateDynamicForm();
         }
@@ -1177,8 +1211,21 @@
                 saveButtonText.textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
             }
             
-            // Return to Dashboard after canceling edit
-            switchTab('dashboard', document.querySelector('.nav-tab:first-child'));
+            // Stay in Add New mode after canceling edit
+            // User can click "Cancel & Return to Dashboard" if they want to leave
+        }
+        
+        async function cancelAndReturnToDashboard() {
+            // Clear any editing state
+            if (currentEditingItem) {
+                cancelEdit();
+            }
+            
+            // Clear the form
+            clearDynamicForm();
+            
+            // Return to Dashboard
+            await switchTab('dashboard', document.querySelector('.nav-tab:first-child'));
         }
 
         async function loadContent() {
@@ -1552,21 +1599,32 @@
                     const { error } = await supabase.from(currentContentType).update(data).eq('id', editingId);
                     if (error) throw error;
                     showToast('Updated successfully!');
+                    
+                    // After update, clear editing state
+                    currentEditingItem = null;
+                    saveBtn.removeAttribute('data-editing-id');
+                    const indicator = document.getElementById('editingIndicator');
+                    if (indicator) indicator.classList.remove('active');
+                    const deleteBtn = document.getElementById('deleteBtn');
+                    if (deleteBtn) deleteBtn.classList.add('hidden');
                 } else {
                     const { error } = await supabase.from(currentContentType).insert([data]);
                     if (error) throw error;
-                    showToast('Saved successfully!');
+                    showToast('Saved successfully! Ready to add another.');
                 }
                 
-                // Clear everything
-                cancelEdit();
+                // Clear form but STAY in Add New mode
                 clearDynamicForm();
+                loadContent(); // Update stats
+                
+                // Reset form titles for new entry
+                document.getElementById('formTitle').textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
+                document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
                 
                 document.getElementById('extractionPreview').classList.add('hidden');
                 document.getElementById('rawTextViewer').classList.add('hidden');
                 
-                // Return to Dashboard to see the saved content
-                await switchTab('dashboard', document.querySelector('.nav-tab:first-child'));
+                // Stay in Add New tab - ready for next entry
                 
             } catch (error) {
                 console.error('Save error:', error);
