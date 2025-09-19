@@ -1494,6 +1494,14 @@
             syncStatus.innerHTML = '<span>↻</span><span>Loading events from Google Calendar...</span>';
             
             try {
+                // Clear existing scheduled events first to prevent duplicates
+                scheduledEvents = [];
+                document.querySelectorAll('.event-block').forEach(block => {
+                    if (block.parentNode) {
+                        block.parentNode.removeChild(block);
+                    }
+                });
+                
                 // Calculate date range - get 3 months ahead
                 const startDate = new Date();
                 startDate.setHours(0, 0, 0, 0);
@@ -1506,6 +1514,7 @@
                 const timeMax = endDate.toISOString();
                 
                 let allEvents = [];
+                const eventMap = new Map(); // Use map to prevent duplicates
                 
                 // Fetch from all calendars
                 for (const [calendarType, calendarId] of Object.entries(CALENDAR_IDS)) {
@@ -1533,19 +1542,26 @@
                                         const endDateTime = new Date(event.end.dateTime);
                                         const duration = Math.round((endDateTime - startDateTime) / 60000);
                                         
+                                        // Create unique key to prevent duplicates
+                                        const eventKey = `${event.summary}-${startDateTime.toISOString()}`;
+                                        
+                                        // Skip if we already have this event
+                                        if (eventMap.has(eventKey)) {
+                                            console.log(`Skipping duplicate: ${event.summary}`);
+                                            return;
+                                        }
+                                        
                                         // Parse webpage URL from description if present
                                         let webpageUrl = '';
                                         let supabaseId = '';
                                         let supabaseTable = '';
                                         
                                         if (event.description) {
-                                            // Look for URL in description
                                             const urlMatch = event.description.match(/(https?:\/\/timeandspace\.org[^\s\n]*)/);
                                             if (urlMatch) {
                                                 webpageUrl = urlMatch[1];
                                             }
                                             
-                                            // Look for Supabase reference
                                             const supabaseMatch = event.description.match(/(movies|events|galleries):([a-f0-9-]+)/);
                                             if (supabaseMatch) {
                                                 supabaseTable = supabaseMatch[1];
@@ -1553,7 +1569,7 @@
                                             }
                                         }
                                         
-                                        allEvents.push({
+                                        const eventData = {
                                             id: event.id,
                                             googleEventId: event.id,
                                             title: event.summary || 'Untitled Event',
@@ -1568,19 +1584,21 @@
                                             supabaseId: supabaseId,
                                             supabaseTable: supabaseTable,
                                             isAllDay: false
-                                        });
+                                        };
+                                        
+                                        eventMap.set(eventKey, eventData);
+                                        allEvents.push(eventData);
                                     }
                                 });
                             }
+                            console.log(`Loaded ${data?.items?.length || 0} events from ${calendarType}`);
                         }
-                        console.log(`Loaded ${data?.items?.length || 0} events from ${calendarType}`);
                     } catch (error) {
                         console.error(`Error fetching from ${calendarType}:`, error);
                     }
                 }
                 
-                // Process and add to scheduled events
-                scheduledEvents = [];
+                // Convert unique events to scheduled events
                 allEvents.forEach(event => {
                     const scheduledEvent = convertToScheduledEvent(event);
                     if (scheduledEvent) {
@@ -1589,11 +1607,12 @@
                 });
                 
                 console.log(`=== GOOGLE CALENDAR IMPORT COMPLETE ===`);
-                console.log(`Total events imported: ${scheduledEvents.length}`);
+                console.log(`Total unique events imported: ${scheduledEvents.length}`);
                 
                 renderEventsForCurrentWeek();
                 updateWeekStats();
                 updateDebugCounts();
+                renderLibrary(); // Also update library
                 
                 syncStatus.classList.remove('syncing');
                 syncStatus.classList.add('connected');
