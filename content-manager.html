@@ -990,6 +990,23 @@
                 .join(' ');
         }
 
+        function generateUrlSlug(text) {
+            return text
+                .toLowerCase()
+                .replace(/[^\w\s-]/g, '') // Remove special characters
+                .replace(/\s+/g, '-') // Replace spaces with hyphens
+                .replace(/--+/g, '-') // Replace multiple hyphens with single hyphen
+                .replace(/^-+/, '') // Remove starting hyphen
+                .replace(/-+$/, ''); // Remove ending hyphen
+        }
+
+        function generateWebpageUrl(contentType, title) {
+            const baseUrl = 'https://timeandspace.org'; // Your actual domain
+            const slug = generateUrlSlug(title);
+            const typeSegment = contentType.slice(0, -1); // Remove 's' from 'movies' -> 'movie'
+            return `${baseUrl}/${contentType}/${slug}`;
+        }
+
         async function generateDynamicForm() {
             const schema = tableSchemas[currentContentType];
             if (!schema) {
@@ -1101,7 +1118,33 @@
             
             formFields.innerHTML = fieldsHTML;
             
+            // Add auto-generation listener for webpage_url
             setTimeout(() => {
+                const titleField = titleFields[currentContentType];
+                const titleInput = document.getElementById(titleField);
+                const webpageUrlInput = document.getElementById('webpage_url');
+                
+                if (titleInput && webpageUrlInput) {
+                    titleInput.addEventListener('input', function() {
+                        // Only auto-generate if the URL field is empty or was previously auto-generated
+                        if (!webpageUrlInput.dataset.manuallyEdited) {
+                            webpageUrlInput.value = generateWebpageUrl(currentContentType, titleInput.value);
+                        }
+                    });
+                    
+                    // Mark as manually edited if user types in the URL field
+                    webpageUrlInput.addEventListener('input', function() {
+                        this.dataset.manuallyEdited = 'true';
+                    });
+                    
+                    // Clear manual edit flag when form is cleared
+                    webpageUrlInput.addEventListener('change', function() {
+                        if (!this.value) {
+                            delete this.dataset.manuallyEdited;
+                        }
+                    });
+                }
+                
                 const imageInputs = document.querySelectorAll('[id$="Input"]');
                 imageInputs.forEach(input => {
                     const column = input.id.replace('Input', '');
@@ -1626,6 +1669,19 @@
             if (titleField && !data[titleField]) {
                 showToast(`Please enter a ${formatFieldLabel(titleField)}`);
                 return;
+            }
+            
+            // Auto-generate webpage_url if the field exists in schema and has a title
+            if (schema.includes('webpage_url') && titleField && data[titleField]) {
+                // Only auto-generate if the field is empty or not manually edited
+                if (!data.webpage_url) {
+                    data.webpage_url = generateWebpageUrl(currentContentType, data[titleField]);
+                    // Update the form field to show the generated URL
+                    const urlField = document.getElementById('webpage_url');
+                    if (urlField) {
+                        urlField.value = data.webpage_url;
+                    }
+                }
             }
             
             try {
