@@ -749,7 +749,10 @@
                     </select>
                 </div>
                 <div id="libraryItems"></div>
-                <button class="import-button" id="importFromSupabase" style="width: 100%; margin-top: 15px;">
+                <button class="import-button" id="importFromGoogle" style="width: 100%; margin-top: 15px;">
+                    Import from Google Calendar
+                </button>
+                <button class="import-button" id="importFromSupabase" style="width: 100%; margin-top: 10px;">
                     Import from Database
                 </button>
                 <button class="add-event-button" id="addEventButton" style="width: 100%; margin-top: 10px;">
@@ -1607,26 +1610,45 @@
         }
 
         function convertToScheduledEvent(eventData) {
-            if (!eventData.startTime || !eventData.startTime.dateTime) {
+            if (!eventData.startTime || !(eventData.startTime instanceof Date)) {
                 return null;
             }
             
-            const startDate = new Date(eventData.startTime.dateTime);
+            const startDate = new Date(eventData.startTime);
             const eventDate = new Date(startDate);
             eventDate.setHours(0, 0, 0, 0);
             
+            // Determine theater from calendar or extended properties
             let theater = 0;
             if (eventData.calendar === 'theater-2') {
                 theater = 1;
+            } else if (eventData.calendar === 'theater-1') {
+                theater = 0;
+            } else if (eventData.location) {
+                // Check location for theater info
+                if (eventData.location.toLowerCase().includes('theater 2')) {
+                    theater = 1;
+                }
             }
+            
+            // Check extended properties if available
+            if (eventData.extendedProperties && eventData.extendedProperties.private) {
+                const tslTheater = eventData.extendedProperties.private['tsl-theater'];
+                if (tslTheater !== undefined) {
+                    theater = parseInt(tslTheater);
+                }
+            }
+            
+            const dayOfWeek = calculateDayOfWeek(eventDate);
             
             return {
                 ...eventData,
                 actualDate: eventDate,
+                day: dayOfWeek,
                 theater: theater,
                 startHour: startDate.getHours(),
                 startMinute: startDate.getMinutes(),
-                id: `existing-${eventData.googleEventId || Date.now()}`
+                id: eventData.id || `existing-${eventData.googleEventId || Date.now()}`
             };
         }
 
@@ -2388,6 +2410,7 @@
             document.getElementById('prevWeek').onclick = () => changeWeek(-1);
             document.getElementById('nextWeek').onclick = () => changeWeek(1);
             document.getElementById('collapseToggle').onclick = toggleCollapse;
+            document.getElementById('importFromGoogle').onclick = importFromGoogleCalendar;
             document.getElementById('importFromSupabase').onclick = importFromSupabase;
             document.getElementById('addEventButton').onclick = openAddEventModal;
             document.getElementById('calendarFilter').onchange = renderLibrary;
