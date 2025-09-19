@@ -1934,7 +1934,15 @@
             if (!lane) return;
             
             const eventBlock = document.createElement('div');
-            eventBlock.className = `event-block calendar-${event.calendar}`;
+            
+            // Fix calendar class for theater events
+            let calendarClass = event.calendar;
+            if (event.calendar === 'theater' || event.programType === 'movie') {
+                // Use specific theater calendar based on lane
+                calendarClass = event.theater === 0 ? 'theater-1' : 'theater-2';
+            }
+            
+            eventBlock.className = `event-block calendar-${calendarClass}`;
             eventBlock.draggable = true;
             eventBlock.dataset.eventId = event.id;
             
@@ -2341,7 +2349,8 @@
                     const existingIndex = scheduledEvents.findIndex(e => 
                         e.title === event.title && 
                         e.actualDate && 
-                        e.actualDate.toDateString() === scheduledDate.toDateString()
+                        e.actualDate.toDateString() === scheduledDate.toDateString() &&
+                        e.theater === targetTheater
                     );
                     
                     if (existingIndex !== -1) {
@@ -2351,15 +2360,23 @@
                         scheduledEvents[existingIndex].day = parseInt(this.dataset.day);
                         scheduledEvent = scheduledEvents[existingIndex];
                     } else {
+                        // Determine the correct calendar based on type and theater lane
+                        let targetCalendar = event.calendar;
+                        if (event.programType === 'movie' || event.calendar === 'theater') {
+                            // Movies go to specific theater calendars
+                            targetCalendar = targetTheater === 0 ? 'theater-1' : 'theater-2';
+                        }
+                        
                         scheduledEvent = {
                             ...event,
                             day: parseInt(this.dataset.day),
                             theater: targetTheater,
+                            calendar: targetCalendar, // Use the specific theater calendar
                             startHour: actualHour,
                             startMinute: minute,
                             actualDate: scheduledDate,
                             id: `scheduled-${Date.now()}-${Math.random()}`,
-                            googleEventId: event.googleEventId,
+                            googleEventId: null, // Clear any invalid ID
                             instanceOf: event.googleEventId || event.id,
                             // v1.8: Preserve webpage URL
                             webpageUrl: event.webpageUrl,
@@ -2383,19 +2400,24 @@
                         draggedItem.parentNode.removeChild(draggedItem);
                     }
                     
+                    // Determine calendar for moved events
+                    let targetCalendar = event.calendar;
+                    if (event.programType === 'movie' || event.calendar === 'theater' || 
+                        event.calendar === 'theater-1' || event.calendar === 'theater-2') {
+                        // Update theater calendar based on new lane
+                        targetCalendar = targetTheater === 0 ? 'theater-1' : 'theater-2';
+                    }
+                    
                     scheduledEvent = {
                         ...event,
                         day: parseInt(this.dataset.day),
                         theater: targetTheater,
+                        calendar: targetCalendar, // Use the updated calendar
                         startHour: actualHour,
                         startMinute: minute,
                         actualDate: scheduledDate,
                         id: originalId
                     };
-                    
-                    if (event.programType === 'movie') {
-                        scheduledEvent.calendar = targetTheater === 0 ? 'theater-1' : 'theater-2';
-                    }
                     
                     scheduledEvents.push(scheduledEvent);
                 }
