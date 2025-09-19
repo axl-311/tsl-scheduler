@@ -877,27 +877,75 @@
                 
                 for (const table of tables) {
                     try {
-                        // Simple approach: try to get sample data, fallback to default if empty
-                        const { data, error } = await supabase.from(table).select('*').limit(1);
+                        console.log(`Detecting schema for ${table}...`);
                         
-                        if (!error && data && data.length > 0) {
-                            schemas[table] = Object.keys(data[0]);
-                        } else if (!error && data && data.length === 0) {
-                            // Table exists but empty - use your actual schema for events
-                            if (table === 'events') {
-                                schemas[table] = ['id', 'event_name', 'presented_by', 'duration_minutes', 'description', 'critic_quotes', 'simpletix_embed_code', 'content_type', 'created_at', 'updated_at', 'poster_url', 'web_graphics_url', 'webpage_url'];
-                            } else {
-                                schemas[table] = getDefaultSchema(table);
-                            }
+                        // Method 1: Try to get schema from actual data (fastest when data exists)
+                        const { data: sampleData, error: sampleError } = await supabase
+                            .from(table)
+                            .select('*')
+                            .limit(1)
+                            .maybeSingle();
+                        
+                        if (!sampleError && sampleData) {
+                            schemas[table] = Object.keys(sampleData);
+                            console.log(`✓ Schema from sample data for ${table}:`, schemas[table]);
                         } else {
-                            console.warn(`Table ${table} not accessible:`, error);
-                            schemas[table] = getDefaultSchema(table);
+                            console.log(`${table} is empty or inaccessible, querying schema directly...`);
+                            
+                            // Method 2: Query PostgreSQL information_schema for empty tables
+                            const { data: schemaData, error: schemaError } = await supabase
+                                .rpc('sql', {
+                                    query: `
+                                        SELECT column_name 
+                                        FROM information_schema.columns 
+                                        WHERE table_name = '${table}' 
+                                        AND table_schema = 'public' 
+                                        ORDER BY ordinal_position
+                                    `
+                                });
+                            
+                            if (!schemaError && schemaData && schemaData.length > 0) {
+                                schemas[table] = schemaData.map(row => row.column_name);
+                                console.log(`✓ Schema from information_schema for ${table}:`, schemas[table]);
+                            } else {
+                                console.log(`Information schema failed for ${table}, trying direct column query...`);
+                                
+                                // Method 3: Try a different PostgreSQL query approach
+                                const { data: colData, error: colError } = await supabase
+                                    .from('information_schema.columns')
+                                    .select('column_name')
+                                    .eq('table_name', table)
+                                    .eq('table_schema', 'public')
+                                    .order('ordinal_position');
+                                
+                                if (!colError && colData && colData.length > 0) {
+                                    schemas[table] = colData.map(col => col.column_name);
+                                    console.log(`✓ Schema from direct column query for ${table}:`, schemas[table]);
+                                } else {
+                                    console.log(`All schema detection methods failed for ${table}`);
+                                    
+                                    // Method 4: Try empty insert to trigger constraint error (reveals column names)
+                                    const { error: insertError } = await supabase
+                                        .from(table)
+                                        .insert({});
+                                    
+                                    if (insertError && insertError.message) {
+                                        console.log(`Insert error for ${table}:`, insertError.message);
+                                        // Parse error message for column hints - this is a last resort
+                                    }
+                                    
+                                    throw new Error(`Could not detect schema for ${table} - table may not exist or be accessible`);
+                                }
+                            }
                         }
                         
                         titles[table] = detectTitleField(schemas[table]);
                         
                     } catch (tableError) {
-                        console.warn(`Error accessing ${table}:`, tableError);
+                        console.error(`❌ Schema detection failed for ${table}:`, tableError.message);
+                        
+                        // Only use fallback as absolute last resort and warn user
+                        console.warn(`⚠️ Using fallback schema for ${table} - this may not match your actual table structure`);
                         schemas[table] = getDefaultSchema(table);
                         titles[table] = detectTitleField(schemas[table]);
                     }
@@ -905,13 +953,17 @@
                 
                 tableSchemas = schemas;
                 titleFields = titles;
-                console.log('Loaded schemas:', tableSchemas);
+                console.log('📊 Final loaded schemas:', tableSchemas);
+                console.log('🏷️ Title fields:', titleFields);
                 
             } catch (error) {
-                console.error('Schema loading error:', error);
+                console.error('❌ Complete schema loading failure:', error);
+                showToast('Schema detection failed - using basic fallbacks');
+                
+                // Only as absolute last resort
                 tableSchemas = {
                     movies: getDefaultSchema('movies'),
-                    events: ['id', 'event_name', 'presented_by', 'duration_minutes', 'description', 'critic_quotes', 'simpletix_embed_code', 'content_type', 'created_at', 'updated_at', 'poster_url', 'web_graphics_url', 'webpage_url'],
+                    events: getDefaultSchema('events'), 
                     galleries: getDefaultSchema('galleries')
                 };
                 titleFields = {
