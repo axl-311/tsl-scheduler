@@ -1124,30 +1124,60 @@
 
         async function switchTab(tab, element) {
             try {
-                if (currentEditingItem && tab === 'dashboard') {
-                    cancelEdit();
+                // Clear editing state when switching to dashboard
+                if (tab === 'dashboard' && currentEditingItem) {
+                    currentEditingItem = null;
+                    const indicator = document.getElementById('editingIndicator');
+                    if (indicator) indicator.classList.remove('active');
+                    const saveBtn = document.getElementById('saveBtn');
+                    if (saveBtn) saveBtn.removeAttribute('data-editing-id');
+                    const deleteBtn = document.getElementById('deleteBtn');
+                    if (deleteBtn) {
+                        deleteBtn.classList.add('hidden');
+                        deleteBtn.removeAttribute('data-delete-id');
+                        deleteBtn.removeAttribute('data-delete-type');
+                    }
                 }
                 
+                // Update tab styles
                 document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                
                 if (element) element.classList.add('active');
                 
+                // Hide ALL tab content first
+                document.querySelectorAll('.tab-content').forEach(c => {
+                    c.classList.remove('active');
+                    c.style.display = 'none';
+                });
+                
+                // Then show only the selected tab
                 if (tab === 'dashboard') {
-                    document.getElementById('dashboard-tab').classList.add('active');
+                    const dashboardTab = document.getElementById('dashboard-tab');
+                    dashboardTab.classList.add('active');
+                    dashboardTab.style.display = 'block';
                     await loadContent();
                 } else if (tab === 'importer' || tab === 'add-new') {
-                    document.getElementById('importer-tab').classList.add('active');
+                    const importerTab = document.getElementById('importer-tab');
+                    importerTab.classList.add('active');
+                    importerTab.style.display = 'block';
                     if (!currentEditingItem) {
                         await generateDynamicForm();
                     }
                 }
             } catch (error) {
                 console.error('Error switching tabs:', error);
+                // Ensure proper display even on error
+                document.querySelectorAll('.tab-content').forEach(c => {
+                    c.classList.remove('active');
+                    c.style.display = 'none';
+                });
                 if (tab === 'dashboard') {
-                    document.getElementById('dashboard-tab').classList.add('active');
+                    const dashboardTab = document.getElementById('dashboard-tab');
+                    dashboardTab.classList.add('active');
+                    dashboardTab.style.display = 'block';
                 } else {
-                    document.getElementById('importer-tab').classList.add('active');
+                    const importerTab = document.getElementById('importer-tab');
+                    importerTab.classList.add('active');
+                    importerTab.style.display = 'block';
                 }
             }
         }
