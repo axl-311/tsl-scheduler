@@ -2018,7 +2018,7 @@ async function handleImageUpload(event, column, movieId = "misc") {
         document.getElementById(column + 'Preview').classList.remove('hidden');
         document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
 
-        showToast(`Image uploaded to ${bucket} successfully!`);
+        showToast(`Image for column "${column}" uploaded to ${bucket} successfully!`);
     } catch (error) {
         showToast('Error uploading image: ' + error.message);
         console.error('Image upload error:', error);
