@@ -595,7 +595,7 @@
         .image-upload-area {
             border: 2px dashed #d2d2d7;
             border-radius: 8px;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
         }
@@ -605,11 +605,17 @@
             background: #f0f7ff;
         }
 
+        .image-upload-area.drag-hover {
+            border-color: #34c759 !important;
+            background-color: #e8f5e9 !important;
+        }
+
         .upload-placeholder {
             padding: 30px 20px;
             text-align: center;
             cursor: pointer;
             color: #86868b;
+            user-select: none;
         }
 
         .upload-placeholder span {
@@ -681,7 +687,7 @@
     <div class="app-container">
         <div class="header">
             <div>
-                <h1>TSL Content Manager<span class="version-badge">v5.0 Clean</span></h1>
+                <h1>TSL Content Manager<span class="version-badge">v5.1 Fixed</span></h1>
             </div>
             <div class="sync-status" id="connectionStatus">
                 <span>○</span>
@@ -855,7 +861,7 @@
                 
                 const statusEl = document.getElementById('connectionStatus');
                 statusEl.classList.add('connected');
-                statusEl.innerHTML = '<span>✓</span><span>Connected</span>';
+                statusEl.innerHTML = '<span>✔</span><span>Connected</span>';
                 
                 await loadContent();
                 await generateDynamicForm();
@@ -879,7 +885,6 @@
                     try {
                         console.log(`Detecting schema for ${table}...`);
                         
-                        // Method 1: Try to get actual data
                         const { data: sampleData, error: sampleError } = await supabase
                             .from(table)
                             .select('*')
@@ -887,11 +892,10 @@
                         
                         if (!sampleError && sampleData && sampleData.length > 0) {
                             schemas[table] = Object.keys(sampleData[0]);
-                            console.log(`✓ Schema from data for ${table}:`, schemas[table]);
+                            console.log(`✔ Schema from data for ${table}:`, schemas[table]);
                         } else {
                             console.log(`${table} is empty, using known schema...`);
                             
-                            // Method 2: Use manually maintained schemas that match your actual Supabase structure
                             const knownSchemas = {
                                 events: [
                                     'id', 'event_name', 'presented_by', 'duration_minutes', 
@@ -914,7 +918,7 @@
                             
                             if (knownSchemas[table]) {
                                 schemas[table] = knownSchemas[table];
-                                console.log(`✓ Using known schema for ${table}:`, schemas[table]);
+                                console.log(`✔ Using known schema for ${table}:`, schemas[table]);
                             } else {
                                 schemas[table] = getDefaultSchema(table);
                                 console.log(`⚠ Using default schema for ${table}:`, schemas[table]);
@@ -936,7 +940,6 @@
                 
             } catch (error) {
                 console.error('❌ Schema loading failed:', error);
-                // Emergency fallback
                 tableSchemas = {
                     movies: getDefaultSchema('movies'),
                     events: getDefaultSchema('events'),
@@ -987,10 +990,10 @@
             const name = columnName.toLowerCase();
             
             if (
-        name.includes('poster_url') ||
-        name.includes('web_graphics_url') || 
-        name.includes('web_graphic_url') ||   // ✅ added singular support
-        name.includes('image_url')) {
+                name.includes('poster_url') ||
+                name.includes('web_graphics_url') || 
+                name.includes('web_graphic_url') ||
+                name.includes('image_url')) {
                 return 'file';
             }
             
@@ -1031,196 +1034,172 @@
         function generateUrlSlug(text) {
             return text
                 .toLowerCase()
-                .replace(/[^\w\s-]/g, '') // Remove special characters
-                .replace(/\s+/g, '-') // Replace spaces with hyphens
-                .replace(/--+/g, '-') // Replace multiple hyphens with single hyphen
-                .replace(/^-+/, '') // Remove starting hyphen
-                .replace(/-+$/, ''); // Remove ending hyphen
+                .replace(/[^\w\s-]/g, '')
+                .replace(/\s+/g, '-')
+                .replace(/--+/g, '-')
+                .replace(/^-+/, '')
+                .replace(/-+$/, '');
         }
 
         function generateWebpageUrl(contentType, title) {
-            const baseUrl = 'https://timeandspace.org'; // Your actual domain
+            const baseUrl = 'https://timeandspace.org';
             const slug = generateUrlSlug(title);
-            const typeSegment = contentType.slice(0, -1); // Remove 's' from 'movies' -> 'movie'
+            const typeSegment = contentType.slice(0, -1);
             return `${baseUrl}/${contentType}/${slug}`;
         }
 
         async function generateDynamicForm() {
-    const schema = tableSchemas[currentContentType];
-    if (!schema) {
-        document.getElementById('formFields').innerHTML = 
-            `<div class="empty-state">No schema found for ${currentContentType} table</div>`;
-        return;
-    }
-    
-    const schemaInfo = document.getElementById('schemaInfo');
-    const schemaDetails = document.getElementById('schemaDetails');
-    schemaDetails.textContent = `${currentContentType} table has ${schema.length} columns: ${schema.join(', ')}`;
-    schemaInfo.classList.remove('hidden');
-    
-    if (currentEditingItem) {
-        document.getElementById('formTitle').textContent = `Editing ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)}`;
-        document.getElementById('saveButtonText').textContent = `Update ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)}`;
-    } else {
-        document.getElementById('formTitle').textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
-        document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
-    }
-    
-    const formFields = document.getElementById('formFields');
-    let fieldsHTML = '';
-    
-    const userFields = schema.filter(col => 
-        !col.includes('id') && 
-        !col.includes('created_at') && 
-        !col.includes('updated_at') &&
-        col !== 'id'
-    );
-    
-    const shortFields = [];
-    const longFields = [];
-    const imageFields = [];
-
-    userFields.forEach(column => {
-        const fieldType = getFieldType(column);
-        if (fieldType === 'textarea') {
-            longFields.push(column);
-        } else if (fieldType === 'file') {
-            imageFields.push(column);
-        } else {
-            shortFields.push(column);
-        }
-    });
-    
-    if (shortFields.length > 0) {
-        fieldsHTML += '<div class="form-grid">';
-        shortFields.forEach(column => {
-            const fieldType = getFieldType(column);
-            const label = formatFieldLabel(column);
-            const required = column === titleFields[currentContentType] ? ' *' : '';
-            
-            fieldsHTML += `
-                <div class="form-group">
-                    <label class="form-label">${label}${required}</label>
-                    <input type="${fieldType}" id="${column}" class="form-input" data-column="${column}" />
-                </div>
-            `;
-        });
-        fieldsHTML += '</div>';
-    }
-    
-    longFields.forEach(column => {
-        const label = formatFieldLabel(column);
-        const rows = column.toLowerCase().includes('synopsis') || column.toLowerCase().includes('description') ? '5' : '2';
-        
-        fieldsHTML += `
-            <div class="form-group">
-                <label class="form-label">${label}</label>
-                <textarea id="${column}" class="form-input" rows="${rows}" data-column="${column}"></textarea>
-            </div>
-        `;
-    });
-
-    if (imageFields.length > 0) {
-        fieldsHTML += '<h4 style="margin: 20px 0 15px 0; color: #1d1d1f;">Images</h4>';
-        fieldsHTML += '<div class="form-grid">';
-        imageFields.forEach(column => {
-            const label = formatFieldLabel(column);
-            
-            let previewClass = 'image-preview';
-            if (column.includes('poster')) {
-                previewClass = 'image-preview poster-preview';
-            } else if (column.includes('graphics') || column.includes('graphic')) {
-                previewClass = 'image-preview graphics-preview';
+            const schema = tableSchemas[currentContentType];
+            if (!schema) {
+                document.getElementById('formFields').innerHTML = 
+                    `<div class="empty-state">No schema found for ${currentContentType} table</div>`;
+                return;
             }
             
-            fieldsHTML += `
-                <div class="form-group">
-                    <label class="form-label">${label}</label>
-                    <div class="image-upload-area" id="${column}Upload">
-                        <input type="file" id="${column}Input" accept="image/*" style="display: none;">
-                        <div class="upload-placeholder" onclick="document.getElementById('${column}Input').click()">
-                            <span>📁 Drop image here or click to upload</span>
-                            <div class="upload-hint">JPG, PNG, WebP (max 5MB)</div>
+            const schemaInfo = document.getElementById('schemaInfo');
+            const schemaDetails = document.getElementById('schemaDetails');
+            schemaDetails.textContent = `${currentContentType} table has ${schema.length} columns: ${schema.join(', ')}`;
+            schemaInfo.classList.remove('hidden');
+            
+            if (currentEditingItem) {
+                document.getElementById('formTitle').textContent = `Editing ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)}`;
+                document.getElementById('saveButtonText').textContent = `Update ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)}`;
+            } else {
+                document.getElementById('formTitle').textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
+                document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
+            }
+            
+            const formFields = document.getElementById('formFields');
+            let fieldsHTML = '';
+            
+            const userFields = schema.filter(col => 
+                !col.includes('id') && 
+                !col.includes('created_at') && 
+                !col.includes('updated_at') &&
+                col !== 'id'
+            );
+            
+            const shortFields = [];
+            const longFields = [];
+            const imageFields = [];
+
+            userFields.forEach(column => {
+                const fieldType = getFieldType(column);
+                if (fieldType === 'textarea') {
+                    longFields.push(column);
+                } else if (fieldType === 'file') {
+                    imageFields.push(column);
+                } else {
+                    shortFields.push(column);
+                }
+            });
+            
+            if (shortFields.length > 0) {
+                fieldsHTML += '<div class="form-grid">';
+                shortFields.forEach(column => {
+                    const fieldType = getFieldType(column);
+                    const label = formatFieldLabel(column);
+                    const required = column === titleFields[currentContentType] ? ' *' : '';
+                    
+                    fieldsHTML += `
+                        <div class="form-group">
+                            <label class="form-label">${label}${required}</label>
+                            <input type="${fieldType}" id="${column}" class="form-input" data-column="${column}" />
                         </div>
-                        <div id="${column}Preview" class="${previewClass} hidden">
-                            <img id="${column}Img" src="" alt="${label} preview">
-                            <button type="button" onclick="removeImage('${column}')" class="remove-image-btn">×</button>
-                        </div>
+                    `;
+                });
+                fieldsHTML += '</div>';
+            }
+            
+            longFields.forEach(column => {
+                const label = formatFieldLabel(column);
+                const rows = column.toLowerCase().includes('synopsis') || column.toLowerCase().includes('description') ? '5' : '2';
+                
+                fieldsHTML += `
+                    <div class="form-group">
+                        <label class="form-label">${label}</label>
+                        <textarea id="${column}" class="form-input" rows="${rows}" data-column="${column}"></textarea>
                     </div>
-                    <input type="hidden" id="${column}" class="form-input" data-column="${column}">
-                </div>
-            `;
-        });
-        fieldsHTML += '</div>';
-    }
-    
-    formFields.innerHTML = fieldsHTML;
-    
-    // Add all the event listeners after the DOM is updated
-    setTimeout(() => {
-        // Setup drag and drop for image areas
-        setupImageDragDrop();
-        
-        // Add auto-generation listener for webpage_url
-        const titleField = titleFields[currentContentType];
-        const titleInput = document.getElementById(titleField);
-        const webpageUrlInput = document.getElementById('webpage_url');
-        
-        if (titleInput && webpageUrlInput) {
-            titleInput.addEventListener('input', function() {
-                if (!webpageUrlInput.dataset.manuallyEdited) {
-                    webpageUrlInput.value = generateWebpageUrl(currentContentType, titleInput.value);
-                }
+                `;
             });
-            
-            webpageUrlInput.addEventListener('input', function() {
-                this.dataset.manuallyEdited = 'true';
-            });
-            
-            webpageUrlInput.addEventListener('change', function() {
-                if (!this.value) {
-                    delete this.dataset.manuallyEdited;
-                }
-            });
-        }
-        
-        // Setup file input change handlers
-        const imageInputs = document.querySelectorAll('[id$="Input"]');
-        imageInputs.forEach(input => {
-            const column = input.id.replace('Input', '');
 
-            if (input._uploadHandler) {
-                input.removeEventListener('change', input._uploadHandler);
+            if (imageFields.length > 0) {
+                fieldsHTML += '<h4 style="margin: 20px 0 15px 0; color: #1d1d1f;">Images</h4>';
+                fieldsHTML += '<div class="form-grid">';
+                imageFields.forEach(column => {
+                    const label = formatFieldLabel(column);
+                    
+                    let previewClass = 'image-preview';
+                    if (column.includes('poster')) {
+                        previewClass = 'image-preview poster-preview';
+                    } else if (column.includes('graphics') || column.includes('graphic')) {
+                        previewClass = 'image-preview graphics-preview';
+                    }
+                    
+                    fieldsHTML += `
+                        <div class="form-group">
+                            <label class="form-label">${label}</label>
+                            <div class="image-upload-area" id="${column}Upload">
+                                <input type="file" id="${column}Input" accept="image/*" style="display: none;">
+                                <div class="upload-placeholder" onclick="document.getElementById('${column}Input').click()">
+                                    <span>📁 Drop image here or click to upload</span>
+                                    <div class="upload-hint">JPG, PNG, WebP (max 5MB)</div>
+                                </div>
+                                <div id="${column}Preview" class="${previewClass} hidden">
+                                    <img id="${column}Img" src="" alt="${label} preview">
+                                    <button type="button" onclick="removeImage('${column}')" class="remove-image-btn">×</button>
+                                </div>
+                            </div>
+                            <input type="hidden" id="${column}" class="form-input" data-column="${column}">
+                        </div>
+                    `;
+                });
+                fieldsHTML += '</div>';
             }
-
-            input._uploadHandler = (e) => handleImageUpload(e, column);
-            input.addEventListener('change', input._uploadHandler);
-        });
-    }, 100);
-}
-
+            
+            formFields.innerHTML = fieldsHTML;
+            
+            setTimeout(() => {
+                setupImageDragDrop();
                 
+                const titleField = titleFields[currentContentType];
+                const titleInput = document.getElementById(titleField);
+                const webpageUrlInput = document.getElementById('webpage_url');
                 
-const imageInputs = document.querySelectorAll('[id$="Input"]');
-imageInputs.forEach(input => {
-    const column = input.id.replace('Input', '');
+                if (titleInput && webpageUrlInput) {
+                    titleInput.addEventListener('input', function() {
+                        if (!webpageUrlInput.dataset.manuallyEdited) {
+                            webpageUrlInput.value = generateWebpageUrl(currentContentType, titleInput.value);
+                        }
+                    });
+                    
+                    webpageUrlInput.addEventListener('input', function() {
+                        this.dataset.manuallyEdited = 'true';
+                    });
+                    
+                    webpageUrlInput.addEventListener('change', function() {
+                        if (!this.value) {
+                            delete this.dataset.manuallyEdited;
+                        }
+                    });
+                }
+                
+                const imageInputs = document.querySelectorAll('[id$="Input"]');
+                imageInputs.forEach(input => {
+                    const column = input.id.replace('Input', '');
 
-    // If this input already has a handler, remove it first
-    if (input._uploadHandler) {
-        input.removeEventListener('change', input._uploadHandler);
-    }
+                    if (input._uploadHandler) {
+                        input.removeEventListener('change', input._uploadHandler);
+                    }
 
-    // Define a single handler and attach it
-    input._uploadHandler = (e) => handleImageUpload(e, column);
-    input.addEventListener('change', input._uploadHandler);
-});
-
-}, 100);
+                    input._uploadHandler = (e) => handleImageUpload(e, column);
+                    input.addEventListener('change', input._uploadHandler);
+                });
+            }, 100);
         }
 
         async function switchTab(tab, element) {
             try {
-                // Clear editing state when switching to dashboard
                 if (tab === 'dashboard' && currentEditingItem) {
                     currentEditingItem = null;
                     const indicator = document.getElementById('editingIndicator');
@@ -1235,7 +1214,6 @@ imageInputs.forEach(input => {
                     }
                 }
                 
-                // If clicking Add New while editing, clear edit state and start fresh
                 if ((tab === 'importer' || tab === 'add-new') && currentEditingItem) {
                     currentEditingItem = null;
                     const indicator = document.getElementById('editingIndicator');
@@ -1249,25 +1227,20 @@ imageInputs.forEach(input => {
                         deleteBtn.removeAttribute('data-delete-type');
                     }
                     
-                    // Clear the form and regenerate
                     clearDynamicForm();
                     
-                    // Reset form titles
                     document.getElementById('formTitle').textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
                     document.getElementById('saveButtonText').textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
                 }
                 
-                // Update tab styles
                 document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
                 if (element) element.classList.add('active');
                 
-                // Hide ALL tab content first
                 document.querySelectorAll('.tab-content').forEach(c => {
                     c.classList.remove('active');
                     c.style.display = 'none';
                 });
                 
-                // Then show only the selected tab
                 if (tab === 'dashboard') {
                     const dashboardTab = document.getElementById('dashboard-tab');
                     dashboardTab.classList.add('active');
@@ -1281,7 +1254,6 @@ imageInputs.forEach(input => {
                 }
             } catch (error) {
                 console.error('Error switching tabs:', error);
-                // Ensure proper display even on error
                 document.querySelectorAll('.tab-content').forEach(c => {
                     c.classList.remove('active');
                     c.style.display = 'none';
@@ -1303,10 +1275,8 @@ imageInputs.forEach(input => {
             document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
             if (element) element.classList.add('active');
             
-            // Clear form but stay in Add New
             clearDynamicForm();
             
-            // Reset editing state without changing tabs
             currentEditingItem = null;
             const indicator = document.getElementById('editingIndicator');
             if (indicator) {
@@ -1325,7 +1295,6 @@ imageInputs.forEach(input => {
                 deleteBtn.removeAttribute('data-delete-type');
             }
             
-            // Reset form titles
             const formTitle = document.getElementById('formTitle');
             const saveButtonText = document.getElementById('saveButtonText');
             
@@ -1336,9 +1305,8 @@ imageInputs.forEach(input => {
             
             await generateDynamicForm();
             
-            // Explicitly ensure we stay in Add New tab
             document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-            document.querySelector('.nav-tab:nth-child(2)').classList.add('active'); // Add New tab
+            document.querySelector('.nav-tab:nth-child(2)').classList.add('active');
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.getElementById('importer-tab').classList.add('active');
         }
@@ -1356,7 +1324,6 @@ imageInputs.forEach(input => {
                 saveBtn.removeAttribute('data-editing-id');
             }
             
-            // Hide delete button when not editing
             const deleteBtn = document.getElementById('deleteBtn');
             if (deleteBtn) {
                 deleteBtn.classList.add('hidden');
@@ -1373,21 +1340,15 @@ imageInputs.forEach(input => {
                 formTitle.textContent = `${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1)} Details`;
                 saveButtonText.textContent = `Save ${currentContentType.charAt(0).toUpperCase() + currentContentType.slice(1).slice(0, -1)} to Database`;
             }
-            
-            // Stay in Add New mode after canceling edit
-            // User can click "Cancel & Return to Dashboard" if they want to leave
         }
         
         async function cancelAndReturnToDashboard() {
-            // Clear any editing state
             if (currentEditingItem) {
                 cancelEdit();
             }
             
-            // Clear the form
             clearDynamicForm();
             
-            // Return to Dashboard
             await switchTab('dashboard', document.querySelector('.nav-tab:first-child'));
         }
 
@@ -1497,7 +1458,7 @@ imageInputs.forEach(input => {
                 .replace(/â€œ/g, '"')
                 .replace(/â€\x9D/g, '"')
                 .replace(/â€"/g, '—')
-                .replace(/â€"/g, '–')
+                .replace(/â€"/g, '—')
                 .replace(/Â/g, '')
                 .trim();
         }
@@ -1754,12 +1715,9 @@ imageInputs.forEach(input => {
                 return;
             }
             
-            // Auto-generate webpage_url if the field exists in schema and has a title
             if (schema.includes('webpage_url') && titleField && data[titleField]) {
-                // Only auto-generate if the field is empty or not manually edited
                 if (!data.webpage_url) {
                     data.webpage_url = generateWebpageUrl(currentContentType, data[titleField]);
-                    // Update the form field to show the generated URL
                     const urlField = document.getElementById('webpage_url');
                     if (urlField) {
                         urlField.value = data.webpage_url;
@@ -1776,16 +1734,13 @@ imageInputs.forEach(input => {
                     if (error) throw error;
                     showToast('Updated successfully!');
                     
-                    // After update, stay in edit mode so user can continue editing
-                    // Just refresh the form with the updated data
-                    loadContent(); // Update stats
+                    loadContent();
                     
                 } else {
                     const { error } = await supabase.from(currentContentType).insert([data]);
                     if (error) throw error;
                     showToast('Saved successfully!');
                     
-                    // After saving new item, return to dashboard to see it in context
                     clearDynamicForm();
                     await switchTab('dashboard', document.querySelector('.nav-tab:first-child'));
                 }
@@ -1845,7 +1800,6 @@ imageInputs.forEach(input => {
                 document.getElementById('formTitle').textContent = `Editing ${type.charAt(0).toUpperCase() + type.slice(1).slice(0, -1)}`;
                 document.getElementById('saveButtonText').textContent = `Update ${type.charAt(0).toUpperCase() + type.slice(1).slice(0, -1)}`;
                 
-                // Show delete button when editing
                 const deleteBtn = document.getElementById('deleteBtn');
                 if (deleteBtn) {
                     deleteBtn.classList.remove('hidden');
@@ -1881,7 +1835,6 @@ imageInputs.forEach(input => {
                 
                 showToast('Item deleted successfully');
                 
-                // Clear everything and return to dashboard
                 cancelEdit();
                 await switchTab('dashboard', document.querySelector('.nav-tab:first-child'));
                 
@@ -1976,169 +1929,148 @@ imageInputs.forEach(input => {
             }, 3000);
         }
 
-        
+        async function handleImageUpload(event, column) {
+            const file = event.target.files[0];
+            if (!file) return;
 
-async function handleImageUpload(event, column, movieId = "misc") {
-    const file = event.target.files[0];
-    if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                showToast('Please select an image file');
+                return;
+            }
 
-    if (!file.type.startsWith('image/')) {
-        showToast('Please select an image file');
-        return;
-    }
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('Image must be smaller than 5MB');
+                return;
+            }
 
-    if (file.size > 5 * 1024 * 1024) {
-        showToast('Image must be smaller than 5MB');
-        return;
-    }
-
-    try {
-        // Determine bucket based on field name
-        let bucket;
-        const columnLower = column.toLowerCase();
-        
-        if (columnLower.includes('poster')) {
-            bucket = "posters";
-        } else if (columnLower.includes('web_graphic') || columnLower.includes('web_graphics')) {
-            bucket = "web-graphics";
-        } else if (columnLower.includes('image')) {
-            // Generic image fields default to web-graphics
-            bucket = "web-graphics";
-        } else {
-            // Default fallback
-            bucket = "web-graphics";
-        }
-
-        // Sanitize + unique filename
-        const cleanName = file.name
-            .replace(/\s+/g, '-')        
-            .replace(/[^a-zA-Z0-9.\-_]/g, '');
-        const uniqueSuffix = Math.random().toString(36).substring(2, 8);
-        const fileName = `${Date.now()}-${uniqueSuffix}-${cleanName}`;
-
-        // Determine folder structure based on content type
-        const contentFolder = currentContentType || 'misc';
-        const itemId = document.getElementById('saveBtn')?.getAttribute('data-editing-id') || 'new';
-        const filePath = `${contentFolder}/${itemId}/${fileName}`;
-
-        // Upload into correct bucket
-        const { error: uploadError } = await supabase.storage
-            .from(bucket)
-            .upload(filePath, file, { upsert: true });
-
-        if (uploadError) {
-            console.error('Upload error:', uploadError);
-            showToast('Failed to upload image');
-            return;
-        }
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-            .from(bucket)
-            .getPublicUrl(filePath);
-
-        const publicUrl = urlData.publicUrl;
-
-        // Save URL into hidden field
-        document.getElementById(column).value = publicUrl;
-
-        // Update preview
-        document.getElementById(column + 'Img').src = publicUrl;
-        document.getElementById(column + 'Preview').classList.remove('hidden');
-        const placeholder = document.querySelector(`#${column}Upload .upload-placeholder`);
-        if (placeholder) {
-            placeholder.style.display = 'none';
-        }
-
-        showToast(`${formatFieldLabel(column)} uploaded successfully!`);
-    } catch (error) {
-        showToast('Error uploading image: ' + error.message);
-        console.error('Image upload error:', error);
-    }
-}
-        
-function setupImageDragDrop() {
-    // Find all image upload areas
-    const imageUploadAreas = document.querySelectorAll('.image-upload-area');
-    
-    imageUploadAreas.forEach(uploadArea => {
-        // Get the column name from the ID (e.g., 'poster_urlUpload' -> 'poster_url')
-        const column = uploadArea.id.replace('Upload', '');
-        
-        // Prevent default drag behaviors
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, preventDefaults, false);
-        });
-        
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-        
-        // Highlight drop area when item is dragged over it
-        ['dragenter', 'dragover'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, highlight, false);
-        });
-        
-        ['dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, unhighlight, false);
-        });
-        
-        function highlight(e) {
-            uploadArea.style.borderColor = '#34c759';
-            uploadArea.style.backgroundColor = '#e8f5e9';
-        }
-        
-        function unhighlight(e) {
-            uploadArea.style.borderColor = '';
-            uploadArea.style.backgroundColor = '';
-        }
-        
-        // Handle dropped files
-        uploadArea.addEventListener('drop', handleDrop, false);
-        
-        function handleDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            
-            if (files.length > 0) {
-                const file = files[0];
+            try {
+                let bucket;
+                const columnLower = column.toLowerCase();
                 
-                // Check if it's an image
-                if (!file.type.startsWith('image/')) {
-                    showToast('Please drop an image file');
+                if (columnLower.includes('poster')) {
+                    bucket = "posters";
+                } else if (columnLower.includes('web_graphic') || columnLower.includes('web_graphics')) {
+                    bucket = "web-graphics";
+                } else if (columnLower.includes('image')) {
+                    bucket = "web-graphics";
+                } else {
+                    bucket = "web-graphics";
+                }
+
+                const cleanName = file.name
+                    .replace(/\s+/g, '-')        
+                    .replace(/[^a-zA-Z0-9.\-_]/g, '');
+                const uniqueSuffix = Math.random().toString(36).substring(2, 8);
+                const fileName = `${Date.now()}-${uniqueSuffix}-${cleanName}`;
+
+                const contentFolder = currentContentType || 'misc';
+                const itemId = document.getElementById('saveBtn')?.getAttribute('data-editing-id') || 'new';
+                const filePath = `${contentFolder}/${itemId}/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from(bucket)
+                    .upload(filePath, file, { upsert: true });
+
+                if (uploadError) {
+                    console.error('Upload error:', uploadError);
+                    showToast('Failed to upload image');
                     return;
                 }
-                
-                // Check file size
-                if (file.size > 5 * 1024 * 1024) {
-                    showToast('Image must be smaller than 5MB');
-                    return;
+
+                const { data: urlData } = supabase.storage
+                    .from(bucket)
+                    .getPublicUrl(filePath);
+
+                const publicUrl = urlData.publicUrl;
+
+                document.getElementById(column).value = publicUrl;
+
+                document.getElementById(column + 'Img').src = publicUrl;
+                document.getElementById(column + 'Preview').classList.remove('hidden');
+                const placeholder = document.querySelector(`#${column}Upload .upload-placeholder`);
+                if (placeholder) {
+                    placeholder.style.display = 'none';
                 }
-                
-                // Create a synthetic event for the existing handleImageUpload function
-                const syntheticEvent = {
-                    target: {
-                        files: [file]
-                    }
-                };
-                
-                // Call the existing handleImageUpload function
-                handleImageUpload(syntheticEvent, column);
-                
-                // Update the file input as well (for form consistency)
-                const fileInput = document.getElementById(column + 'Input');
-                if (fileInput) {
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(file);
-                    fileInput.files = dataTransfer.files;
-                }
+
+                showToast(`${formatFieldLabel(column)} uploaded successfully!`);
+            } catch (error) {
+                showToast('Error uploading image: ' + error.message);
+                console.error('Image upload error:', error);
             }
         }
-    });
-}
         
-function removeImage(column) {
+        function setupImageDragDrop() {
+            const imageUploadAreas = document.querySelectorAll('.image-upload-area');
+            
+            imageUploadAreas.forEach(uploadArea => {
+                const column = uploadArea.id.replace('Upload', '');
+                
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    uploadArea.addEventListener(eventName, preventDefaults, false);
+                });
+                
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    uploadArea.addEventListener(eventName, highlight, false);
+                });
+                
+                ['dragleave', 'drop'].forEach(eventName => {
+                    uploadArea.addEventListener(eventName, unhighlight, false);
+                });
+                
+                function highlight(e) {
+                    uploadArea.style.borderColor = '#34c759';
+                    uploadArea.style.backgroundColor = '#e8f5e9';
+                }
+                
+                function unhighlight(e) {
+                    uploadArea.style.borderColor = '';
+                    uploadArea.style.backgroundColor = '';
+                }
+                
+                uploadArea.addEventListener('drop', handleDrop, false);
+                
+                function handleDrop(e) {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    
+                    if (files.length > 0) {
+                        const file = files[0];
+                        
+                        if (!file.type.startsWith('image/')) {
+                            showToast('Please drop an image file');
+                            return;
+                        }
+                        
+                        if (file.size > 5 * 1024 * 1024) {
+                            showToast('Image must be smaller than 5MB');
+                            return;
+                        }
+                        
+                        const syntheticEvent = {
+                            target: {
+                                files: [file]
+                            }
+                        };
+                        
+                        handleImageUpload(syntheticEvent, column);
+                        
+                        const fileInput = document.getElementById(column + 'Input');
+                        if (fileInput) {
+                            const dataTransfer = new DataTransfer();
+                            dataTransfer.items.add(file);
+                            fileInput.files = dataTransfer.files;
+                        }
+                    }
+                }
+            });
+        }
+        
+        function removeImage(column) {
             const field = document.getElementById(column);
             const img = document.getElementById(column + 'Img');
             const preview = document.getElementById(column + 'Preview');
