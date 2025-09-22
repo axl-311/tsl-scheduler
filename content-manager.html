@@ -1948,8 +1948,7 @@
         }
 
         
-
-async function handleImageUpload(event, column, movieId = "misc") {
+async function handleImageUpload(event, column) {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -1964,26 +1963,11 @@ async function handleImageUpload(event, column, movieId = "misc") {
     }
 
     try {
-        // Decide bucket based on field name
-        let bucket = "posters";
-        if (column.toLowerCase().includes("web_graphics")) {
-            bucket = "web-graphics";
-        }
+        const fileName = `${Date.now()}-${file.name}`;
 
-        // Sanitize + unique filename
-        const cleanName = file.name
-            .replace(/\s+/g, '-')        
-            .replace(/[^a-zA-Z0-9.\-_]/g, '');
-        const uniqueSuffix = Math.random().toString(36).substring(2, 8);
-        const fileName = `${Date.now()}-${uniqueSuffix}-${cleanName}`;
-
-        // Subfolder per movie
-        const filePath = `movies/${movieId}/${fileName}`;
-
-        // Upload into correct bucket
-        const { error: uploadError } = await supabase.storage
-            .from(bucket)
-            .upload(filePath, file, { upsert: true });
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('posters')
+            .upload(fileName, file, { upsert: true });
 
         if (uploadError) {
             console.error('Upload error:', uploadError);
@@ -1991,22 +1975,18 @@ async function handleImageUpload(event, column, movieId = "misc") {
             return;
         }
 
-        // Get public URL
         const { data: urlData } = supabase.storage
-            .from(bucket)
-            .getPublicUrl(filePath);
+            .from('posters')
+            .getPublicUrl(fileName);
 
         const publicUrl = urlData.publicUrl;
 
-        // Save URL into hidden field
         document.getElementById(column).value = publicUrl;
-
-        // Update preview
         document.getElementById(column + 'Img').src = publicUrl;
         document.getElementById(column + 'Preview').classList.remove('hidden');
         document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
 
-        showToast(`Image uploaded to ${bucket} successfully!`);
+        showToast('Image uploaded successfully!');
     } catch (error) {
         showToast('Error uploading image: ' + error.message);
         console.error('Image upload error:', error);
@@ -2014,7 +1994,32 @@ async function handleImageUpload(event, column, movieId = "misc") {
 }
 
 
-function removeImage(column) {
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('Image must be smaller than 5MB');
+                return;
+            }
+
+            try {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const dataUrl = e.target.result;
+                    
+                    document.getElementById(column).value = dataUrl;
+                    
+                    document.getElementById(column + 'Img').src = dataUrl;
+                    document.getElementById(column + 'Preview').classList.remove('hidden');
+                    document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
+                    
+                    showToast('Image loaded successfully!');
+                };
+                reader.readAsDataURL(file);
+            } catch (error) {
+                showToast('Error loading image: ' + error.message);
+                console.error('Image upload error:', error);
+            }
+        }
+
+        function removeImage(column) {
             const field = document.getElementById(column);
             const img = document.getElementById(column + 'Img');
             const preview = document.getElementById(column + 'Preview');
@@ -2075,3 +2080,4 @@ function removeImage(column) {
     </script>
 </body>
 </html>
+
