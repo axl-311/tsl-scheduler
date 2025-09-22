@@ -1948,38 +1948,55 @@
         }
 
         async function handleImageUpload(event, column) {
-            const file = event.target.files[0];
-            if (!file) return;
+    const file = event.target.files[0];
+    if (!file) return;
 
-            if (!file.type.startsWith('image/')) {
-                showToast('Please select an image file');
-                return;
-            }
+    if (!file.type.startsWith('image/')) {
+        showToast('Please select an image file');
+        return;
+    }
 
-            if (file.size > 5 * 1024 * 1024) {
-                showToast('Image must be smaller than 5MB');
-                return;
-            }
+    if (file.size > 5 * 1024 * 1024) {
+        showToast('Image must be smaller than 5MB');
+        return;
+    }
 
-            try {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const dataUrl = e.target.result;
-                    
-                    document.getElementById(column).value = dataUrl;
-                    
-                    document.getElementById(column + 'Img').src = dataUrl;
-                    document.getElementById(column + 'Preview').classList.remove('hidden');
-                    document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
-                    
-                    showToast('Image loaded successfully!');
-                };
-                reader.readAsDataURL(file);
-            } catch (error) {
-                showToast('Error loading image: ' + error.message);
-                console.error('Image upload error:', error);
-            }
+    try {
+        // Make a unique filename
+        const fileName = `${Date.now()}-${file.name}`;
+
+        // Upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('posters')  // your bucket name
+            .upload(fileName, file, { upsert: true });
+
+        if (uploadError) {
+            console.error('Upload error:', uploadError);
+            showToast('Failed to upload image');
+            return;
         }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+            .from('posters')
+            .getPublicUrl(fileName);
+
+        const publicUrl = urlData.publicUrl;
+
+        // Save URL into the hidden field
+        document.getElementById(column).value = publicUrl;
+
+        // Update preview
+        document.getElementById(column + 'Img').src = publicUrl;
+        document.getElementById(column + 'Preview').classList.remove('hidden');
+        document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
+
+        showToast('Image uploaded successfully!');
+    } catch (error) {
+        showToast('Error uploading image: ' + error.message);
+        console.error('Image upload error:', error);
+    }
+}
 
         function removeImage(column) {
             const field = document.getElementById(column);
