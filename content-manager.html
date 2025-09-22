@@ -1179,14 +1179,22 @@
                     });
                 }
                 
-                const imageInputs = document.querySelectorAll('[id$="Input"]');
-                imageInputs.forEach(input => {
-                    const column = input.id.replace('Input', '');
-                    if (column.includes('poster_url') || column.includes('web_graphics_url') || column.includes('image_url')) {
-                        input.addEventListener('change', (e) => handleImageUpload(e, column));
-                    }
-                });
-            }, 100);
+                
+const imageInputs = document.querySelectorAll('[id$="Input"]');
+imageInputs.forEach(input => {
+    const column = input.id.replace('Input', '');
+
+    // If this input already has a handler, remove it first
+    if (input._uploadHandler) {
+        input.removeEventListener('change', input._uploadHandler);
+    }
+
+    // Define a single handler and attach it
+    input._uploadHandler = (e) => handleImageUpload(e, column);
+    input.addEventListener('change', input._uploadHandler);
+});
+
+}, 100);
         }
 
         async function switchTab(tab, element) {
