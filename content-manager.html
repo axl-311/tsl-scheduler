@@ -1976,9 +1976,19 @@ async function handleImageUpload(event, column, movieId = "misc") {
     }
 
     try {
-        // Decide bucket based on field name
-        let bucket = "posters";
-        if (column.toLowerCase().includes("web_graphics")) {
+        // Determine bucket based on field name
+        let bucket;
+        const columnLower = column.toLowerCase();
+        
+        if (columnLower.includes('poster')) {
+            bucket = "posters";
+        } else if (columnLower.includes('web_graphic') || columnLower.includes('web_graphics')) {
+            bucket = "web-graphics";
+        } else if (columnLower.includes('image')) {
+            // Generic image fields default to web-graphics
+            bucket = "web-graphics";
+        } else {
+            // Default fallback
             bucket = "web-graphics";
         }
 
@@ -1989,8 +1999,10 @@ async function handleImageUpload(event, column, movieId = "misc") {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         const fileName = `${Date.now()}-${uniqueSuffix}-${cleanName}`;
 
-        // Subfolder per movie
-        const filePath = `movies/${movieId}/${fileName}`;
+        // Determine folder structure based on content type
+        const contentFolder = currentContentType || 'misc';
+        const itemId = document.getElementById('saveBtn')?.getAttribute('data-editing-id') || 'new';
+        const filePath = `${contentFolder}/${itemId}/${fileName}`;
 
         // Upload into correct bucket
         const { error: uploadError } = await supabase.storage
@@ -2016,15 +2028,17 @@ async function handleImageUpload(event, column, movieId = "misc") {
         // Update preview
         document.getElementById(column + 'Img').src = publicUrl;
         document.getElementById(column + 'Preview').classList.remove('hidden');
-        document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
+        const placeholder = document.querySelector(`#${column}Upload .upload-placeholder`);
+        if (placeholder) {
+            placeholder.style.display = 'none';
+        }
 
-        showToast(`Image for column "${column}" uploaded to ${bucket} successfully!`);
+        showToast(`${formatFieldLabel(column)} uploaded successfully!`);
     } catch (error) {
         showToast('Error uploading image: ' + error.message);
         console.error('Image upload error:', error);
     }
 }
-
 
 function removeImage(column) {
             const field = document.getElementById(column);
