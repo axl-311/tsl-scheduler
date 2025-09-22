@@ -986,7 +986,11 @@
             
             const name = columnName.toLowerCase();
             
-            if (name.includes('poster_url') || name.includes('web_graphics_url') || name.includes('image_url')) {
+            if (
+        name.includes('poster_url') ||
+        name.includes('web_graphics_url') || 
+        name.includes('web_graphic_url') ||   // ✅ added singular support
+        name.includes('image_url')) {
                 return 'file';
             }
             
