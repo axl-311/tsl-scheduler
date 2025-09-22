@@ -1964,13 +1964,11 @@ async function handleImageUpload(event, column) {
     }
 
     try {
-        // Sanitize filename: remove spaces/special chars
         const cleanName = file.name
-            .replace(/\s+/g, '-')        // spaces → dashes
-            .replace(/[^a-zA-Z0-9.\-_]/g, ''); // strip weird characters
+            .replace(/\s+/g, '-')        
+            .replace(/[^a-zA-Z0-9.\-_]/g, '');
         const fileName = `${Date.now()}-${cleanName}`;
 
-        // Upload to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
             .from('posters')
             .upload(fileName, file, { upsert: true });
@@ -1981,17 +1979,13 @@ async function handleImageUpload(event, column) {
             return;
         }
 
-        // Get public URL
         const { data: urlData } = supabase.storage
             .from('posters')
             .getPublicUrl(fileName);
 
         const publicUrl = urlData.publicUrl;
 
-        // Save URL into the hidden field
         document.getElementById(column).value = publicUrl;
-
-        // Update preview
         document.getElementById(column + 'Img').src = publicUrl;
         document.getElementById(column + 'Preview').classList.remove('hidden');
         document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
@@ -2003,34 +1997,7 @@ async function handleImageUpload(event, column) {
     }
 }
 
-
-
-            if (file.size > 5 * 1024 * 1024) {
-                showToast('Image must be smaller than 5MB');
-                return;
-            }
-
-            try {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const dataUrl = e.target.result;
-                    
-                    document.getElementById(column).value = dataUrl;
-                    
-                    document.getElementById(column + 'Img').src = dataUrl;
-                    document.getElementById(column + 'Preview').classList.remove('hidden');
-                    document.querySelector(`#${column}Upload .upload-placeholder`).style.display = 'none';
-                    
-                    showToast('Image loaded successfully!');
-                };
-                reader.readAsDataURL(file);
-            } catch (error) {
-                showToast('Error loading image: ' + error.message);
-                console.error('Image upload error:', error);
-            }
-        }
-
-        function removeImage(column) {
+function removeImage(column) {
             const field = document.getElementById(column);
             const img = document.getElementById(column + 'Img');
             const preview = document.getElementById(column + 'Preview');
