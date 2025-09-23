@@ -687,7 +687,7 @@
     <div class="app-container">
         <div class="header">
             <div>
-                <h1>TSL Content Manager<span class="version-badge">v5.1 Fixed</span></h1>
+                <h1>TSL Content Manager<span class="version-badge">v5.2 No Dupes</span></h1>
             </div>
             <div class="sync-status" id="connectionStatus">
                 <span>○</span>
@@ -1456,7 +1456,7 @@
             return str
                 .replace(/â€™/g, "'")
                 .replace(/â€œ/g, '"')
-                .replace(/â€\x9D/g, '"')
+                .replace(/â€/g, '"')
                 .replace(/â€"/g, '—')
                 .replace(/â€"/g, '—')
                 .replace(/Â/g, '')
@@ -1929,6 +1929,7 @@
             }, 3000);
         }
 
+        // FIXED IMAGE UPLOAD FUNCTION - NO MORE DUPLICATES!
         async function handleImageUpload(event, column) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1944,6 +1945,7 @@
             }
 
             try {
+                // Determine bucket based on column name
                 let bucket;
                 const columnLower = column.toLowerCase();
                 
@@ -1951,25 +1953,42 @@
                     bucket = "posters";
                 } else if (columnLower.includes('web_graphic') || columnLower.includes('web_graphics')) {
                     bucket = "web-graphics";
-                } else if (columnLower.includes('image')) {
-                    bucket = "web-graphics";
                 } else {
                     bucket = "web-graphics";
                 }
 
-                const cleanName = file.name
-                    .replace(/\s+/g, '-')        
-                    .replace(/[^a-zA-Z0-9.\-_]/g, '');
-                const uniqueSuffix = Math.random().toString(36).substring(2, 8);
-                const fileName = `${Date.now()}-${uniqueSuffix}-${cleanName}`;
+                // Get the item ID (either editing ID or use title-based ID for new items)
+                const editingId = document.getElementById('saveBtn')?.getAttribute('data-editing-id');
+                let itemId;
+                
+                if (editingId) {
+                    // Editing existing item - use its ID
+                    itemId = editingId;
+                } else {
+                    // New item - create ID based on title if available
+                    const titleField = titleFields[currentContentType];
+                    const titleInput = document.getElementById(titleField);
+                    if (titleInput && titleInput.value) {
+                        // Use slugified title as ID
+                        itemId = generateUrlSlug(titleInput.value);
+                    } else {
+                        // Fallback to timestamp if no title yet
+                        itemId = `temp-${Date.now()}`;
+                    }
+                }
 
-                const contentFolder = currentContentType || 'misc';
-                const itemId = document.getElementById('saveBtn')?.getAttribute('data-editing-id') || 'new';
-                const filePath = `${contentFolder}/${itemId}/${fileName}`;
+                // Create CONSISTENT filename based on item ID and image type
+                const fileExt = file.name.split('.').pop().toLowerCase();
+                const imageType = columnLower.includes('poster') ? 'poster' : 'web-graphic';
+                const fileName = `${currentContentType}/${itemId}-${imageType}.${fileExt}`;
 
+                // Upload with upsert to replace existing file
                 const { error: uploadError } = await supabase.storage
                     .from(bucket)
-                    .upload(filePath, file, { upsert: true });
+                    .upload(fileName, file, { 
+                        upsert: true,  // This replaces existing file with same name
+                        cacheControl: '3600'
+                    });
 
                 if (uploadError) {
                     console.error('Upload error:', uploadError);
@@ -1977,14 +1996,17 @@
                     return;
                 }
 
+                // Get the public URL (will always be the same for this item/type)
                 const { data: urlData } = supabase.storage
                     .from(bucket)
-                    .getPublicUrl(filePath);
+                    .getPublicUrl(fileName);
 
                 const publicUrl = urlData.publicUrl;
 
+                // Update form field with URL
                 document.getElementById(column).value = publicUrl;
 
+                // Update preview
                 document.getElementById(column + 'Img').src = publicUrl;
                 document.getElementById(column + 'Preview').classList.remove('hidden');
                 const placeholder = document.querySelector(`#${column}Upload .upload-placeholder`);
