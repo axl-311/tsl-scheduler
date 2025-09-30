@@ -208,11 +208,28 @@
             color: #ccc;
         }
 
+        .day-cell.today {
+            background: #fffbeb;
+            border: 2px solid #f59e0b;
+        }
+
         .day-number {
             font-size: 14px;
             font-weight: 500;
             margin-bottom: 8px;
             color: #1a1a1a;
+        }
+
+        .day-cell.today .day-number {
+            background: #f59e0b;
+            color: white;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-weight: 700;
         }
 
         .other-month .day-number {
@@ -279,114 +296,185 @@
         }
 
         @media (max-width: 768px) {
+            body {
+                overflow-x: hidden;
+            }
+
             .calendar-container {
-                padding: 24px 16px;
+                padding: 16px 12px;
+            }
+            
+            .header {
+                margin-bottom: 24px;
+                padding-bottom: 20px;
+            }
+
+            .brand {
+                margin-bottom: 16px;
+                gap: 12px;
             }
             
             .brand h1 {
-                font-size: 24px;
+                font-size: 20px;
+            }
+
+            .brand .status {
+                font-size: 10px;
+                padding: 3px 6px;
             }
             
             .nav-section {
                 flex-direction: column;
-                align-items: flex-start;
-                gap: 16px;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .month-display {
+                font-size: 16px;
+                text-align: center;
+            }
+            
+            .controls {
+                flex-direction: column;
+                gap: 12px;
+                width: 100%;
+            }
+
+            .view-toggle {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .view-btn {
+                flex: 1;
+                padding: 10px;
+                font-size: 13px;
+            }
+
+            .nav-btn {
+                width: 100%;
+                padding: 12px;
+                font-size: 13px;
             }
             
             .legend {
+                justify-content: center;
                 gap: 16px;
+                font-size: 12px;
+            }
+
+            /* Optimized mobile calendar grid */
+            .calendar-grid {
+                gap: 2px;
+                background: #e5e5e5;
+                border-radius: 6px;
+                margin-bottom: 24px;
+            }
+
+            .day-header {
+                padding: 10px 4px;
+                font-size: 10px;
+                letter-spacing: 0.05em;
             }
             
             .day-cell {
-                min-height: 100px;
-                padding: 8px 6px;
-            }
-            
-            .event {
-                font-size: 10px;
-            }
-
-            .controls {
-                flex-wrap: wrap;
-                justify-content: center;
-            }
-            /* Mobile Responsive - No Side Scroll */
-@media (max-width: 768px) {
-  body {
-    overflow-x: hidden;
-    width: 100vw;
-  }
-  
-  .calendar-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    width: 100%;
-  }
-  
-  .calendar-grid {
-    min-width: 100%;
-    width: 100% !important;
-    display: grid;
-    grid-template-columns: auto repeat(4, 1fr); /* Day labels + 4 days */
-    font-size: 12px; /* Smaller text on mobile */
-  }
-  
-  .time-label {
-    font-size: 10px;
-    padding: 4px;
-  }
-  
-  .calendar-cell {
-    min-height: 40px;
-    padding: 2px;
-  }
-  
-  .event-card {
-    font-size: 11px;
-    padding: 4px;
-    min-height: 30px;
-  }
-  
-  /* Keep grid lines visible */
-  .calendar-cell {
-    border: 1px solid #ddd !important;
-  }
-}
-
-/* Even smaller phones */
-@media (max-width: 480px) {
-  .calendar-grid {
-    font-size: 10px;
-  }
-  
-  .event-card {
-    font-size: 9px;
-    padding: 2px;
-  }
-  
-  .time-label {
-    font-size: 9px;
-  }
-}
-        }
-
-        @media (max-width: 480px) {
-            .calendar-grid {
-                gap: 0;
-            }
-            
-            .day-header {
-                padding: 12px 4px;
+                min-height: 85px;
+                padding: 6px 4px;
                 font-size: 11px;
             }
             
-            .day-cell {
-                min-height: 80px;
-                padding: 6px 4px;
+            .day-number {
+                font-size: 12px;
+                margin-bottom: 4px;
+                font-weight: 600;
+            }
+
+            .event {
+                font-size: 9px;
+                padding: 3px 4px;
+                margin-bottom: 2px;
+                border-left-width: 2px;
+                line-height: 1.2;
+            }
+
+            .event-time {
+                font-size: 8px;
+                margin-top: 1px;
+            }
+
+            /* Week view on mobile - stack vertically */
+            .week-view {
+                grid-template-columns: 1fr;
+                gap: 8px;
             }
 
             .week-view .day-cell {
-                min-height: 300px;
+                min-height: 200px;
+                padding: 12px;
+                border-radius: 6px;
+            }
+
+            .week-view .day-header {
+                font-size: 13px;
+                padding: 10px;
+                margin-bottom: 8px;
+            }
+
+            .week-view .event {
+                font-size: 11px;
+                padding: 6px 8px;
+            }
+
+            .week-view .event-time {
+                font-size: 10px;
+            }
+
+            .footer {
+                padding-top: 20px;
+                font-size: 11px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .calendar-container {
+                padding: 12px 8px;
+            }
+
+            .brand h1 {
+                font-size: 18px;
+            }
+
+            .calendar-grid {
+                gap: 1px;
+                border-radius: 4px;
+            }
+            
+            .day-header {
+                padding: 8px 2px;
+                font-size: 9px;
+            }
+            
+            .day-cell {
+                min-height: 75px;
+                padding: 4px 3px;
+            }
+
+            .day-number {
+                font-size: 11px;
+            }
+
+            .event {
+                font-size: 8px;
+                padding: 2px 3px;
+            }
+
+            .event-time {
+                font-size: 7px;
+            }
+
+            .week-view .day-cell {
+                min-height: 180px;
+                padding: 10px;
             }
         }
     </style>
@@ -618,10 +706,21 @@
 
             const currentMonth = currentDate.getMonth();
             const date = new Date(startDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Reset time for accurate comparison
 
             while (date <= endDate) {
                 const dayCell = document.createElement('div');
                 dayCell.className = 'day-cell';
+                
+                // Check if this is today
+                const dateComparison = new Date(date);
+                dateComparison.setHours(0, 0, 0, 0);
+                const isToday = dateComparison.getTime() === today.getTime();
+                
+                if (isToday) {
+                    dayCell.classList.add('today');
+                }
                 
                 if (currentView === 'month' && date.getMonth() !== currentMonth) {
                     dayCell.classList.add('other-month');
@@ -633,6 +732,9 @@
                     dayHeader.className = 'day-header';
                     const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
                     dayHeader.textContent = `${dayName} ${date.getDate()}`;
+                    if (isToday) {
+                        dayHeader.textContent += ' (Today)';
+                    }
                     dayCell.appendChild(dayHeader);
                 } else {
                     const dayNumber = document.createElement('div');
