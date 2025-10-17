@@ -260,6 +260,180 @@
     </footer>
   </div>
 
+  /* ===========================
+   TSL — Calendar Style Tweaks (visual-only)
+   Drop this AFTER your existing <style> on the calendar page
+   =========================== */
+
+/* Font stack + global rhythm */
+.calendar-wrap,
+.calendar-wrap * {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  letter-spacing: 0 !important;        /* match site */
+}
+
+/* Brand / Header */
+.brand h1{
+  font-weight: 500 !important;
+  font-size: clamp(22px, 2.6vw, 28px) !important;
+}
+.status{
+  font-weight: 400 !important;
+  letter-spacing: .06em !important;
+}
+
+/* Month label */
+.month-display{
+  font-weight: 500 !important;
+  font-size: clamp(16px, 2.2vw, 18px) !important;
+}
+
+/* Controls */
+.view-btn,
+.nav-btn{
+  font-weight: 500 !important;
+  font-size: 12px !important;
+}
+
+/* Use site red */
+:root{
+  --tsl-red: #c4281f; /* site red */
+}
+
+/* Legend — lighter, larger, no icons change needed */
+.legend{
+  gap: clamp(12px, 2vw, 20px) !important;
+}
+.legend-item{
+  font-size: clamp(13px, 1.8vw, 16px) !important;
+  font-weight: 400 !important;
+  color: #000 !important;
+}
+.legend-swatch{
+  width: 10px !important;
+  height: 10px !important;
+  border: 1px solid #000 !important;
+}
+
+/* Weekday header row */
+.day-header{
+  /* was 700; cap at 500 and match site sizing */
+  font: 500 clamp(10px, 1.5vw, 11px)/1 "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+  color: #000 !important;
+  background: #f5f5f5 !important;
+}
+
+/* Day cells */
+.day-cell{
+  padding: clamp(8px, 1.2vw, 10px) clamp(6px, 1vw, 8px) !important;
+  background: #fff !important;
+}
+.other-month{
+  background: #fafafa !important;
+  color: #bbb !important;
+}
+
+/* Day number (was 600) */
+.day-number{
+  font: 500 clamp(11px, 1.7vw, 12px)/1 "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  color: #000 !important;
+  margin-bottom: 4px !important;
+}
+
+/* Today ring */
+.today{
+  outline: 2px solid var(--tsl-red) !important;
+  outline-offset: -2px !important;
+  background: #fff8f7 !important;
+}
+
+/* Event pills */
+.event{
+  border: 1px solid #000 !important;
+  border-radius: 6px !important;
+  padding: clamp(5px, 1vw, 6px) clamp(6px, 1vw, 8px) !important;
+  font: 500 clamp(10px, 1.6vw, 11px)/1.25 "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  color: #000 !important;
+  background: #fff !important;
+  transition: opacity .18s ease !important;
+  transform: none !important;     /* kill the slide */
+}
+.event:hover{
+  opacity: .6 !important;
+}
+.event-time{
+  font: 400 clamp(9px, 1.4vw, 10px)/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  color: #666 !important;
+  margin-top: 3px !important;
+}
+
+/* Category accents (left keyline) */
+.event.special-events{ border-left: 3px solid var(--tsl-red) !important; }
+.event.movies{         border-left: 3px solid #000 !important; }
+
+/* Week view cards */
+.calendar-grid.week-view{
+  gap: clamp(8px, 1.5vw, 12px) !important;
+}
+.calendar-grid.week-view .day-cell{
+  border-radius: 10px !important;
+  min-height: clamp(220px, 45vw, 360px) !important;
+  padding: clamp(12px, 2vw, 14px) clamp(10px, 1.8vw, 12px) !important;
+}
+.calendar-grid.week-view .day-header-inline{
+  /* was 700; cap at 500 */
+  font: 500 clamp(11px, 1.7vw, 12px)/1 "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  letter-spacing: .06em !important;
+  text-transform: uppercase !important;
+  background: #f5f5f5 !important;
+  border: 1px solid #000 !important;
+  padding: clamp(8px, 1.6vw, 10px) clamp(6px, 1.2vw, 8px) !important;
+  border-radius: 8px !important;
+  margin-bottom: clamp(8px, 1.6vw, 12px) !important;
+}
+
+/* Buttons: active = red, hover = opacity dip (no bold shift) */
+.view-btn.active{
+  background: var(--tsl-red) !important;
+  color: #fff !important;
+}
+.view-btn:hover,
+.nav-btn:hover{
+  opacity: .6 !important;
+}
+
+/* Footer */
+.footer{
+  color: #666 !important;
+  font-size: clamp(11px, 1.6vw, 12px) !important;
+}
+
+/* Responsive tune-ups */
+@media (max-width: 900px){
+  .topbar{ grid-template-columns: 1fr !important; gap: 12px !important; }
+  .legend{ justify-content: flex-start !important; }
+}
+@media (max-width: 720px){
+  .calendar-wrap{ padding: 28px 14px 36px !important; }
+  .brand h1{ font-size: clamp(20px, 5vw, 22px) !important; }
+  .month-display{ font-size: clamp(15px, 4.5vw, 16px) !important; }
+  .day-header{ font-size: clamp(10px, 3.3vw, 12px) !important; padding: 10px 6px !important; }
+  .day-cell{ min-height: 90px !important; }
+  .event{ font-size: clamp(10px, 3.2vw, 12px) !important; }
+  .event-time{ font-size: clamp(9px, 2.8vw, 11px) !important; }
+  .calendar-grid.week-view{ grid-template-columns: 1fr !important; }
+}
+
+/* Keep all text weights ≤ 500—final guard */
+.calendar-wrap h1, .calendar-wrap h2, .calendar-wrap h3,
+.day-header, .day-number,
+.calendar-grid.week-view .day-header-inline,
+.view-btn, .nav-btn, .event {
+  font-weight: 500 !important;
+}
+  
   <script>
     /* ===========================
        Google Calendar Config (unchanged ids/keys)
