@@ -6,12 +6,6 @@
 <title>Time & Space Limited — Calendar</title>
 
 <style>
-  /* ===========================
-     TSL Calendar — Minimal Restyle
-     Palette & Type: Helvetica / Black / White / TSL Red
-     Interaction: hover → opacity .6 (no bold shift), active → red
-     =========================== */
-
   :root{
     --tsl-black:#000;
     --tsl-white:#fff;
@@ -20,8 +14,7 @@
     --tsl-gray-600:#666;
     --tsl-gray-200:#e6e6e6;
     --tsl-gray-100:#f5f5f5;
-    /* If you want to tweak the red, adjust here */
-    --tsl-red:#E10600;
+    --tsl-red:#c4281f;
   }
 
   *{ box-sizing:border-box; margin:0; padding:0; }
@@ -32,9 +25,9 @@
     color: var(--tsl-gray-900);
     -webkit-font-smoothing:antialiased;
     -moz-osx-font-smoothing:grayscale;
-    font-family: Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height:1.35;
-    letter-spacing:-0.01em;
+    letter-spacing:0;
   }
 
   .calendar-wrap{
@@ -44,7 +37,6 @@
     min-height:100vh;
   }
 
-  /* Header / Brand */
   .tsl-header{
     border-bottom:1px solid var(--tsl-black);
     padding-bottom:20px;
@@ -54,15 +46,14 @@
     display:flex; align-items:baseline; gap:12px; margin-bottom:12px;
   }
   .brand h1{
-    font-size:28px; font-weight:500; letter-spacing:-0.02em; color:var(--tsl-black);
+    font-size:clamp(22px, 2.6vw, 28px); font-weight:500; letter-spacing:0; color:var(--tsl-black);
   }
   .status{
-    font-size:10px; text-transform:uppercase; letter-spacing:.08em;
+    font-size:10px; text-transform:uppercase; letter-spacing:.06em;
     color:var(--tsl-black); border:1px solid var(--tsl-black);
-    padding:3px 6px; border-radius:3px;
+    padding:3px 6px; border-radius:3px; font-weight:400;
   }
 
-  /* Top controls */
   .topbar{
     display:grid;
     grid-template-columns: 1fr auto auto;
@@ -70,56 +61,52 @@
     align-items:center;
   }
   .month-display{
-    font-size:18px; font-weight:500;
+    font-size:clamp(16px, 2.2vw, 18px); font-weight:500;
   }
 
   .controls{
     display:flex; align-items:center; gap:10px;
   }
 
-  /* Segmented view toggle (Month / Week) */
   .view-toggle{
     display:flex; gap:0; border:1px solid var(--tsl-black); border-radius:6px; overflow:hidden;
   }
   .view-btn{
     appearance:none; border:none; background:var(--tsl-white); color:var(--tsl-black);
-    font:500 12px/1 Helvetica, Arial, sans-serif;
+    font:500 12px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
     padding:8px 12px; cursor:pointer; transition:opacity .18s ease;
   }
   .view-btn + .view-btn{ border-left:1px solid var(--tsl-black); }
   .view-btn:hover{ opacity:.6; }
   .view-btn.active{ background:var(--tsl-red); color:var(--tsl-white); }
 
-  /* Nav buttons */
   .nav-btn{
     appearance:none; background:var(--tsl-white);
     border:1px solid var(--tsl-black); color:var(--tsl-black);
-    font:500 12px/1 Helvetica, Arial, sans-serif;
+    font:500 12px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
     padding:8px 12px; border-radius:6px; cursor:pointer; transition:opacity .18s ease;
   }
   .nav-btn:hover{ opacity:.6; }
 
-  /* Legend (dots -> thin squares to match keyline style) */
   .legend{
-    display:flex; gap:16px; flex-wrap:wrap; justify-self:end;
+    display:flex; gap:clamp(12px, 2vw, 20px); flex-wrap:wrap; justify-self:end;
   }
   .legend-item{
-    display:flex; align-items:center; gap:8px; font-size:18px; color:var(--tsl-gray-700);
+    display:flex; align-items:center; gap:8px; font-size:clamp(13px, 1.8vw, 16px); color:var(--tsl-black); font-weight:400;
   }
   .legend-swatch{
     width:10px; height:10px; border:1px solid var(--tsl-black); background:var(--tsl-white);
   }
   .swatch-events{ background:var(--tsl-red); }
-  .swatch-movies{ background:var(--tsl-white); border:1px solid var(--tsl-black); }
+  .swatch-movies{ background:var(--tsl-white); }
 
-  /* Grid */
   .calendar-grid{
     display:grid; grid-template-columns:repeat(7, 1fr);
     gap:0; border:1px solid var(--tsl-black); border-radius:8px; overflow:hidden;
     margin-top:20px; margin-bottom:40px;
   }
   .day-header{
-    font:700 11px/1 Helvetica, Arial, sans-serif;
+    font:500 clamp(10px, 1.5vw, 11px)/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
     letter-spacing:.08em; text-transform:uppercase; color:var(--tsl-black);
     padding:12px 8px; text-align:center; background:var(--tsl-gray-100);
     border-right:1px solid var(--tsl-black);
@@ -127,54 +114,47 @@
   .day-header:last-child{ border-right:none; }
 
   .day-cell{
-    position:relative; min-height:120px; padding:10px 8px; background:var(--tsl-white);
+    position:relative; min-height:120px; padding:clamp(8px, 1.2vw, 10px) clamp(6px, 1vw, 8px); background:var(--tsl-white);
     border-top:1px solid var(--tsl-black); border-right:1px solid var(--tsl-black);
     display:flex; flex-direction:column; gap:6px;
   }
-  /* Right border cleanup for last column handled in render */
   .other-month{ background:#fafafa; color:#bbb; }
   .day-number{
-    font:600 12px/1 Helvetica, Arial, sans-serif; color:var(--tsl-black); margin-bottom:4px;
+    font:500 clamp(11px, 1.7vw, 12px)/1 "Helvetica Neue", Helvetica, Arial, sans-serif; color:var(--tsl-black); margin-bottom:4px;
   }
-  /* Today: red keyline ring, keep text black */
   .today{
     outline:2px solid var(--tsl-red);
     outline-offset:-2px;
     background:#fff8f7;
   }
 
-  /* Event pills */
   .event{
     display:block; text-decoration:none; color:var(--tsl-black);
     background:var(--tsl-white);
     border:1px solid var(--tsl-black);
-    padding:6px 8px; border-radius:6px;
-    font:500 11px/1.25 Helvetica, Arial, sans-serif;
-    transition:opacity .18s ease, transform .18s ease;
-    will-change:opacity, transform;
+    padding:clamp(5px, 1vw, 6px) clamp(6px, 1vw, 8px); border-radius:6px;
+    font:500 clamp(10px, 1.6vw, 11px)/1.25 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    transition:opacity .18s ease;
   }
   .event:hover{ opacity:.6; }
-  .event-time{ font:400 10px/1.2 Helvetica, Arial, sans-serif; color:var(--tsl-gray-700); margin-top:3px; }
+  .event-time{ font:400 clamp(9px, 1.4vw, 10px)/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif; color:var(--tsl-gray-700); margin-top:3px; }
 
-  /* Category accents via left keyline */
   .event.special-events{ border-left:3px solid var(--tsl-red); }
   .event.movies{ border-left:3px solid var(--tsl-black); }
 
-  /* Week view variant */
   .calendar-grid.week-view{
-    border:none; gap:12px; grid-template-columns:repeat(7, 1fr);
+    border:none; gap:clamp(8px, 1.5vw, 12px); grid-template-columns:repeat(7, 1fr);
   }
   .calendar-grid.week-view .day-header{ display:none; }
   .calendar-grid.week-view .day-cell{
-    border:1px solid var(--tsl-black); border-radius:10px; min-height:360px; padding:14px 12px;
+    border:1px solid var(--tsl-black); border-radius:10px; min-height:clamp(220px, 45vw, 360px); padding:clamp(12px, 2vw, 14px) clamp(10px, 1.8vw, 12px);
   }
   .calendar-grid.week-view .day-cell .day-header-inline{
     background:var(--tsl-gray-100); border:1px solid var(--tsl-black);
-    padding:10px 8px; border-radius:8px; margin-bottom:12px;
-    font:700 12px/1 Helvetica, Arial, sans-serif; text-transform:uppercase; letter-spacing:.06em;
+    padding:clamp(8px, 1.6vw, 10px) clamp(6px, 1.2vw, 8px); border-radius:8px; margin-bottom:clamp(8px, 1.6vw, 12px);
+    font:500 clamp(11px, 1.7vw, 12px)/1 "Helvetica Neue", Helvetica, Arial, sans-serif; text-transform:uppercase; letter-spacing:.06em;
   }
 
-  /* Loading + Error */
   .loading{
     display:flex; align-items:center; justify-content:center; min-height:320px;
     color:var(--tsl-gray-700); font-size:14px;
@@ -184,33 +164,28 @@
     padding:14px; border-radius:8px; font-size:14px;
   }
 
-  /* Footer */
   .footer{
     border-top:1px solid var(--tsl-black);
-    padding-top:18px; text-align:center; color:var(--tsl-gray-700); font-size:12px;
+    padding-top:18px; text-align:center; color:var(--tsl-gray-700); font-size:clamp(11px, 1.6vw, 12px);
   }
 
-  /* Motion respect */
   @media (prefers-reduced-motion: reduce){
-    .event{ transition:none; }
-    .view-btn, .nav-btn{ transition:none; }
+    .event, .view-btn, .nav-btn{ transition:none; }
   }
 
-  /* Responsive */
   @media (max-width: 900px){
     .topbar{ grid-template-columns: 1fr; gap:12px; }
     .legend{ justify-content:flex-start; }
   }
   @media (max-width: 720px){
     .calendar-wrap{ padding:28px 14px 36px; }
-    .brand h1{ font-size:22px; }
-    .month-display{ font-size:16px; }
-    .day-header{ padding:10px 6px; font-size:12px; }
-    .day-cell{ min-height:90px; padding:8px 6px; }
-    .event{ font-size:12px; padding:5px 6px; border-radius:6px; }
-    .event-time{ font-size:11px; }
+    .brand h1{ font-size:clamp(20px, 5vw, 22px); }
+    .month-display{ font-size:clamp(15px, 4.5vw, 16px); }
+    .day-header{ font-size:clamp(10px, 3.3vw, 12px); padding:10px 6px; }
+    .day-cell{ min-height:90px; }
+    .event{ font-size:clamp(10px, 3.2vw, 12px); }
+    .event-time{ font-size:clamp(9px, 2.8vw, 11px); }
     .calendar-grid.week-view{ grid-template-columns:1fr; }
-    .calendar-grid.week-view .day-cell{ min-height:220px; }
   }
 </style>
 </head>
@@ -252,7 +227,6 @@
       <div class="day-header">Fri</div>
       <div class="day-header">Sat</div>
       <div class="day-header">Sun</div>
-      <!-- day cells injected -->
     </div>
 
     <footer class="footer">
@@ -260,184 +234,7 @@
     </footer>
   </div>
 
-  /* ===========================
-   TSL — Calendar Style Tweaks (visual-only)
-   Drop this AFTER your existing <style> on the calendar page
-   =========================== */
-
-/* Font stack + global rhythm */
-.calendar-wrap,
-.calendar-wrap * {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-  letter-spacing: 0 !important;        /* match site */
-}
-
-/* Brand / Header */
-.brand h1{
-  font-weight: 500 !important;
-  font-size: clamp(22px, 2.6vw, 28px) !important;
-}
-.status{
-  font-weight: 400 !important;
-  letter-spacing: .06em !important;
-}
-
-/* Month label */
-.month-display{
-  font-weight: 500 !important;
-  font-size: clamp(16px, 2.2vw, 18px) !important;
-}
-
-/* Controls */
-.view-btn,
-.nav-btn{
-  font-weight: 500 !important;
-  font-size: 12px !important;
-}
-
-/* Use site red */
-:root{
-  --tsl-red: #c4281f; /* site red */
-}
-
-/* Legend — lighter, larger, no icons change needed */
-.legend{
-  gap: clamp(12px, 2vw, 20px) !important;
-}
-.legend-item{
-  font-size: clamp(13px, 1.8vw, 16px) !important;
-  font-weight: 400 !important;
-  color: #000 !important;
-}
-.legend-swatch{
-  width: 10px !important;
-  height: 10px !important;
-  border: 1px solid #000 !important;
-}
-
-/* Weekday header row */
-.day-header{
-  /* was 700; cap at 500 and match site sizing */
-  font: 500 clamp(10px, 1.5vw, 11px)/1 "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-  letter-spacing: .08em !important;
-  text-transform: uppercase !important;
-  color: #000 !important;
-  background: #f5f5f5 !important;
-}
-
-/* Day cells */
-.day-cell{
-  padding: clamp(8px, 1.2vw, 10px) clamp(6px, 1vw, 8px) !important;
-  background: #fff !important;
-}
-.other-month{
-  background: #fafafa !important;
-  color: #bbb !important;
-}
-
-/* Day number (was 600) */
-.day-number{
-  font: 500 clamp(11px, 1.7vw, 12px)/1 "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-  color: #000 !important;
-  margin-bottom: 4px !important;
-}
-
-/* Today ring */
-.today{
-  outline: 2px solid var(--tsl-red) !important;
-  outline-offset: -2px !important;
-  background: #fff8f7 !important;
-}
-
-/* Event pills */
-.event{
-  border: 1px solid #000 !important;
-  border-radius: 6px !important;
-  padding: clamp(5px, 1vw, 6px) clamp(6px, 1vw, 8px) !important;
-  font: 500 clamp(10px, 1.6vw, 11px)/1.25 "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-  color: #000 !important;
-  background: #fff !important;
-  transition: opacity .18s ease !important;
-  transform: none !important;     /* kill the slide */
-}
-.event:hover{
-  opacity: .6 !important;
-}
-.event-time{
-  font: 400 clamp(9px, 1.4vw, 10px)/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-  color: #666 !important;
-  margin-top: 3px !important;
-}
-
-/* Category accents (left keyline) */
-.event.special-events{ border-left: 3px solid var(--tsl-red) !important; }
-.event.movies{         border-left: 3px solid #000 !important; }
-
-/* Week view cards */
-.calendar-grid.week-view{
-  gap: clamp(8px, 1.5vw, 12px) !important;
-}
-.calendar-grid.week-view .day-cell{
-  border-radius: 10px !important;
-  min-height: clamp(220px, 45vw, 360px) !important;
-  padding: clamp(12px, 2vw, 14px) clamp(10px, 1.8vw, 12px) !important;
-}
-.calendar-grid.week-view .day-header-inline{
-  /* was 700; cap at 500 */
-  font: 500 clamp(11px, 1.7vw, 12px)/1 "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-  letter-spacing: .06em !important;
-  text-transform: uppercase !important;
-  background: #f5f5f5 !important;
-  border: 1px solid #000 !important;
-  padding: clamp(8px, 1.6vw, 10px) clamp(6px, 1.2vw, 8px) !important;
-  border-radius: 8px !important;
-  margin-bottom: clamp(8px, 1.6vw, 12px) !important;
-}
-
-/* Buttons: active = red, hover = opacity dip (no bold shift) */
-.view-btn.active{
-  background: var(--tsl-red) !important;
-  color: #fff !important;
-}
-.view-btn:hover,
-.nav-btn:hover{
-  opacity: .6 !important;
-}
-
-/* Footer */
-.footer{
-  color: #666 !important;
-  font-size: clamp(11px, 1.6vw, 12px) !important;
-}
-
-/* Responsive tune-ups */
-@media (max-width: 900px){
-  .topbar{ grid-template-columns: 1fr !important; gap: 12px !important; }
-  .legend{ justify-content: flex-start !important; }
-}
-@media (max-width: 720px){
-  .calendar-wrap{ padding: 28px 14px 36px !important; }
-  .brand h1{ font-size: clamp(20px, 5vw, 22px) !important; }
-  .month-display{ font-size: clamp(15px, 4.5vw, 16px) !important; }
-  .day-header{ font-size: clamp(10px, 3.3vw, 12px) !important; padding: 10px 6px !important; }
-  .day-cell{ min-height: 90px !important; }
-  .event{ font-size: clamp(10px, 3.2vw, 12px) !important; }
-  .event-time{ font-size: clamp(9px, 2.8vw, 11px) !important; }
-  .calendar-grid.week-view{ grid-template-columns: 1fr !important; }
-}
-
-/* Keep all text weights ≤ 500—final guard */
-.calendar-wrap h1, .calendar-wrap h2, .calendar-wrap h3,
-.day-header, .day-number,
-.calendar-grid.week-view .day-header-inline,
-.view-btn, .nav-btn, .event {
-  font-weight: 500 !important;
-}
-  
   <script>
-    /* ===========================
-       Google Calendar Config (unchanged ids/keys)
-       =========================== */
     const CLIENT_ID = '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
     const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
     const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
@@ -453,7 +250,6 @@
     let currentDate = new Date();
     let currentView = 'month';
 
-    // Load GAPI and init
     async function initializeGapi(){
       try{
         await new Promise((res, rej)=>{
@@ -481,7 +277,7 @@
       let startDate, endDate;
       if(currentView==='week'){
         const today = new Date(currentDate);
-        const dow = today.getDay(); // 0=Sun
+        const dow = today.getDay();
         const mondayOffset = (dow===0 ? -6 : 1 - dow);
         startDate = new Date(today); startDate.setDate(today.getDate()+mondayOffset);
         endDate   = new Date(startDate); endDate.setDate(startDate.getDate()+6);
@@ -552,18 +348,12 @@
 
     function renderCalendar(startDate, endDate, events){
       const grid = document.getElementById('calendarGrid');
-
-      // Week class toggle
       grid.classList.toggle('week-view', currentView==='week');
-
-      // Remove old day cells (keep headers)
       grid.querySelectorAll('.day-cell').forEach(n=>n.remove());
 
       const curMonth = currentDate.getMonth();
       const loopDate = new Date(startDate);
       const today = new Date(); today.setHours(0,0,0,0);
-
-      // We need to mark last column borders off in month view
       let colIndex = 0;
 
       while(loopDate<=endDate){
@@ -601,7 +391,6 @@
           const a=document.createElement('a');
           a.className = `event ${ev.calendarType}`;
 
-          // Prefer first URL in description; fall back to Google link
           let link = ev.htmlLink || '#';
           if(ev.description){
             const m = ev.description.match(/https?:\/\/[^\s<>"{}|\\^`[\]]+/i);
@@ -612,7 +401,6 @@
           let timeText='';
           if(ev.start.dateTime){
             const t=new Date(ev.start.dateTime);
-            // Force ET like the rest of your stack
             timeText = t.toLocaleTimeString('en-US',{hour:'numeric', minute:'2-digit', hour12:true});
           }
           const title = ev.summary || 'Untitled Event';
@@ -620,7 +408,6 @@
           cell.appendChild(a);
         });
 
-        // Month grid right border cleanup for last column
         colIndex = (colIndex+1) % 7;
         if(currentView==='month' && colIndex===0){
           cell.style.borderRight = 'none';
@@ -631,7 +418,6 @@
       }
     }
 
-    // Navigation
     function previousPeriod(){
       if(currentView==='week'){ currentDate.setDate(currentDate.getDate()-7); }
       else{ currentDate.setMonth(currentDate.getMonth()-1); }
@@ -651,7 +437,6 @@
       loadCalendar();
     }
 
-    // View switching
     function switchToMonth(){
       currentView='month';
       document.getElementById('monthViewBtn').classList.add('active');
@@ -669,7 +454,6 @@
       resetAndLoad();
     }
 
-    // Listeners
     document.getElementById('prevBtn').addEventListener('click', previousPeriod);
     document.getElementById('nextBtn').addEventListener('click', nextPeriod);
     document.getElementById('todayBtn').addEventListener('click', goToToday);
