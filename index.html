@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v2.0 Clean</title>
+    <title>TSL Scheduler v2.1 - Date Fixed</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
@@ -43,7 +43,7 @@
 
         .version {
             font-size: 12px;
-            background: #007aff;
+            background: #34c759;
             color: white;
             padding: 4px 8px;
             border-radius: 12px;
@@ -230,7 +230,7 @@
             flex: 1;
             background: white;
             border-radius: 12px;
-            padding: 20px 20px 20px 80px; /* Extra left padding for time labels */
+            padding: 20px 20px 20px 80px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             overflow-x: auto;
         }
@@ -277,7 +277,7 @@
 
         .theater-grid {
             position: relative;
-            height: 960px; /* 12 hours * 80px per hour */
+            height: 960px;
             border-left: 1px solid #e0e0e0;
         }
 
@@ -313,7 +313,6 @@
             overflow: hidden;
         }
 
-        /* Make children non-interactive for solid drag */
         .event-block * {
             pointer-events: none;
             user-select: none;
@@ -364,7 +363,7 @@
             transition: opacity 0.2s;
             font-size: 14px;
             line-height: 1;
-            pointer-events: auto !important; /* Override parent rule */
+            pointer-events: auto !important;
         }
 
         .delete-btn:hover {
@@ -434,7 +433,7 @@
             <div>
                 <h1>
                     TSL Scheduler
-                    <span class="version">v2.0 Clean</span>
+                    <span class="version">v2.1 FIXED</span>
                 </h1>
             </div>
             <div class="header-actions">
@@ -523,7 +522,7 @@
         // ============================================
         
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.log('TSL Scheduler v2.0 Clean initialized');
+        console.log('TSL Scheduler v2.1 - Date Fixed initialized');
 
         // ============================================
         // GOOGLE API
@@ -579,23 +578,39 @@
         };
 
         // ============================================
-        // WEEK NAVIGATION
+        // WEEK NAVIGATION - FIXED FOR CORRECT DATES
         // ============================================
         
         function setWeek(offset) {
             currentWeek = new Date();
             currentWeek.setHours(0, 0, 0, 0);
-            const day = currentWeek.getDay();
-            // Adjust to Tuesday (day 2)
-            const diff = (day === 0 ? -6 : 1) - day + (day === 0 ? 7 : 0);
-            currentWeek.setDate(currentWeek.getDate() + diff + (offset * 7));
+            
+            // Find the Friday of the current "week" (Fri-Mon period)
+            const day = currentWeek.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+            
+            // Calculate days from last Friday
+            // If today is Friday (5), daysFromFriday = 0
+            // If today is Saturday (6), daysFromFriday = 1
+            // If today is Sunday (0), daysFromFriday = 2
+            // If today is Monday (1), daysFromFriday = 3
+            // If today is Tuesday (2), daysFromFriday = 4
+            // If today is Wednesday (3), daysFromFriday = 5
+            // If today is Thursday (4), daysFromFriday = 6
+            const daysFromFriday = (day + 2) % 7;
+            
+            // Set to Friday
+            currentWeek.setDate(currentWeek.getDate() - daysFromFriday);
+            
+            // Apply week offset
+            currentWeek.setDate(currentWeek.getDate() + (offset * 7));
+            
             updateWeekDisplay();
             renderSchedule();
         }
 
         function updateWeekDisplay() {
             const end = new Date(currentWeek);
-            end.setDate(end.getDate() + 6);
+            end.setDate(end.getDate() + 3); // Friday + 3 = Monday
             const options = { month: 'short', day: 'numeric', year: 'numeric' };
             document.getElementById('weekDisplay').textContent = 
                 `${currentWeek.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
@@ -622,7 +637,6 @@
                 const saved = localStorage.getItem('tsl-scheduled-events');
                 if (saved) {
                     scheduled = JSON.parse(saved);
-                    // Convert date strings back to Date objects
                     scheduled.forEach(event => {
                         if (event.startTime) {
                             event.startTime = new Date(event.startTime);
@@ -713,14 +727,13 @@
                 item.title.toLowerCase().includes(search)
             );
             
-            // Apply recent filter
             if (recentFilter !== 'all') {
                 const daysAgo = parseInt(recentFilter);
                 const cutoffDate = new Date();
                 cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
                 
                 filtered = filtered.filter(item => {
-                    if (!item.updatedAt) return true; // Include items without timestamp
+                    if (!item.updatedAt) return true;
                     const itemDate = new Date(item.updatedAt);
                     return itemDate >= cutoffDate;
                 });
@@ -745,11 +758,10 @@
                 </div>
             `).join('');
 
-            // Add drag listeners
             document.querySelectorAll('.library-item').forEach(el => {
                 el.addEventListener('dragstart', e => {
                     draggedItem = JSON.parse(e.target.dataset.item);
-                    dragOffset = 0; // Snap from top when dragging from library
+                    dragOffset = 0;
                     e.dataTransfer.effectAllowed = 'move';
                 });
             });
@@ -780,7 +792,7 @@
         }
 
         // ============================================
-        // SCHEDULE RENDERING
+        // SCHEDULE RENDERING - FIXED DATES
         // ============================================
         
         function renderSchedule() {
@@ -790,7 +802,7 @@
             let html = '';
             for (let i = 0; i < 4; i++) {
                 const date = new Date(currentWeek);
-                date.setDate(date.getDate() + (i + 3)); // Fri=3, Sat=4, Sun=5, Mon=6
+                date.setDate(date.getDate() + i); // FIXED: Friday + 0, +1, +2, +3
                 
                 html += `
                     <div class="day-column">
@@ -820,7 +832,6 @@
             
             container.innerHTML = html;
             
-            // Add drop listeners
             document.querySelectorAll('.theater-grid').forEach(grid => {
                 grid.addEventListener('dragover', handleDragOver);
                 grid.addEventListener('dragleave', handleDragLeave);
@@ -841,12 +852,11 @@
             const rect = this.getBoundingClientRect();
             let y = e.clientY - rect.top;
             
-            // Adjust for drag offset (snap from TOP of block)
             if (dragOffset > 0) {
                 y = y - dragOffset;
             }
             
-            const snappedY = Math.round(y / 20) * 20; // Snap to 15min intervals (20px = 15min)
+            const snappedY = Math.round(y / 20) * 20;
             
             let preview = this.querySelector('.drag-preview');
             if (!preview) {
@@ -882,7 +892,6 @@
             const rect = this.getBoundingClientRect();
             let y = e.clientY - rect.top;
             
-            // Adjust for drag offset (snap from TOP of block)
             if (dragOffset > 0) {
                 y = y - dragOffset;
             }
@@ -895,10 +904,9 @@
             const min = Math.round((snappedY % 80) / 80 * 60);
             
             const date = new Date(currentWeek);
-            date.setDate(date.getDate() + day + 3); // +3 to start at Friday
+            date.setDate(date.getDate() + day); // FIXED: Friday + day offset
             date.setHours(hour, min, 0, 0);
             
-            // If moving an existing scheduled event, remove the original first
             if (draggedItem.fromSchedule && draggedItem.scheduleId) {
                 const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
                 if (index !== -1) {
@@ -913,14 +921,13 @@
                 startTime: date,
                 position: snappedY,
                 scheduleId: `sched-${Date.now()}`,
-                fromSchedule: false  // Reset flag
+                fromSchedule: false
             });
             
-            // Reset drag offset
             dragOffset = 0;
             
             renderSchedule();
-            saveToLocalStorage(); // Auto-save
+            saveToLocalStorage();
             showToast(`${draggedItem.fromSchedule ? 'Moved' : 'Scheduled'}: ${draggedItem.title}`);
         }
 
@@ -936,7 +943,7 @@
                 const block = document.createElement('div');
                 block.className = `event-block ${event.type === 'movie' ? `movie-t${event.theater}` : 'event'}`;
                 block.style.top = `${event.position}px`;
-                block.style.height = `${event.duration * 80 / 60}px`; // 80px per hour
+                block.style.height = `${event.duration * 80 / 60}px`;
                 block.draggable = true;
                 
                 const hour = event.startTime.getHours();
@@ -950,7 +957,6 @@
                     <button class="delete-btn">×</button>
                 `;
                 
-                // Re-drag scheduled events
                 block.addEventListener('dragstart', e => {
                     const rect = block.getBoundingClientRect();
                     dragOffset = e.clientY - rect.top;
@@ -958,7 +964,6 @@
                     e.dataTransfer.effectAllowed = 'move';
                 });
                 
-                // Delete button
                 block.querySelector('.delete-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
                     deleteEvent(event.scheduleId);
@@ -980,7 +985,7 @@
             if (confirm(`Delete ${event.title}?`)) {
                 scheduled.splice(index, 1);
                 renderSchedule();
-                saveToLocalStorage(); // Auto-save
+                saveToLocalStorage();
                 showToast('Event deleted');
             }
         }
@@ -1018,7 +1023,6 @@
                 
                 for (const event of scheduled) {
                     try {
-                        // Determine which calendar to use
                         let calendarId;
                         if (event.type === 'movie') {
                             calendarId = event.theater === 1 ? CALENDARS['theater-1'] : CALENDARS['theater-2'];
@@ -1026,7 +1030,6 @@
                             calendarId = CALENDARS['events'];
                         }
                         
-                        // Build the Google Calendar event
                         const startTime = new Date(event.startTime);
                         const endTime = new Date(startTime.getTime() + (event.duration * 60000));
                         
@@ -1049,10 +1052,8 @@
                             }
                         };
                         
-                        // Check if event already exists in Google Calendar
                         let existingEventId = null;
                         if (event.googleEventId) {
-                            // Try to get the event
                             try {
                                 const checkResponse = await gapi.client.calendar.events.get({
                                     calendarId: calendarId,
@@ -1062,13 +1063,11 @@
                                     existingEventId = event.googleEventId;
                                 }
                             } catch (e) {
-                                // Event doesn't exist, will create new
                                 console.log('Event not found, will create new');
                             }
                         }
                         
                         if (existingEventId) {
-                            // Update existing event
                             await gapi.client.calendar.events.update({
                                 calendarId: calendarId,
                                 eventId: existingEventId,
@@ -1077,13 +1076,11 @@
                             updated++;
                             console.log(`Updated: ${event.title}`);
                         } else {
-                            // Create new event
                             const response = await gapi.client.calendar.events.insert({
                                 calendarId: calendarId,
                                 resource: googleEvent
                             });
                             
-                            // Store the Google Event ID back in our scheduled event
                             const idx = scheduled.findIndex(e => e.scheduleId === event.scheduleId);
                             if (idx !== -1) {
                                 scheduled[idx].googleEventId = response.result.id;
@@ -1099,7 +1096,6 @@
                     }
                 }
                 
-                // Save updated scheduled array with Google IDs
                 saveToLocalStorage();
                 
                 if (errors === 0) {
@@ -1119,23 +1115,16 @@
         // ============================================
         
         setWeek(0);
-        
-        // Load saved schedule from localStorage
         loadFromLocalStorage();
-        
-        // Auto-load from Supabase
         importFromSupabase();
         
-        // Clear button handler
         document.getElementById('clearBtn').onclick = clearLocalStorage;
         
-        // Load Google API
         const gapiScript = document.createElement('script');
         gapiScript.src = 'https://apis.google.com/js/api.js';
         gapiScript.onload = initGoogleAPI;
         document.head.appendChild(gapiScript);
         
-        // Load Google Identity Services
         const gsiScript = document.createElement('script');
         gsiScript.src = 'https://accounts.google.com/gsi/client';
         gsiScript.onload = () => {
