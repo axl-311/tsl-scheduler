@@ -777,17 +777,26 @@
             date.setDate(date.getDate() + day + 3); // +3 to start at Friday
             date.setHours(hour, min, 0, 0);
             
+            // If moving an existing scheduled event, remove the original first
+            if (draggedItem.fromSchedule && draggedItem.scheduleId) {
+                const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
+                if (index !== -1) {
+                    scheduled.splice(index, 1);
+                }
+            }
+            
             scheduled.push({
                 ...draggedItem,
                 day,
                 theater,
                 startTime: date,
                 position: snappedY,
-                scheduleId: `sched-${Date.now()}`
+                scheduleId: `sched-${Date.now()}`,
+                fromSchedule: false  // Reset flag
             });
             
             renderSchedule();
-            showToast(`Scheduled: ${draggedItem.title}`);
+            showToast(`${draggedItem.fromSchedule ? 'Moved' : 'Scheduled'}: ${draggedItem.title}`);
         }
 
         // ============================================
@@ -795,7 +804,7 @@
         // ============================================
         
         function renderScheduledEvents() {
-            scheduled.forEach((event, index) => {
+            scheduled.forEach((event) => {
                 const grid = document.querySelector(`[data-day="${event.day}"][data-theater="${event.theater}"]`);
                 if (!grid) return;
                 
@@ -820,14 +829,14 @@
                 block.addEventListener('dragstart', e => {
                     const rect = block.getBoundingClientRect();
                     dragOffset = e.clientY - rect.top;
-                    draggedItem = { ...event, fromSchedule: true, originalIndex: index };
+                    draggedItem = { ...event, fromSchedule: true, scheduleId: event.scheduleId };
                     e.dataTransfer.effectAllowed = 'move';
                 });
                 
                 // Delete button
                 block.querySelector('.delete-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    deleteEvent(index);
+                    deleteEvent(event.scheduleId);
                 });
                 
                 grid.appendChild(block);
@@ -838,7 +847,10 @@
         // DELETE EVENT
         // ============================================
         
-        function deleteEvent(index) {
+        function deleteEvent(scheduleId) {
+            const index = scheduled.findIndex(e => e.scheduleId === scheduleId);
+            if (index === -1) return;
+            
             const event = scheduled[index];
             if (confirm(`Delete ${event.title}?`)) {
                 scheduled.splice(index, 1);
