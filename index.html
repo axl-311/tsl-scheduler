@@ -530,28 +530,51 @@
         // ============================================
         
         function initGoogleAPI() {
-            gapi.load('client:auth2', async () => {
+            gapi.load('client', async () => {
                 await gapi.client.init({
                     apiKey: API_KEY,
-                    clientId: CLIENT_ID,
-                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-                    scope: SCOPES
+                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
                 });
+                console.log('Google API client initialized');
             });
         }
+        
+        function initOAuth() {
+            const tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (response) => {
+                    if (response.access_token) {
+                        accessToken = response.access_token;
+                        document.getElementById('status').textContent = 'Connected';
+                        document.getElementById('status').classList.add('connected');
+                        document.getElementById('syncBtn').disabled = false;
+                        document.getElementById('pushBtn').disabled = false;
+                        showToast('Connected to Google Calendar');
+                    }
+                },
+            });
+            
+            window.tokenClient = tokenClient;
+        }
 
-        document.getElementById('authBtn').onclick = async () => {
-            try {
-                await gapi.auth2.getAuthInstance().signIn();
-                accessToken = gapi.auth.getToken().access_token;
-                document.getElementById('status').textContent = 'Connected';
-                document.getElementById('status').classList.add('connected');
-                document.getElementById('syncBtn').disabled = false;
-                document.getElementById('pushBtn').disabled = false;
-                showToast('Connected to Google Calendar');
-            } catch (error) {
-                console.error('Auth error:', error);
-                showToast('Authentication failed');
+        document.getElementById('authBtn').onclick = () => {
+            if (accessToken) {
+                google.accounts.oauth2.revoke(accessToken, () => {
+                    console.log('Access token revoked');
+                });
+                accessToken = null;
+                document.getElementById('status').textContent = 'Not connected';
+                document.getElementById('status').classList.remove('connected');
+                document.getElementById('syncBtn').disabled = true;
+                document.getElementById('pushBtn').disabled = true;
+                showToast('Disconnected from Google Calendar');
+            } else {
+                if (window.tokenClient) {
+                    window.tokenClient.requestAccessToken();
+                } else {
+                    showToast('Authentication not ready. Please refresh the page.');
+                }
             }
         };
 
@@ -1107,10 +1130,20 @@
         document.getElementById('clearBtn').onclick = clearLocalStorage;
         
         // Load Google API
-        const script = document.createElement('script');
-        script.src = 'https://apis.google.com/js/api.js';
-        script.onload = initGoogleAPI;
-        document.head.appendChild(script);
+        const gapiScript = document.createElement('script');
+        gapiScript.src = 'https://apis.google.com/js/api.js';
+        gapiScript.onload = initGoogleAPI;
+        document.head.appendChild(gapiScript);
+        
+        // Load Google Identity Services
+        const gsiScript = document.createElement('script');
+        gsiScript.src = 'https://accounts.google.com/gsi/client';
+        gsiScript.onload = () => {
+            setTimeout(() => {
+                initOAuth();
+            }, 1000);
+        };
+        document.head.appendChild(gsiScript);
     </script>
 </body>
 </html>
