@@ -578,34 +578,38 @@
         };
 
         // ============================================
-        // WEEK NAVIGATION - FIXED FOR CORRECT DATES
+        // WEEK NAVIGATION - FIXED FOR CUMULATIVE NAVIGATION
         // ============================================
         
+        let weekOffset = 0; // Track cumulative offset from today
+        
         function setWeek(offset) {
-            currentWeek = new Date();
-            currentWeek.setHours(0, 0, 0, 0);
+            // Update the offset cumulatively
+            weekOffset += offset;
             
-            // Find the Friday of the current "week" (Fri-Mon period)
-            const day = currentWeek.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+            // Start from today
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
             
-            // Calculate days from last Friday
-            // If today is Friday (5), daysFromFriday = 0
-            // If today is Saturday (6), daysFromFriday = 1
-            // If today is Sunday (0), daysFromFriday = 2
-            // If today is Monday (1), daysFromFriday = 3
-            // If today is Tuesday (2), daysFromFriday = 4
-            // If today is Wednesday (3), daysFromFriday = 5
-            // If today is Thursday (4), daysFromFriday = 6
+            // Find Friday of current week
+            const day = today.getDay();
             const daysFromFriday = (day + 2) % 7;
             
-            // Set to Friday
-            currentWeek.setDate(currentWeek.getDate() - daysFromFriday);
+            // Set to Friday of this week
+            currentWeek = new Date(today);
+            currentWeek.setDate(today.getDate() - daysFromFriday);
             
-            // Apply week offset
-            currentWeek.setDate(currentWeek.getDate() + (offset * 7));
+            // Apply cumulative offset
+            currentWeek.setDate(currentWeek.getDate() + (weekOffset * 7));
             
             updateWeekDisplay();
             renderSchedule();
+        }
+        
+        function resetWeek() {
+            // Reset to current week
+            weekOffset = 0;
+            setWeek(0);
         }
 
         function updateWeekDisplay() {
