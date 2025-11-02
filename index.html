@@ -1,791 +1,884 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TSL Scheduler v3.0 - WORKING</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSL Scheduler v3.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #f5f5f5;
-      padding: 20px;
-    }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
 
-    .container {
-      max-width: 100%;
-      margin: 0 auto;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      overflow: hidden;
-    }
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+        }
 
-    .header {
-      padding: 20px;
-      border-bottom: 1px solid #ddd;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: white;
-    }
+        /* ===== LIBRARY PANEL ===== */
+        .library {
+            width: 320px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-height: calc(100vh - 140px);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
 
-    .header h1 {
-      font-size: 24px;
-      font-weight: 600;
-    }
+        .library h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
 
-    .controls {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
+        .library-search {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
 
-    .btn {
-      padding: 10px 20px;
-      border: 1px solid #2196F3;
-      background: #2196F3;
-      color: white;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: background 0.2s;
-    }
+        .library-search:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
 
-    .btn:hover {
-      background: #1976D2;
-      border-color: #1976D2;
-    }
+        .library-items {
+            flex: 1;
+            overflow-y: auto;
+        }
 
-    .btn.secondary {
-      background: white;
-      color: #2196F3;
-    }
+        .library-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-left: 4px solid;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: move;
+            min-height: 70px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: box-shadow 0.2s;
+        }
 
-    .btn.secondary:hover {
-      background: #f5f5f5;
-    }
+        .library-item:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
 
-    select {
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-      background: white;
-      cursor: pointer;
-    }
+        /* CRITICAL: Solid drag - children non-interactive */
+        .library-item * {
+            pointer-events: none;
+            user-select: none;
+        }
 
-    .main-content {
-      display: flex;
-      height: calc(100vh - 180px);
-    }
+        .library-item-title {
+            font-weight: 600;
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 4px;
+        }
 
-    .library {
-      width: 320px;
-      border-right: 1px solid #ddd;
-      overflow-y: auto;
-      padding: 20px;
-      background: #fafafa;
-    }
+        .library-item-meta {
+            font-size: 11px;
+            color: #666;
+        }
 
-    .library h3 {
-      font-size: 16px;
-      margin-bottom: 15px;
-      font-weight: 600;
-      color: #333;
-    }
+        /* ===== SCHEDULER PANEL ===== */
+        .scheduler {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
 
-    .library-item {
-      padding: 12px;
-      margin-bottom: 10px;
-      background: white;
-      border-radius: 6px;
-      cursor: move;
-      border-left: 4px solid;
-      min-height: 70px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      transition: box-shadow 0.2s;
-    }
+        .header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-    .library-item:hover {
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+        }
 
-    /* CRITICAL: Make all children non-interactive */
-    .library-item * {
-      pointer-events: none;
-      user-select: none;
-    }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
 
-    .library-item-title {
-      font-weight: 600;
-      font-size: 13px;
-      margin-bottom: 4px;
-      color: #333;
-    }
+        .btn {
+            padding: 10px 20px;
+            border: 1px solid #2196F3;
+            background: #2196F3;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
 
-    .library-item-meta {
-      font-size: 11px;
-      color: #666;
-    }
+        .btn:hover {
+            background: #1976D2;
+            border-color: #1976D2;
+        }
 
-    .scheduler {
-      flex: 1;
-      overflow: auto;
-      padding: 20px;
-      padding-left: 80px; /* Space for time labels */
-    }
+        .btn.secondary {
+            background: white;
+            color: #2196F3;
+        }
 
-    .week-view {
-      display: flex;
-      gap: 15px;
-      min-width: fit-content;
-    }
+        .btn.secondary:hover {
+            background: #f5f5f5;
+        }
 
-    .day-column {
-      flex: 1;
-      min-width: 220px;
-    }
+        select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+        }
 
-    .day-header {
-      padding: 12px;
-      background: #f5f5f5;
-      border-radius: 6px 6px 0 0;
-      font-weight: 600;
-      text-align: center;
-      font-size: 14px;
-      color: #333;
-      border: 1px solid #e0e0e0;
-      border-bottom: 2px solid #2196F3;
-    }
+        /* ===== WEEK VIEW ===== */
+        .week-container {
+            padding: 20px;
+            overflow-x: auto;
+        }
 
-    .time-grid-container {
-      position: relative;
-    }
+        .week-view {
+            display: flex;
+            gap: 20px;
+            min-width: fit-content;
+        }
 
-    .time-grid {
-      position: relative;
-      height: 960px; /* 20px per 15min × 4 = 80px per hour × 12 hours */
-      background-image: 
-        repeating-linear-gradient(to bottom, #ddd 0px, #ddd 1px, transparent 1px, transparent 80px),
-        repeating-linear-gradient(to bottom, #eee 0px, #eee 1px, transparent 1px, transparent 20px);
-      border: 1px solid #ddd;
-      border-top: none;
-      background-color: white;
-    }
+        .day-column {
+            min-width: 310px; /* 70px time + 120px T1 + 120px T2 */
+        }
 
-    .time-labels {
-      position: absolute;
-      left: -70px;
-      top: 0;
-      width: 60px;
-      height: 100%;
-    }
+        .day-header {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            border-radius: 6px 6px 0 0;
+            border: 1px solid #e0e0e0;
+            border-bottom: 2px solid #2196F3;
+        }
 
-    .time-label {
-      position: absolute;
-      right: 10px;
-      font-size: 11px;
-      color: #666;
-      transform: translateY(-50%);
-      font-weight: 500;
-    }
+        .theaters-container {
+            display: flex;
+            position: relative;
+            border: 1px solid #e0e0e0;
+            border-top: none;
+            background: white;
+        }
 
-    .scheduled-event {
-      position: absolute;
-      padding: 10px;
-      border-radius: 6px;
-      cursor: move;
-      font-size: 12px;
-      border-left: 4px solid rgba(0,0,0,0.3);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-      display: flex;
-      flex-direction: column;
-      width: calc(100% - 10px);
-      left: 5px;
-      user-select: none;
-      transition: box-shadow 0.2s;
-    }
+        /* ===== TIME LABELS ===== */
+        .time-labels {
+            width: 70px;
+            background: #fafafa;
+            border-right: 2px solid #e0e0e0;
+            position: relative;
+            padding-top: 28px; /* Offset for theater headers */
+        }
 
-    /* CRITICAL: Make all children of scheduled events non-interactive */
-    .scheduled-event * {
-      pointer-events: none;
-      user-select: none;
-    }
+        .time-label {
+            position: absolute;
+            width: 100%;
+            text-align: right;
+            padding-right: 10px;
+            font-size: 11px;
+            color: #666;
+            font-weight: 500;
+            transform: translateY(-50%);
+            top: 0; /* Will be adjusted in JS to align with grid */
+        }
 
-    .scheduled-event:hover {
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-    }
+        /* ===== THEATERS ===== */
+        .theater {
+            width: 120px; /* Narrower columns */
+            position: relative;
+        }
 
-    .event-title {
-      font-weight: 600;
-      margin-bottom: 3px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+        .theater-header {
+            height: 28px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 13px;
+            color: #333;
+        }
 
-    .event-time {
-      font-size: 11px;
-      opacity: 0.85;
-    }
+        .theater-grid {
+            position: relative;
+            height: 960px; /* 12 hours × 80px */
+            background-image: 
+                repeating-linear-gradient(to bottom, #ddd 0px, #ddd 1px, transparent 1px, transparent 80px),
+                repeating-linear-gradient(to bottom, #eee 0px, #eee 1px, transparent 1px, transparent 20px);
+        }
 
-    .delete-btn {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: rgba(0,0,0,0.6);
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-size: 14px;
-      line-height: 20px;
-      text-align: center;
-      opacity: 0;
-      transition: opacity 0.2s;
-      /* CRITICAL: Delete button needs pointer events */
-      pointer-events: auto !important;
-    }
+        .theater:first-of-type {
+            border-right: 2px solid #e0e0e0; /* Line between T1 and T2 */
+        }
 
-    .scheduled-event:hover .delete-btn {
-      opacity: 1;
-    }
+        /* ===== SCHEDULED EVENTS ===== */
+        .scheduled-event {
+            position: absolute;
+            left: 5px;
+            right: 5px;
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 4px solid rgba(0,0,0,0.3);
+            cursor: move;
+            font-size: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+            transition: box-shadow 0.2s;
+        }
 
-    .delete-btn:hover {
-      background: #f44336;
-    }
+        .scheduled-event:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        }
 
-    .snap-indicator {
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: #2196F3;
-      pointer-events: none;
-      z-index: 100;
-      display: none;
-    }
+        /* CRITICAL: Solid drag - children non-interactive */
+        .scheduled-event * {
+            pointer-events: none;
+            user-select: none;
+        }
 
-    .snap-indicator::before {
-      content: attr(data-time);
-      position: absolute;
-      right: 10px;
-      top: -22px;
-      background: #2196F3;
-      color: white;
-      padding: 4px 10px;
-      border-radius: 4px;
-      font-size: 11px;
-      white-space: nowrap;
-      font-weight: 500;
-    }
+        .event-title {
+            font-weight: 600;
+            margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
-    .status-popup {
-      position: fixed;
-      top: 80px;
-      right: 20px;
-      padding: 14px 24px;
-      background: #4CAF50;
-      color: white;
-      border-radius: 6px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-      z-index: 2000;
-      transform: translateX(400px);
-      transition: transform 0.3s ease;
-      font-size: 14px;
-      font-weight: 500;
-    }
+        .event-time {
+            font-size: 11px;
+            opacity: 0.85;
+        }
 
-    .status-popup.show {
-      transform: translateX(0);
-    }
+        .delete-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 20px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+            /* CRITICAL: Exception for delete button */
+            pointer-events: auto !important;
+        }
 
-    .status-popup.error {
-      background: #f44336;
-    }
-  </style>
+        .scheduled-event:hover .delete-btn {
+            opacity: 1;
+        }
+
+        .delete-btn:hover {
+            background: #f44336;
+        }
+
+        /* ===== SNAP INDICATOR ===== */
+        .snap-indicator {
+            position: fixed;
+            height: 2px;
+            background: #2196F3;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+        }
+
+        .snap-indicator::before {
+            content: attr(data-time);
+            position: absolute;
+            right: 10px;
+            top: -22px;
+            background: #2196F3;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        /* ===== STATUS POPUP ===== */
+        .status-popup {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            padding: 14px 24px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 6px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            z-index: 2000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-popup.show {
+            transform: translateX(0);
+        }
+
+        .status-popup.error {
+            background: #f44336;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>TSL Scheduler v3.0</h1>
-      <div class="controls">
-        <select id="viewMode">
-          <option value="weekend" selected>Weekend (FRI-MON)</option>
-          <option value="midweek">Midweek (TUE-FRI)</option>
-          <option value="full">Full Week (7 Days)</option>
-        </select>
-        <button class="btn secondary" onclick="prevWeek()">← Prev Week</button>
-        <button class="btn secondary" onclick="nextWeek()">Next Week →</button>
-        <button class="btn" onclick="syncFromGoogle()">Sync from Google</button>
-        <button class="btn" onclick="pushToGoogle()">Push to Google</button>
-      </div>
+    <div class="container">
+        <!-- LIBRARY -->
+        <div class="library">
+            <h3>Movies & Events</h3>
+            <input type="text" id="librarySearch" class="library-search" placeholder="Search...">
+            <div id="libraryItems" class="library-items"></div>
+        </div>
+
+        <!-- SCHEDULER -->
+        <div class="scheduler">
+            <div class="header">
+                <h1>TSL Scheduler v3.0</h1>
+                <div class="controls">
+                    <select id="viewMode">
+                        <option value="weekend" selected>Weekend (FRI-MON)</option>
+                        <option value="midweek">Midweek (TUE-FRI)</option>
+                        <option value="full">Full Week (7 Days)</option>
+                    </select>
+                    <button class="btn secondary" onclick="prevWeek()">← Prev</button>
+                    <button class="btn secondary" onclick="nextWeek()">Next →</button>
+                    <button class="btn" onclick="syncFromGoogle()">Sync from Google</button>
+                    <button class="btn" onclick="pushToGoogle()">Push to Google</button>
+                </div>
+            </div>
+
+            <div class="week-container">
+                <div id="weekView" class="week-view"></div>
+            </div>
+        </div>
     </div>
 
-    <div class="main-content">
-      <div class="library">
-        <h3>Movies & Events</h3>
-        <div id="libraryItems"></div>
-      </div>
+    <div id="snapIndicator" class="snap-indicator"></div>
+    <div id="statusPopup" class="status-popup"></div>
 
-      <div class="scheduler">
-        <div id="weekView" class="week-view"></div>
-      </div>
-    </div>
-  </div>
+    <script>
+        // ===== CONFIG =====
+        const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjUzMDc5NjgsImV4cCI6MjA0MDg4Mzk2OH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
+        
+        const PIXELS_PER_15MIN = 20;
+        const PIXELS_PER_HOUR = 80;
+        const START_HOUR = 13; // 1 PM
+        const GRID_HOURS = 12;
 
-  <div id="snapIndicator" class="snap-indicator"></div>
-  <div id="statusPopup" class="status-popup"></div>
+        // ===== STATE =====
+        let currentWeekStart = new Date();
+        let viewMode = 'weekend';
+        let scheduledEvents = [];
+        let libraryItems = [];
+        let draggedItem = null;
+        let dragOffsetY = 0;
+        let dragTheater = null;
 
-  <script>
-    // Credentials
-    const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjUzMDc5NjgsImV4cCI6MjA0MDg4Mzk2OH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
+        // ===== INIT =====
+        init();
 
-    // Grid constants
-    const PIXELS_PER_15MIN = 20;
-    const PIXELS_PER_HOUR = 80;
-    const START_HOUR = 13; // 1:00 PM
-    const GRID_HOURS = 12;
+        async function init() {
+            setupWeekStart();
+            await loadData();
+            renderLibrary();
+            renderScheduler();
+            setupSearch(); // Add search functionality
+        }
 
-    // State
-    let currentWeekStart = new Date();
-    let viewMode = 'weekend';
-    let scheduledEvents = [];
-    let libraryItems = [];
-    let draggedItem = null;
-    let dragOffsetY = 0;
+        function setupWeekStart() {
+            const today = new Date();
+            const day = today.getDay();
+            const friday = 5;
+            const diff = day >= friday ? day - friday : day - friday + 7;
+            currentWeekStart.setDate(today.getDate() - diff);
+            currentWeekStart.setHours(0, 0, 0, 0);
+        }
 
-    // Initialize
-    init();
+        async function loadData() {
+            try {
+                const [moviesRes, eventsRes] = await Promise.all([
+                    fetch(`${SUPABASE_URL}/rest/v1/movies?select=*`, {
+                        headers: {
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`
+                        }
+                    }),
+                    fetch(`${SUPABASE_URL}/rest/v1/events?select=*`, {
+                        headers: {
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`
+                        }
+                    })
+                ]);
 
-    async function init() {
-      setupWeekStart();
-      await loadData();
-      renderLibrary();
-      renderScheduler();
-    }
+                const movies = await moviesRes.json();
+                const events = await eventsRes.json();
 
-    function setupWeekStart() {
-      const today = new Date();
-      const day = today.getDay();
-      const friday = 5;
-      const diff = day >= friday ? day - friday : day - friday + 7;
-      currentWeekStart.setDate(today.getDate() - diff);
-      currentWeekStart.setHours(0, 0, 0, 0);
-    }
+                libraryItems = [
+                    ...(movies || []).map(m => ({ ...m, content_type: 'movie' })),
+                    ...(events || []).map(e => ({ ...e, content_type: 'event' }))
+                ];
 
-    async function loadData() {
-      try {
-        // Load movies with simple fetch
-        const moviesRes = await fetch(`${SUPABASE_URL}/rest/v1/movies?select=*`, {
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`
-          }
+                console.log('✅ Loaded', libraryItems.length, 'items');
+                showStatus(`Loaded ${libraryItems.length} items!`, 'success');
+            } catch (error) {
+                console.error('❌ Error:', error);
+                showStatus('Error loading data', 'error');
+                
+                // Dummy data for testing
+                libraryItems = [
+                    { id: 1, title: 'Test Movie 1', runtime_minutes: 120, content_type: 'movie' },
+                    { id: 2, title: 'Test Movie 2', runtime_minutes: 95, content_type: 'movie' },
+                    { id: 3, event_title: 'Test Event', runtime_minutes: 60, content_type: 'event' }
+                ];
+            }
+        }
+
+        function renderLibrary(searchTerm = '') {
+            const container = document.getElementById('libraryItems');
+            container.innerHTML = '';
+
+            // Filter items based on search
+            const filteredItems = libraryItems.filter(item => {
+                if (!searchTerm) return true;
+                const title = (item.title || item.event_title || '').toLowerCase();
+                return title.includes(searchTerm.toLowerCase());
+            });
+
+            if (filteredItems.length === 0) {
+                container.innerHTML = '<div style="color: #999; padding: 20px; text-align: center;">No items found</div>';
+                return;
+            }
+
+            filteredItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'library-item';
+                div.draggable = true;
+                div.dataset.itemId = item.id; // Store item ID for drag
+                
+                const color = getItemColor(item);
+                div.style.borderLeftColor = color;
+                div.style.background = color + '15';
+                
+                const title = document.createElement('div');
+                title.className = 'library-item-title';
+                title.textContent = item.title || item.event_title;
+                
+                const meta = document.createElement('div');
+                meta.className = 'library-item-meta';
+                const duration = Math.round((item.runtime_minutes || 90) / 60 * 10) / 10;
+                meta.textContent = `${duration}h`;
+                
+                div.appendChild(title);
+                div.appendChild(meta);
+                div.addEventListener('dragstart', handleDragStart);
+                div.addEventListener('dragend', handleDragEnd);
+                
+                container.appendChild(div);
+            });
+        }
+
+        // Add search event listener
+        function setupSearch() {
+            const searchInput = document.getElementById('librarySearch');
+            searchInput.addEventListener('input', (e) => {
+                renderLibrary(e.target.value);
+            });
+        }
+
+        function renderScheduler() {
+            const container = document.getElementById('weekView');
+            container.innerHTML = '';
+
+            const days = getDaysToShow();
+
+            days.forEach(date => {
+                const dayCol = document.createElement('div');
+                dayCol.className = 'day-column';
+
+                // Day header
+                const header = document.createElement('div');
+                header.className = 'day-header';
+                header.textContent = formatDate(date);
+                dayCol.appendChild(header);
+
+                // Theaters container
+                const theatersContainer = document.createElement('div');
+                theatersContainer.className = 'theaters-container';
+
+                // Time labels (shared)
+                const timeLabels = document.createElement('div');
+                timeLabels.className = 'time-labels';
+                for (let h = 0; h < GRID_HOURS; h++) {
+                    const label = document.createElement('div');
+                    label.className = 'time-label';
+                    // Position relative to grid top (28px = theater header height)
+                    label.style.top = (28 + h * PIXELS_PER_HOUR) + 'px';
+                    const hour = (START_HOUR + h) % 24;
+                    label.textContent = formatHour(hour);
+                    timeLabels.appendChild(label);
+                }
+                theatersContainer.appendChild(timeLabels);
+
+                // Theater 1
+                const theater1 = createTheater('T1', date, 1);
+                theatersContainer.appendChild(theater1);
+
+                // Theater 2
+                const theater2 = createTheater('T2', date, 2);
+                theatersContainer.appendChild(theater2);
+
+                dayCol.appendChild(theatersContainer);
+                container.appendChild(dayCol);
+            });
+
+            renderScheduledEvents();
+        }
+
+        function createTheater(name, date, theaterNum) {
+            const theater = document.createElement('div');
+            theater.className = 'theater';
+
+            const header = document.createElement('div');
+            header.className = 'theater-header';
+            header.textContent = name;
+            theater.appendChild(header);
+
+            const grid = document.createElement('div');
+            grid.className = 'theater-grid';
+            grid.dataset.date = date.toISOString().split('T')[0];
+            grid.dataset.theater = theaterNum;
+
+            grid.addEventListener('dragover', handleDragOver);
+            grid.addEventListener('drop', handleDrop);
+
+            theater.appendChild(grid);
+            return theater;
+        }
+
+        function renderScheduledEvents() {
+            scheduledEvents.forEach(event => {
+                const grid = document.querySelector(`[data-date="${event.date}"][data-theater="${event.theater}"]`);
+                if (!grid) return;
+
+                const eventDiv = document.createElement('div');
+                eventDiv.className = 'scheduled-event';
+                eventDiv.draggable = true;
+                eventDiv.dataset.eventId = event.id;
+
+                const color = getItemColor(event);
+                eventDiv.style.background = color;
+                eventDiv.style.borderLeftColor = darkenColor(color);
+                eventDiv.style.color = isLightColor(color) ? '#000' : '#fff';
+
+                // Position
+                const minutes = event.startHour * 60 + event.startMinute;
+                const startMinutes = START_HOUR * 60;
+                const relativeMinutes = minutes - startMinutes;
+                const top = (relativeMinutes / 15) * PIXELS_PER_15MIN;
+                const height = ((event.runtime_minutes || 90) / 15) * PIXELS_PER_15MIN;
+
+                eventDiv.style.top = top + 'px';
+                eventDiv.style.height = height + 'px';
+
+                // Content
+                const title = document.createElement('div');
+                title.className = 'event-title';
+                title.textContent = event.title || event.event_title;
+
+                const time = document.createElement('div');
+                time.className = 'event-time';
+                time.textContent = formatHour(event.startHour) + ':' + String(event.startMinute).padStart(2, '0');
+
+                // Delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.innerHTML = '×';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    deleteScheduledEvent(event.id);
+                };
+
+                eventDiv.appendChild(title);
+                eventDiv.appendChild(time);
+                eventDiv.appendChild(deleteBtn);
+
+                eventDiv.addEventListener('dragstart', handleDragStart);
+                eventDiv.addEventListener('dragend', handleDragEnd);
+
+                grid.appendChild(eventDiv);
+            });
+        }
+
+        function handleDragStart(e) {
+            draggedItem = this;
+
+            const rect = this.getBoundingClientRect();
+            dragOffsetY = e.clientY - rect.top;
+
+            e.dataTransfer.effectAllowed = 'move';
+
+            if (this.classList.contains('library-item')) {
+                e.dataTransfer.setData('source', 'library');
+                e.dataTransfer.setData('itemId', this.dataset.itemId);
+            } else {
+                e.dataTransfer.setData('source', 'scheduled');
+                e.dataTransfer.setData('eventId', this.dataset.eventId);
+            }
+
+            this.style.opacity = '0.5';
+        }
+
+        function handleDragEnd(e) {
+            if (draggedItem) {
+                draggedItem.style.opacity = '';
+                draggedItem = null;
+            }
+            hideSnapIndicator();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+
+            if (!draggedItem) return;
+
+            const grid = e.currentTarget;
+            const rect = grid.getBoundingClientRect();
+
+            const blockTopY = e.clientY - dragOffsetY;
+            const relativeY = blockTopY - rect.top;
+
+            const snappedY = snapToGrid(relativeY);
+            const minutes = (snappedY / PIXELS_PER_15MIN) * 15;
+            const hour = START_HOUR + Math.floor(minutes / 60);
+            const minute = minutes % 60;
+
+            showSnapIndicator(grid, snappedY, hour, minute);
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            hideSnapIndicator();
+
+            const source = e.dataTransfer.getData('source');
+            const grid = e.currentTarget;
+            const rect = grid.getBoundingClientRect();
+
+            const blockTopY = e.clientY - dragOffsetY;
+            const relativeY = blockTopY - rect.top;
+
+            const snappedY = snapToGrid(relativeY);
+            const minutes = (snappedY / PIXELS_PER_15MIN) * 15;
+            const hour = START_HOUR + Math.floor(minutes / 60);
+            const minute = minutes % 60;
+            const date = grid.dataset.date;
+            const theater = parseInt(grid.dataset.theater);
+
+            if (source === 'library') {
+                const itemId = e.dataTransfer.getData('itemId');
+                const item = libraryItems.find(i => i.id == itemId);
+                if (item) {
+                    addScheduledEvent(item, date, theater, hour, minute);
+                }
+            } else {
+                const eventId = e.dataTransfer.getData('eventId');
+                moveScheduledEvent(eventId, date, theater, hour, minute);
+            }
+        }
+
+        function addScheduledEvent(item, date, theater, hour, minute) {
+            const event = {
+                id: Date.now() + Math.random(),
+                ...item,
+                date,
+                theater,
+                startHour: hour,
+                startMinute: minute
+            };
+            scheduledEvents.push(event);
+            renderScheduler();
+        }
+
+        function moveScheduledEvent(eventId, date, theater, hour, minute) {
+            const event = scheduledEvents.find(e => e.id == eventId);
+            if (event) {
+                event.date = date;
+                event.theater = theater;
+                event.startHour = hour;
+                event.startMinute = minute;
+                renderScheduler();
+            }
+        }
+
+        function deleteScheduledEvent(eventId) {
+            scheduledEvents = scheduledEvents.filter(e => e.id != eventId);
+            renderScheduler();
+        }
+
+        function snapToGrid(y) {
+            return Math.max(0, Math.round(y / PIXELS_PER_15MIN) * PIXELS_PER_15MIN);
+        }
+
+        function showSnapIndicator(grid, y, hour, minute) {
+            const indicator = document.getElementById('snapIndicator');
+            const rect = grid.getBoundingClientRect();
+            indicator.style.display = 'block';
+            indicator.style.top = (rect.top + y) + 'px';
+            indicator.style.left = rect.left + 'px';
+            indicator.style.width = rect.width + 'px';
+            indicator.dataset.time = formatHour(hour) + ':' + String(minute).padStart(2, '0');
+        }
+
+        function hideSnapIndicator() {
+            document.getElementById('snapIndicator').style.display = 'none';
+        }
+
+        function showStatus(message, type = 'success') {
+            const popup = document.getElementById('statusPopup');
+            popup.textContent = message;
+            popup.className = 'status-popup ' + type + ' show';
+            setTimeout(() => {
+                popup.classList.remove('show');
+            }, 3000);
+        }
+
+        function getDaysToShow() {
+            const days = [];
+            const start = new Date(currentWeekStart);
+
+            if (viewMode === 'weekend') {
+                for (let i = 0; i < 4; i++) {
+                    const date = new Date(start);
+                    date.setDate(start.getDate() + i);
+                    days.push(date);
+                }
+            } else if (viewMode === 'midweek') {
+                for (let i = -3; i < 1; i++) {
+                    const date = new Date(start);
+                    date.setDate(start.getDate() + i);
+                    days.push(date);
+                }
+            } else {
+                const monday = new Date(start);
+                monday.setDate(start.getDate() - 4);
+                for (let i = 0; i < 7; i++) {
+                    const date = new Date(monday);
+                    date.setDate(monday.getDate() + i);
+                    days.push(date);
+                }
+            }
+
+            return days;
+        }
+
+        function formatDate(date) {
+            const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            return days[date.getDay()] + ' ' + months[date.getMonth()] + ' ' + date.getDate();
+        }
+
+        function formatHour(hour) {
+            const h = hour % 12 || 12;
+            const ampm = hour < 12 ? 'AM' : 'PM';
+            return h + ':00 ' + ampm;
+        }
+
+        function getItemColor(item) {
+            const str = item.title || item.event_title || '';
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const h = Math.abs(hash % 360);
+            return `hsl(${h}, 70%, 65%)`;
+        }
+
+        function darkenColor(color) {
+            if (color.includes('hsl')) {
+                return color.replace(/\d+%\)/, '45%)');
+            }
+            return color;
+        }
+
+        function isLightColor(color) {
+            if (color.includes('hsl')) {
+                const lightness = parseInt(color.match(/(\d+)%\)/)[1]);
+                return lightness > 60;
+            }
+            return true;
+        }
+
+        function prevWeek() {
+            currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+            renderScheduler();
+        }
+
+        function nextWeek() {
+            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+            renderScheduler();
+        }
+
+        document.getElementById('viewMode').addEventListener('change', (e) => {
+            viewMode = e.target.value;
+            renderScheduler();
         });
-        
-        if (!moviesRes.ok) throw new Error('Failed to load movies');
-        const movies = await moviesRes.json();
 
-        // Load events
-        const eventsRes = await fetch(`${SUPABASE_URL}/rest/v1/events?select=*`, {
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`
-          }
-        });
-        
-        if (!eventsRes.ok) throw new Error('Failed to load events');
-        const events = await eventsRes.json();
-
-        // Combine and add content_type
-        libraryItems = [
-          ...(movies || []).map(m => ({ ...m, content_type: 'movie' })),
-          ...(events || []).map(e => ({ ...e, content_type: 'event' }))
-        ];
-
-        console.log('✅ Loaded', libraryItems.length, 'items');
-        showStatus(`Loaded ${libraryItems.length} items!`, 'success');
-      } catch (error) {
-        console.error('❌ Load error:', error);
-        showStatus('Error: ' + error.message, 'error');
-        
-        // Load dummy data for testing
-        libraryItems = [
-          { id: 1, title: 'Test Movie 1', content_type: 'movie', runtime_minutes: 120 },
-          { id: 2, title: 'Test Movie 2', content_type: 'movie', runtime_minutes: 95 },
-          { id: 3, event_title: 'Test Event', content_type: 'event', runtime_minutes: 60 }
-        ];
-      }
-    }
-
-    function renderLibrary() {
-      const container = document.getElementById('libraryItems');
-      container.innerHTML = '';
-
-      if (libraryItems.length === 0) {
-        container.innerHTML = '<div style="color: #999; padding: 20px; text-align: center;">No items loaded</div>';
-        return;
-      }
-
-      libraryItems.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'library-item';
-        div.draggable = true;
-        
-        const color = getItemColor(item);
-        div.style.borderLeftColor = color;
-        div.style.background = color + '15';
-        
-        const title = document.createElement('div');
-        title.className = 'library-item-title';
-        title.textContent = item.title || item.event_title;
-        
-        const meta = document.createElement('div');
-        meta.className = 'library-item-meta';
-        const duration = Math.round((item.runtime_minutes || 90) / 60 * 10) / 10;
-        meta.textContent = `${duration}h`;
-        
-        div.appendChild(title);
-        div.appendChild(meta);
-        
-        div.addEventListener('dragstart', handleDragStart);
-        div.addEventListener('dragend', handleDragEnd);
-        
-        container.appendChild(div);
-      });
-    }
-
-    function renderScheduler() {
-      const container = document.getElementById('weekView');
-      container.innerHTML = '';
-
-      const days = getDaysToShow();
-      
-      days.forEach(date => {
-        const column = document.createElement('div');
-        column.className = 'day-column';
-        
-        const header = document.createElement('div');
-        header.className = 'day-header';
-        header.textContent = formatDate(date);
-        
-        const gridContainer = document.createElement('div');
-        gridContainer.className = 'time-grid-container';
-        
-        const grid = document.createElement('div');
-        grid.className = 'time-grid';
-        grid.dataset.date = date.toISOString().split('T')[0];
-        
-        // Add time labels
-        const labels = document.createElement('div');
-        labels.className = 'time-labels';
-        for (let h = 0; h < GRID_HOURS; h++) {
-          const label = document.createElement('div');
-          label.className = 'time-label';
-          label.style.top = (h * PIXELS_PER_HOUR) + 'px';
-          const hour = (START_HOUR + h) % 24;
-          label.textContent = formatHour(hour);
-          labels.appendChild(label);
+        async function syncFromGoogle() {
+            showStatus('Google sync coming soon!', 'success');
         }
-        grid.appendChild(labels);
-        
-        grid.addEventListener('dragover', handleDragOver);
-        grid.addEventListener('drop', handleDrop);
-        
-        gridContainer.appendChild(grid);
-        column.appendChild(header);
-        column.appendChild(gridContainer);
-        container.appendChild(column);
-      });
 
-      renderScheduledEvents();
-    }
-
-    function renderScheduledEvents() {
-      scheduledEvents.forEach(event => {
-        const grid = document.querySelector(`[data-date="${event.date}"]`);
-        if (!grid) return;
-
-        const eventDiv = document.createElement('div');
-        eventDiv.className = 'scheduled-event';
-        eventDiv.draggable = true;
-        eventDiv.dataset.eventId = event.id;
-        
-        const color = getItemColor(event);
-        eventDiv.style.background = color;
-        eventDiv.style.borderLeftColor = darkenColor(color);
-        eventDiv.style.color = isLightColor(color) ? '#000' : '#fff';
-        
-        // Position
-        const minutes = event.startHour * 60 + event.startMinute;
-        const startMinutes = START_HOUR * 60;
-        const relativeMinutes = minutes - startMinutes;
-        const top = (relativeMinutes / 15) * PIXELS_PER_15MIN;
-        const height = ((event.runtime_minutes || 90) / 15) * PIXELS_PER_15MIN;
-        
-        eventDiv.style.top = top + 'px';
-        eventDiv.style.height = height + 'px';
-        
-        // Content
-        const title = document.createElement('div');
-        title.className = 'event-title';
-        title.textContent = event.title || event.event_title;
-        
-        const time = document.createElement('div');
-        time.className = 'event-time';
-        time.textContent = formatHour(event.startHour) + ':' + String(event.startMinute).padStart(2, '0');
-        
-        // Delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'delete-btn';
-        deleteBtn.innerHTML = '×';
-        deleteBtn.onclick = (e) => {
-          e.stopPropagation();
-          deleteScheduledEvent(event.id);
-        };
-        
-        eventDiv.appendChild(title);
-        eventDiv.appendChild(time);
-        eventDiv.appendChild(deleteBtn);
-        
-        eventDiv.addEventListener('dragstart', handleDragStart);
-        eventDiv.addEventListener('dragend', handleDragEnd);
-        
-        grid.appendChild(eventDiv);
-      });
-    }
-
-    function handleDragStart(e) {
-      draggedItem = this;
-      
-      const rect = this.getBoundingClientRect();
-      dragOffsetY = e.clientY - rect.top;
-      
-      e.dataTransfer.effectAllowed = 'move';
-      
-      if (this.classList.contains('library-item')) {
-        const index = Array.from(this.parentNode.children).indexOf(this);
-        e.dataTransfer.setData('source', 'library');
-        e.dataTransfer.setData('index', index);
-      } else {
-        e.dataTransfer.setData('source', 'scheduled');
-        e.dataTransfer.setData('eventId', this.dataset.eventId);
-      }
-      
-      this.style.opacity = '0.5';
-    }
-
-    function handleDragEnd(e) {
-      if (draggedItem) {
-        draggedItem.style.opacity = '';
-        draggedItem = null;
-      }
-      hideSnapIndicator();
-    }
-
-    function handleDragOver(e) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      
-      if (!draggedItem) return;
-      
-      const grid = e.currentTarget;
-      const rect = grid.getBoundingClientRect();
-      
-      const blockTopY = e.clientY - dragOffsetY;
-      const relativeY = blockTopY - rect.top;
-      
-      const snappedY = snapToGrid(relativeY);
-      const minutes = (snappedY / PIXELS_PER_15MIN) * 15;
-      const hour = START_HOUR + Math.floor(minutes / 60);
-      const minute = minutes % 60;
-      
-      showSnapIndicator(grid, snappedY, hour, minute);
-    }
-
-    function handleDrop(e) {
-      e.preventDefault();
-      hideSnapIndicator();
-      
-      const source = e.dataTransfer.getData('source');
-      const grid = e.currentTarget;
-      const rect = grid.getBoundingClientRect();
-      
-      const blockTopY = e.clientY - dragOffsetY;
-      const relativeY = blockTopY - rect.top;
-      
-      const snappedY = snapToGrid(relativeY);
-      const minutes = (snappedY / PIXELS_PER_15MIN) * 15;
-      const hour = START_HOUR + Math.floor(minutes / 60);
-      const minute = minutes % 60;
-      const date = grid.dataset.date;
-      
-      if (source === 'library') {
-        const index = parseInt(e.dataTransfer.getData('index'));
-        const item = libraryItems[index];
-        addScheduledEvent(item, date, hour, minute);
-      } else {
-        const eventId = e.dataTransfer.getData('eventId');
-        moveScheduledEvent(eventId, date, hour, minute);
-      }
-    }
-
-    function addScheduledEvent(item, date, hour, minute) {
-      const event = {
-        id: Date.now() + Math.random(),
-        ...item,
-        date,
-        startHour: hour,
-        startMinute: minute
-      };
-      scheduledEvents.push(event);
-      renderScheduler();
-    }
-
-    function moveScheduledEvent(eventId, date, hour, minute) {
-      const event = scheduledEvents.find(e => e.id == eventId);
-      if (event) {
-        event.date = date;
-        event.startHour = hour;
-        event.startMinute = minute;
-        renderScheduler();
-      }
-    }
-
-    function deleteScheduledEvent(eventId) {
-      scheduledEvents = scheduledEvents.filter(e => e.id != eventId);
-      renderScheduler();
-    }
-
-    function snapToGrid(y) {
-      return Math.max(0, Math.round(y / PIXELS_PER_15MIN) * PIXELS_PER_15MIN);
-    }
-
-    function showSnapIndicator(grid, y, hour, minute) {
-      const indicator = document.getElementById('snapIndicator');
-      const rect = grid.getBoundingClientRect();
-      indicator.style.display = 'block';
-      indicator.style.top = (rect.top + y) + 'px';
-      indicator.style.left = rect.left + 'px';
-      indicator.style.width = rect.width + 'px';
-      indicator.dataset.time = formatHour(hour) + ':' + String(minute).padStart(2, '0');
-    }
-
-    function hideSnapIndicator() {
-      document.getElementById('snapIndicator').style.display = 'none';
-    }
-
-    function showStatus(message, type = 'success') {
-      const popup = document.getElementById('statusPopup');
-      popup.textContent = message;
-      popup.className = 'status-popup ' + type + ' show';
-      setTimeout(() => {
-        popup.classList.remove('show');
-      }, 3000);
-    }
-
-    function getDaysToShow() {
-      const days = [];
-      const start = new Date(currentWeekStart);
-      
-      if (viewMode === 'weekend') {
-        for (let i = 0; i < 4; i++) {
-          const date = new Date(start);
-          date.setDate(start.getDate() + i);
-          days.push(date);
+        async function pushToGoogle() {
+            showStatus('Google push coming soon!', 'success');
         }
-      } else if (viewMode === 'midweek') {
-        for (let i = -3; i < 1; i++) {
-          const date = new Date(start);
-          date.setDate(start.getDate() + i);
-          days.push(date);
-        }
-      } else {
-        const monday = new Date(start);
-        monday.setDate(start.getDate() - 4);
-        for (let i = 0; i < 7; i++) {
-          const date = new Date(monday);
-          date.setDate(monday.getDate() + i);
-          days.push(date);
-        }
-      }
-      
-      return days;
-    }
-
-    function formatDate(date) {
-      const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-      const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-      return days[date.getDay()] + ' ' + months[date.getMonth()] + ' ' + date.getDate();
-    }
-
-    function formatHour(hour) {
-      const h = hour % 12 || 12;
-      const ampm = hour < 12 ? 'AM' : 'PM';
-      return h + ':00 ' + ampm;
-    }
-
-    function getItemColor(item) {
-      const str = item.title || item.event_title || '';
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      const h = Math.abs(hash % 360);
-      return `hsl(${h}, 70%, 65%)`;
-    }
-
-    function darkenColor(color) {
-      if (color.includes('hsl')) {
-        return color.replace(/\d+%\)/, '45%)');
-      }
-      return color;
-    }
-
-    function isLightColor(color) {
-      if (color.includes('hsl')) {
-        const lightness = parseInt(color.match(/(\d+)%\)/)[1]);
-        return lightness > 60;
-      }
-      return true;
-    }
-
-    function prevWeek() {
-      currentWeekStart.setDate(currentWeekStart.getDate() - 7);
-      renderScheduler();
-    }
-
-    function nextWeek() {
-      currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-      renderScheduler();
-    }
-
-    document.getElementById('viewMode').addEventListener('change', (e) => {
-      viewMode = e.target.value;
-      renderScheduler();
-    });
-
-    async function syncFromGoogle() {
-      showStatus('Google sync coming soon!', 'success');
-    }
-
-    async function pushToGoogle() {
-      showStatus('Google push coming soon!', 'success');
-    }
-  </script>
+    </script>
 </body>
 </html>
