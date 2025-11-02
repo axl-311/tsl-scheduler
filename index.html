@@ -454,6 +454,7 @@
                 <button class="btn btn-primary" id="importBtn">Import from Database</button>
                 <button class="btn btn-primary" id="syncBtn" disabled>Sync Google</button>
                 <button class="btn btn-primary" id="pushBtn" disabled>Push to Google</button>
+                <button class="btn btn-secondary" id="clearBtn">Clear Schedule</button>
             </div>
         </div>
 
@@ -579,6 +580,51 @@
 
         document.getElementById('prevWeek').onclick = () => setWeek(-1);
         document.getElementById('nextWeek').onclick = () => setWeek(1);
+
+        // ============================================
+        // SAVE/LOAD TO LOCALSTORAGE
+        // ============================================
+        
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem('tsl-scheduled-events', JSON.stringify(scheduled));
+                console.log('Saved to localStorage:', scheduled.length, 'events');
+            } catch (error) {
+                console.error('Failed to save to localStorage:', error);
+            }
+        }
+        
+        function loadFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem('tsl-scheduled-events');
+                if (saved) {
+                    scheduled = JSON.parse(saved);
+                    // Convert date strings back to Date objects
+                    scheduled.forEach(event => {
+                        if (event.startTime) {
+                            event.startTime = new Date(event.startTime);
+                        }
+                        if (event.actualDate) {
+                            event.actualDate = new Date(event.actualDate);
+                        }
+                    });
+                    console.log('Loaded from localStorage:', scheduled.length, 'events');
+                    renderSchedule();
+                    showToast(`Restored ${scheduled.length} scheduled events`);
+                }
+            } catch (error) {
+                console.error('Failed to load from localStorage:', error);
+            }
+        }
+        
+        function clearLocalStorage() {
+            if (confirm('Clear all scheduled events? This cannot be undone.')) {
+                localStorage.removeItem('tsl-scheduled-events');
+                scheduled = [];
+                renderSchedule();
+                showToast('Schedule cleared');
+            }
+        }
 
         // ============================================
         // IMPORT FROM DATABASE
@@ -851,6 +897,7 @@
             dragOffset = 0;
             
             renderSchedule();
+            saveToLocalStorage(); // Auto-save
             showToast(`${draggedItem.fromSchedule ? 'Moved' : 'Scheduled'}: ${draggedItem.title}`);
         }
 
@@ -910,6 +957,7 @@
             if (confirm(`Delete ${event.title}?`)) {
                 scheduled.splice(index, 1);
                 renderSchedule();
+                saveToLocalStorage(); // Auto-save
                 showToast('Event deleted');
             }
         }
@@ -938,12 +986,109 @@
                 return;
             }
             
-            showToast(`Pushing ${scheduled.length} events...`);
+            showToast(`Pushing ${scheduled.length} events to Google Calendar...`);
             
-            // TODO: Implement push to Google Calendar
-            setTimeout(() => {
-                showToast('Push to Google coming soon!');
-            }, 1000);
+            try {
+                let created = 0;
+                let updated = 0;
+                let errors = 0;
+                
+                for (const event of scheduled) {
+                    try {
+                        // Determine which calendar to use
+                        let calendarId;
+                        if (event.type === 'movie') {
+                            calendarId = event.theater === 1 ? CALENDARS['theater-1'] : CALENDARS['theater-2'];
+                        } else {
+                            calendarId = CALENDARS['events'];
+                        }
+                        
+                        // Build the Google Calendar event
+                        const startTime = new Date(event.startTime);
+                        const endTime = new Date(startTime.getTime() + (event.duration * 60000));
+                        
+                        const googleEvent = {
+                            summary: event.title,
+                            start: {
+                                dateTime: startTime.toISOString(),
+                                timeZone: 'America/New_York'
+                            },
+                            end: {
+                                dateTime: endTime.toISOString(),
+                                timeZone: 'America/New_York'
+                            },
+                            extendedProperties: {
+                                private: {
+                                    supabaseId: event.supabaseId || '',
+                                    supabaseTable: event.table || '',
+                                    scheduleId: event.scheduleId || ''
+                                }
+                            }
+                        };
+                        
+                        // Check if event already exists in Google Calendar
+                        let existingEventId = null;
+                        if (event.googleEventId) {
+                            // Try to get the event
+                            try {
+                                const checkResponse = await gapi.client.calendar.events.get({
+                                    calendarId: calendarId,
+                                    eventId: event.googleEventId
+                                });
+                                if (checkResponse.status === 200) {
+                                    existingEventId = event.googleEventId;
+                                }
+                            } catch (e) {
+                                // Event doesn't exist, will create new
+                                console.log('Event not found, will create new');
+                            }
+                        }
+                        
+                        if (existingEventId) {
+                            // Update existing event
+                            await gapi.client.calendar.events.update({
+                                calendarId: calendarId,
+                                eventId: existingEventId,
+                                resource: googleEvent
+                            });
+                            updated++;
+                            console.log(`Updated: ${event.title}`);
+                        } else {
+                            // Create new event
+                            const response = await gapi.client.calendar.events.insert({
+                                calendarId: calendarId,
+                                resource: googleEvent
+                            });
+                            
+                            // Store the Google Event ID back in our scheduled event
+                            const idx = scheduled.findIndex(e => e.scheduleId === event.scheduleId);
+                            if (idx !== -1) {
+                                scheduled[idx].googleEventId = response.result.id;
+                            }
+                            
+                            created++;
+                            console.log(`Created: ${event.title}`);
+                        }
+                        
+                    } catch (error) {
+                        console.error(`Failed to push ${event.title}:`, error);
+                        errors++;
+                    }
+                }
+                
+                // Save updated scheduled array with Google IDs
+                saveToLocalStorage();
+                
+                if (errors === 0) {
+                    showToast(`✓ Pushed to Google: ${created} created, ${updated} updated`);
+                } else {
+                    showToast(`⚠ Pushed with errors: ${created} created, ${updated} updated, ${errors} failed`);
+                }
+                
+            } catch (error) {
+                console.error('Push error:', error);
+                showToast('Failed to push to Google Calendar');
+            }
         };
 
         // ============================================
@@ -952,8 +1097,14 @@
         
         setWeek(0);
         
+        // Load saved schedule from localStorage
+        loadFromLocalStorage();
+        
         // Auto-load from Supabase
         importFromSupabase();
+        
+        // Clear button handler
+        document.getElementById('clearBtn').onclick = clearLocalStorage;
         
         // Load Google API
         const script = document.createElement('script');
