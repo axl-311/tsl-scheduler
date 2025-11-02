@@ -1,1205 +1,757 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v3.0</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: #f5f5f5;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1800px;
-            margin: 0 auto;
-            display: flex;
-            gap: 20px;
-        }
-
-        /* ===== LIBRARY PANEL ===== */
-        .library-panel {
-            width: 320px;
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            height: fit-content;
-            max-height: calc(100vh - 40px);
-            overflow-y: auto;
-            position: sticky;
-            top: 20px;
-        }
-
-        .library-header {
-            margin-bottom: 15px;
-        }
-
-        .library-header h2 {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-
-        .library-search {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-
-        .library-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .library-filter {
-            padding: 6px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 13px;
-            cursor: pointer;
-        }
-
-        .library-count {
-            font-size: 13px;
-            color: #666;
-        }
-
-        .library-items {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .library-item {
-            padding: 12px;
-            border-radius: 6px;
-            cursor: grab;
-            min-height: 70px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .library-item:active {
-            cursor: grabbing;
-        }
-
-        .library-item.movie {
-            background: #a5dceb;
-            border: 1px solid #8fc9db;
-        }
-
-        .library-item.event {
-            background: #e74c43;
-            color: white;
-            border: 1px solid #d43b32;
-        }
-
-        .library-item-title {
-            font-weight: 600;
-            font-size: 14px;
-            color: #1a1a1a;
-        }
-
-        .library-item.event .library-item-title {
-            color: white;
-        }
-
-        .library-item-meta {
-            font-size: 12px;
-            color: #4a4a4a;
-        }
-
-        .library-item.event .library-item-meta {
-            color: rgba(255,255,255,0.9);
-        }
-
-        /* ===== SCHEDULE GRID ===== */
-        .schedule-panel {
-            flex: 1;
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .schedule-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .schedule-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .schedule-controls {
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            font-size: 14px;
-            cursor: pointer;
-            font-weight: 500;
-        }
-
-        .btn-primary {
-            background: #000;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #333;
-        }
-
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
-        }
-
-        .btn-secondary:hover {
-            background: #e0e0e0;
-        }
-
-        .week-nav {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .week-nav button {
-            padding: 6px 12px;
-            border: 1px solid #ddd;
-            background: white;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .week-nav button:hover {
-            background: #f5f5f5;
-        }
-
-        .week-display {
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .view-mode-select {
-            padding: 6px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 13px;
-            cursor: pointer;
-            background: white;
-            margin-left: auto;
-        }
-
-        .status-message {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            border-radius: 6px;
-            font-size: 14px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 10000;
-            min-width: 300px;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateX(400px);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        @keyframes slideOut {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(400px);
-                opacity: 0;
-            }
-        }
-
-        .status-success {
-            background: #d4edda;
-            color: #155724;
-            border-left: 4px solid #28a745;
-        }
-
-        .status-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border-left: 4px solid #17a2b8;
-        }
-
-        .status-warning {
-            background: #fff3cd;
-            color: #856404;
-            border-left: 4px solid #ffc107;
-        }
-
-        /* ===== GRID LAYOUT ===== */
-        .schedule-grid {
-            display: grid;
-            grid-template-columns: 60px repeat(var(--day-count, 4), 1fr);
-            gap: 0;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        .schedule-grid.full-week {
-            --day-count: 7;
-        }
-
-        .schedule-grid.four-day {
-            --day-count: 4;
-        }
-
-        .time-column {
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid #ddd;
-            background: #fafafa;
-        }
-
-        .time-header {
-            height: 78px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 12px;
-            border-bottom: 2px solid #333;
-            background: #f0f0f0;
-        }
-
-        .time-labels {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .time-label {
-            height: 80px; /* 1 hour = 4 x 20px */
-            display: flex;
-            align-items: flex-start;
-            justify-content: center;
-            padding-top: 4px;
-            font-size: 11px;
-            color: #666;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .day-column {
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid #ddd;
-            min-width: 180px;
-            max-width: 220px;
-        }
-
-        .schedule-grid.full-week .day-column {
-            min-width: 140px;
-            max-width: 160px;
-        }
-
-        .day-column:last-child {
-            border-right: none;
-        }
-
-        .day-header {
-            height: 48px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: #f8f8f8;
-            border-bottom: 2px solid #333;
-        }
-
-        .day-name {
-            font-weight: 600;
-            font-size: 13px;
-        }
-
-        .day-date {
-            font-size: 11px;
-            color: #666;
-        }
-
-        .theater-row {
-            display: flex;
-            height: 100%;
-        }
-
-        .theater-column {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid #ddd;
-            position: relative;
-        }
-
-        .theater-column:last-child {
-            border-right: none;
-        }
-
-        .theater-header {
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 11px;
-            background: #fafafa;
-            border-bottom: 2px solid #333;
-        }
-
-        .theater-content {
-            position: relative;
-            height: 960px; /* 12 hours × 80px/hour */
-            background: 
-                repeating-linear-gradient(
-                    to bottom,
-                    transparent,
-                    transparent 19px,
-                    #f0f0f0 19px,
-                    #f0f0f0 20px
-                );
-        }
-
-        /* ===== SCHEDULED EVENTS ===== */
-        .scheduled-event {
-            position: absolute;
-            left: 4px;
-            right: 4px;
-            padding: 6px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            cursor: grab;
-            border: 1px solid rgba(0,0,0,0.1);
-            z-index: 10;
-        }
-
-        .scheduled-event:active {
-            cursor: grabbing;
-        }
-
-        .scheduled-event.movie-t1 {
-            background: #a5dceb;
-            color: #1a1a1a;
-        }
-
-        .scheduled-event.movie-t2 {
-            background: #4bc4a5;
-            color: #1a1a1a;
-        }
-
-        .scheduled-event.event {
-            background: #e74c43;
-            color: white;
-        }
-
-        .event-title {
-            font-weight: 600;
-            font-size: 13px;
-            margin-bottom: 2px;
-            padding-right: 20px;
-        }
-
-        .event-time {
-            font-size: 11px;
-            opacity: 0.8;
-        }
-
-        .delete-event {
-            position: absolute;
-            top: 4px;
-            right: 4px;
-            width: 18px;
-            height: 18px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 3px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            color: white;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        .scheduled-event:hover .delete-event {
-            opacity: 1;
-        }
-
-        .delete-event:hover {
-            background: rgba(0,0,0,0.4);
-        }
-
-        /* ===== DRAG & DROP HELPERS ===== */
-        .drag-preview {
-            position: fixed;
-            padding: 8px 12px;
-            background: rgba(0,0,0,0.8);
-            color: white;
-            border-radius: 4px;
-            font-size: 12px;
-            pointer-events: none;
-            z-index: 1000;
-            white-space: nowrap;
-        }
-
-        .snap-indicator {
-            position: absolute;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: #2196F3;
-            pointer-events: none;
-            z-index: 100;
-            opacity: 0;
-            transition: opacity 0.1s;
-        }
-
-        .snap-indicator.visible {
-            opacity: 1;
-        }
-
-        .drop-zone {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-        }
-
-        .drop-zone.drag-over {
-            background: rgba(33, 150, 243, 0.1);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TSL Scheduler v3.0 - Solid Drag Fix</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 20px;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn:hover {
+      background: #f5f5f5;
+    }
+
+    select {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .main-content {
+      display: flex;
+      height: calc(100vh - 180px);
+    }
+
+    .library {
+      width: 300px;
+      border-right: 1px solid #ddd;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .library h3 {
+      font-size: 16px;
+      margin-bottom: 15px;
+      font-weight: 600;
+    }
+
+    .library-item {
+      padding: 12px;
+      margin-bottom: 8px;
+      background: #f9f9f9;
+      border-radius: 4px;
+      cursor: move;
+      border-left: 4px solid;
+      min-height: 70px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* CRITICAL: Make all children non-interactive */
+    .library-item * {
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .library-item-title {
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .library-item-meta {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .scheduler {
+      flex: 1;
+      overflow: auto;
+      padding: 20px;
+    }
+
+    .week-view {
+      display: flex;
+      gap: 10px;
+      min-width: fit-content;
+    }
+
+    .day-column {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .day-header {
+      padding: 10px;
+      background: #f5f5f5;
+      border-radius: 4px 4px 0 0;
+      font-weight: 600;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: white;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .time-grid {
+      position: relative;
+      height: 960px; /* 20px per 15min = 80px per hour × 12 hours */
+      background-image: 
+        repeating-linear-gradient(to bottom, #e0e0e0 0px, #e0e0e0 1px, transparent 1px, transparent 80px),
+        repeating-linear-gradient(to bottom, #f0f0f0 0px, #f0f0f0 1px, transparent 1px, transparent 20px);
+      border: 1px solid #ddd;
+      border-top: none;
+    }
+
+    .time-labels {
+      position: absolute;
+      left: -60px;
+      top: 0;
+      width: 50px;
+      height: 100%;
+    }
+
+    .time-label {
+      position: absolute;
+      right: 5px;
+      font-size: 11px;
+      color: #666;
+      transform: translateY(-50%);
+    }
+
+    .scheduled-event {
+      position: absolute;
+      padding: 8px;
+      border-radius: 4px;
+      cursor: move;
+      font-size: 11px;
+      border-left: 4px solid rgba(0,0,0,0.3);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      width: calc(100% - 10px);
+      left: 5px;
+      user-select: none;
+    }
+
+    /* CRITICAL: Make all children of scheduled events non-interactive */
+    .scheduled-event * {
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .scheduled-event:hover {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .event-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .event-time {
+      font-size: 10px;
+      opacity: 0.8;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 18px;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+      /* CRITICAL: Delete button needs pointer events */
+      pointer-events: auto !important;
+    }
+
+    .scheduled-event:hover .delete-btn {
+      opacity: 1;
+    }
+
+    .delete-btn:hover {
+      background: rgba(255,0,0,0.8);
+    }
+
+    .drag-preview {
+      position: fixed;
+      background: rgba(255,255,255,0.9);
+      padding: 8px;
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      pointer-events: none;
+      z-index: 1000;
+      font-size: 11px;
+      border-left: 4px solid;
+    }
+
+    .snap-indicator {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #2196F3;
+      pointer-events: none;
+      z-index: 100;
+      display: none;
+    }
+
+    .snap-indicator::before {
+      content: attr(data-time);
+      position: absolute;
+      right: 10px;
+      top: -20px;
+      background: #2196F3;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    /* Status popup - fixed overlay */
+    .status-popup {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      padding: 12px 20px;
+      background: #4CAF50;
+      color: white;
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 2000;
+      transform: translateX(400px);
+      transition: transform 0.3s ease;
+    }
+
+    .status-popup.show {
+      transform: translateX(0);
+    }
+
+    .status-popup.error {
+      background: #f44336;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <!-- LIBRARY PANEL -->
-        <div class="library-panel">
-            <div class="library-header">
-                <h2>Library</h2>
-                <input type="text" class="library-search" placeholder="Search programs..." id="searchBox">
-            </div>
-            <div class="library-controls">
-                <select class="library-filter" id="filterSelect">
-                    <option value="recent">Recent (30 days)</option>
-                    <option value="movies">Movies</option>
-                    <option value="events">Events</option>
-                </select>
-                <span class="library-count" id="libraryCount">(0)</span>
-            </div>
-            <div class="library-items" id="libraryItems">
-                <!-- Items loaded dynamically -->
-            </div>
-        </div>
-
-        <!-- SCHEDULE PANEL -->
-        <div class="schedule-panel">
-            <div class="schedule-header">
-                <h1 class="schedule-title">TSL Scheduler</h1>
-                <div class="schedule-controls">
-                    <button class="btn btn-secondary" id="syncBtn">Sync with Google</button>
-                    <button class="btn btn-primary" id="pushBtn">Push to Google</button>
-                </div>
-            </div>
-
-            <div class="week-nav">
-                <button id="prevWeekBtn">← Previous</button>
-                <span class="week-display" id="weekDisplay">Week of Nov 1</span>
-                <button id="nextWeekBtn">Next →</button>
-                <select class="view-mode-select" id="viewModeSelect">
-                    <option value="fri-mon">Weekend (FRI-MON)</option>
-                    <option value="tue-fri">Midweek (TUE-FRI)</option>
-                    <option value="full">Full Week (7 Days)</option>
-                </select>
-            </div>
-
-            <div class="schedule-grid" id="scheduleGrid">
-                <!-- Grid built dynamically -->
-            </div>
-        </div>
+  <div class="container">
+    <div class="header">
+      <h1>TSL Scheduler v3.0</h1>
+      <div class="controls">
+        <select id="viewMode">
+          <option value="weekend" selected>Weekend (FRI-MON)</option>
+          <option value="midweek">Midweek (TUE-FRI)</option>
+          <option value="full">Full Week (7 Days)</option>
+        </select>
+        <button class="btn" onclick="prevWeek()">← Prev Week</button>
+        <button class="btn" onclick="nextWeek()">Next Week →</button>
+        <button class="btn" onclick="syncFromGoogle()">Sync from Google</button>
+        <button class="btn" onclick="pushToGoogle()">Push to Google</button>
+      </div>
     </div>
 
-    <!-- Google Calendar API -->
-    <script src="https://apis.google.com/js/api.js"></script>
+    <div class="main-content">
+      <div class="library">
+        <h3>Movies & Events</h3>
+        <div id="libraryItems"></div>
+      </div>
 
-    <script>
-        // ===== CONFIGURATION =====
-        const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
-        const GOOGLE_API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
+      <div class="scheduler">
+        <div id="weekView" class="week-view"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="snapIndicator" class="snap-indicator"></div>
+  <div id="statusPopup" class="status-popup"></div>
+
+  <script>
+    // Credentials
+    const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjUzMDc5NjgsImV4cCI6MjA0MDg4Mzk2OH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
+    const GOOGLE_API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
+    
+    const CALENDARS = {
+      events: '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
+      theater1: '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com',
+      theater2: 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
+    };
+
+    // Grid constants
+    const PIXELS_PER_15MIN = 20; // 20px per 15 minutes
+    const PIXELS_PER_HOUR = 80;   // 80px per hour
+    const START_HOUR = 13;         // 1:00 PM
+    const GRID_HOURS = 12;         // 12 hours total
+
+    // State
+    let currentWeekStart = new Date();
+    let viewMode = 'weekend';
+    let scheduledEvents = [];
+    let libraryItems = [];
+    let draggedItem = null;
+    let dragOffsetY = 0;
+
+    // Initialize
+    init();
+
+    async function init() {
+      setupWeekStart();
+      await loadData();
+      renderLibrary();
+      renderScheduler();
+    }
+
+    function setupWeekStart() {
+      const today = new Date();
+      const day = today.getDay();
+      const friday = 5;
+      const diff = day >= friday ? day - friday : day - friday + 7;
+      currentWeekStart.setDate(today.getDate() - diff);
+      currentWeekStart.setHours(0, 0, 0, 0);
+    }
+
+    async function loadData() {
+      try {
+        // Load movies
+        const moviesRes = await fetch(`${SUPABASE_URL}/rest/v1/movies?select=*`, {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        const movies = await moviesRes.json();
+
+        // Load events
+        const eventsRes = await fetch(`${SUPABASE_URL}/rest/v1/events?select=*`, {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        const events = await eventsRes.json();
+
+        // Combine and add content_type
+        libraryItems = [
+          ...movies.map(m => ({ ...m, content_type: 'movie' })),
+          ...events.map(e => ({ ...e, content_type: 'event' }))
+        ];
+
+        console.log('Loaded', libraryItems.length, 'items');
+      } catch (error) {
+        showStatus('Error loading data: ' + error.message, 'error');
+      }
+    }
+
+    function renderLibrary() {
+      const container = document.getElementById('libraryItems');
+      container.innerHTML = '';
+
+      libraryItems.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'library-item';
+        div.draggable = true;
+        div.style.borderLeftColor = getItemColor(item);
+        div.style.background = getItemColor(item) + '20';
         
-        const CALENDAR_IDS = {
-            events: '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
-            theater1: '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com',
-            theater2: 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
+        const title = document.createElement('div');
+        title.className = 'library-item-title';
+        title.textContent = item.title || item.event_title;
+        
+        const meta = document.createElement('div');
+        meta.className = 'library-item-meta';
+        const duration = Math.round((item.runtime_minutes || 90) / 60 * 10) / 10;
+        meta.textContent = `${duration}h`;
+        
+        div.appendChild(title);
+        div.appendChild(meta);
+        
+        // CRITICAL: Drag events on parent only
+        div.addEventListener('dragstart', handleDragStart);
+        div.addEventListener('dragend', handleDragEnd);
+        
+        container.appendChild(div);
+      });
+    }
+
+    function renderScheduler() {
+      const container = document.getElementById('weekView');
+      container.innerHTML = '';
+
+      const days = getDaysToShow();
+      
+      days.forEach(date => {
+        const column = document.createElement('div');
+        column.className = 'day-column';
+        
+        const header = document.createElement('div');
+        header.className = 'day-header';
+        header.textContent = formatDate(date);
+        
+        const grid = document.createElement('div');
+        grid.className = 'time-grid';
+        grid.dataset.date = date.toISOString().split('T')[0];
+        
+        // Add time labels
+        const labels = document.createElement('div');
+        labels.className = 'time-labels';
+        for (let h = 0; h < GRID_HOURS; h++) {
+          const label = document.createElement('div');
+          label.className = 'time-label';
+          label.style.top = (h * PIXELS_PER_HOUR) + 'px';
+          const hour = (START_HOUR + h) % 24;
+          label.textContent = formatHour(hour);
+          labels.appendChild(label);
+        }
+        grid.appendChild(labels);
+        
+        // Drop handlers
+        grid.addEventListener('dragover', handleDragOver);
+        grid.addEventListener('drop', handleDrop);
+        
+        column.appendChild(header);
+        column.appendChild(grid);
+        container.appendChild(column);
+      });
+
+      renderScheduledEvents();
+    }
+
+    function renderScheduledEvents() {
+      scheduledEvents.forEach(event => {
+        const grid = document.querySelector(`[data-date="${event.date}"]`);
+        if (!grid) return;
+
+        const eventDiv = document.createElement('div');
+        eventDiv.className = 'scheduled-event';
+        eventDiv.draggable = true;
+        eventDiv.dataset.eventId = event.id;
+        
+        const color = getItemColor(event);
+        eventDiv.style.background = color;
+        eventDiv.style.borderLeftColor = color;
+        eventDiv.style.color = isLightColor(color) ? '#000' : '#fff';
+        
+        // Position
+        const minutes = event.startHour * 60 + event.startMinute;
+        const startMinutes = START_HOUR * 60;
+        const relativeMinutes = minutes - startMinutes;
+        const top = (relativeMinutes / 15) * PIXELS_PER_15MIN;
+        const height = ((event.runtime_minutes || 90) / 15) * PIXELS_PER_15MIN;
+        
+        eventDiv.style.top = top + 'px';
+        eventDiv.style.height = height + 'px';
+        
+        // Content
+        const title = document.createElement('div');
+        title.className = 'event-title';
+        title.textContent = event.title || event.event_title;
+        
+        const time = document.createElement('div');
+        time.className = 'event-time';
+        time.textContent = formatHour(event.startHour) + ':' + String(event.startMinute).padStart(2, '0');
+        
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.innerHTML = '×';
+        deleteBtn.onclick = (e) => {
+          e.stopPropagation();
+          deleteScheduledEvent(event.id);
         };
-
-        // ===== STATE =====
-        let library = [];
-        let schedule = [];
-        let currentWeekStart = getFriday(new Date());
-        let draggedItem = null;
-        let gapiInitialized = false;
-        let viewMode = 'fri-mon'; // 'fri-mon', 'tue-fri', or 'full'
-
-        // ===== UTILITY FUNCTIONS =====
-        function getFriday(date) {
-            const d = new Date(date);
-            const day = d.getDay(); // 0=Sun, 5=Fri, 6=Sat
-            let diff;
-            
-            if (day === 5) {
-                diff = 0; // Already Friday
-            } else if (day === 6) {
-                diff = -1; // Saturday -> go back 1 day
-            } else {
-                diff = -(day + 2); // Sun-Thu -> go back to previous Friday
-            }
-            
-            d.setDate(d.getDate() + diff);
-            return d;
-        }
-
-        function getTuesday(date) {
-            const d = new Date(date);
-            const day = d.getDay(); // 0=Sun, 2=Tue
-            let diff;
-            
-            if (day === 2) {
-                diff = 0; // Already Tuesday
-            } else if (day < 2) {
-                diff = -(day + 5); // Sun-Mon -> go back to previous Tuesday
-            } else {
-                diff = -(day - 2); // Wed-Sat -> go back to this week's Tuesday
-            }
-            
-            d.setDate(d.getDate() + diff);
-            return d;
-        }
-
-        function getMonday(date) {
-            const d = new Date(date);
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            return new Date(d.setDate(diff));
-        }
-
-        function getWeekStartForMode(mode) {
-            const now = new Date();
-            switch(mode) {
-                case 'fri-mon':
-                    return getFriday(now);
-                case 'tue-fri':
-                    return getTuesday(now);
-                case 'full':
-                    return getMonday(now);
-                default:
-                    return getFriday(now);
-            }
-        }
-
-        function getDayCount() {
-            return viewMode === 'full' ? 7 : 4;
-        }
-
-        function formatDate(date) {
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        }
-
-        function formatDuration(minutes) {
-            if (!minutes) return '';
-            const hours = Math.floor(minutes / 60);
-            const mins = minutes % 60;
-            if (hours === 0) return `${mins}m`;
-            if (mins === 0) return `${hours}h`;
-            return `${hours}h ${mins}m`;
-        }
-
-        function formatTime(date) {
-            return date.toLocaleTimeString('en-US', { 
-                hour: 'numeric', 
-                minute: '2-digit',
-                hour12: true 
-            });
-        }
-
-        function snapToGrid(y) {
-            const gridSize = 20; // 15 minutes
-            return Math.round(y / gridSize) * gridSize;
-        }
-
-        function pixelsToTime(pixels, startHour = 12) {
-            const minutes = (pixels / 20) * 15;
-            const totalMinutes = startHour * 60 + minutes;
-            const hours = Math.floor(totalMinutes / 60);
-            const mins = totalMinutes % 60;
-            return { hours, minutes: mins };
-        }
-
-        function timeToPixels(hours, minutes, startHour = 12) {
-            const totalMinutes = (hours * 60 + minutes) - (startHour * 60);
-            return (totalMinutes / 15) * 20;
-        }
-
-        function showStatus(message, type = 'info') {
-            // Remove any existing status messages
-            document.querySelectorAll('.status-message').forEach(el => el.remove());
-            
-            // Create new popup
-            const popup = document.createElement('div');
-            popup.className = `status-message status-${type}`;
-            popup.textContent = message;
-            document.body.appendChild(popup);
-            
-            // Auto-remove after 5 seconds
-            setTimeout(() => {
-                popup.style.animation = 'slideOut 0.3s ease-in';
-                setTimeout(() => popup.remove(), 300);
-            }, 5000);
-        }
-
-        // ===== LOAD LIBRARY FROM SUPABASE =====
-        async function loadLibrary() {
-            try {
-                // Load movies
-                const moviesResponse = await fetch(`${SUPABASE_URL}/rest/v1/movies?select=*`, {
-                    headers: {
-                        'apikey': SUPABASE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_KEY}`
-                    }
-                });
-                const movies = await moviesResponse.json();
-
-                // Load events
-                const eventsResponse = await fetch(`${SUPABASE_URL}/rest/v1/events?select=*`, {
-                    headers: {
-                        'apikey': SUPABASE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_KEY}`
-                    }
-                });
-                const events = await eventsResponse.json();
-
-                // Combine and add content_type
-                library = [
-                    ...movies.map(m => ({ ...m, content_type: 'movie' })),
-                    ...events.map(e => ({ ...e, content_type: 'event' }))
-                ];
-
-                console.log('Library loaded:', library.length, 'programs');
-                renderLibrary();
-            } catch (error) {
-                console.error('Error loading library:', error);
-                showStatus('Failed to load library', 'warning');
-            }
-        }
-
-        // ===== RENDER LIBRARY =====
-        function renderLibrary() {
-            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
-            const filter = document.getElementById('filterSelect').value;
-            
-            let filtered = library.filter(item => {
-                // Search filter
-                if (searchTerm && !item.title.toLowerCase().includes(searchTerm)) {
-                    return false;
-                }
-
-                // Type filter
-                if (filter === 'movies' && item.content_type !== 'movie') return false;
-                if (filter === 'events' && item.content_type !== 'event') return false;
-                
-                // Recent filter (30 days)
-                if (filter === 'recent') {
-                    const created = new Date(item.created_at);
-                    const thirtyDaysAgo = new Date();
-                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                    if (created < thirtyDaysAgo) return false;
-                }
-
-                return true;
-            });
-
-            document.getElementById('libraryCount').textContent = `(${filtered.length})`;
-
-            const container = document.getElementById('libraryItems');
-            container.innerHTML = filtered.map(item => `
-                <div class="library-item ${item.content_type}" 
-                     draggable="true" 
-                     data-id="${item.id}">
-                    <div class="library-item-title">${item.title}</div>
-                    <div class="library-item-meta">
-                        ${item.director || item.location || ''}
-                        ${item.runtime_minutes ? ' • ' + formatDuration(item.runtime_minutes) : ''}
-                    </div>
-                </div>
-            `).join('');
-
-            // Attach drag listeners
-            document.querySelectorAll('.library-item').forEach(el => {
-                el.addEventListener('dragstart', handleLibraryDragStart);
-            });
-        }
-
-        // ===== BUILD SCHEDULE GRID =====
-        function buildScheduleGrid() {
-            const grid = document.getElementById('scheduleGrid');
-            const weekStart = new Date(currentWeekStart);
-            const dayCount = getDayCount();
-            
-            // Update grid class
-            grid.className = viewMode === 'full' ? 'schedule-grid full-week' : 'schedule-grid four-day';
-            
-            // Update week display
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekEnd.getDate() + (dayCount - 1));
-            document.getElementById('weekDisplay').textContent = 
-                `${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
-
-            // Build grid HTML
-            let html = '';
-
-            // Time column
-            html += '<div class="time-column">';
-            html += '<div class="time-header">Time</div>';
-            html += '<div class="time-labels">';
-            for (let hour = 12; hour < 24; hour++) {
-                const displayHour = hour > 12 ? hour - 12 : hour;
-                const ampm = hour >= 12 ? 'PM' : 'AM';
-                html += `<div class="time-label">${displayHour}:00 ${ampm}</div>`;
-            }
-            html += '</div></div>';
-
-            // Day columns
-            for (let i = 0; i < dayCount; i++) {
-                const date = new Date(weekStart);
-                date.setDate(date.getDate() + i);
-                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-                const dayDate = formatDate(date);
-                const dateStr = date.toISOString().split('T')[0];
-
-                html += `
-                    <div class="day-column" data-date="${dateStr}">
-                        <div class="day-header">
-                            <div class="day-name">${dayName}</div>
-                            <div class="day-date">${dayDate}</div>
-                        </div>
-                        <div class="theater-row">
-                            <div class="theater-column" data-theater="T1">
-                                <div class="theater-header">T1</div>
-                                <div class="theater-content" data-date="${dateStr}" data-theater="T1">
-                                    <div class="snap-indicator"></div>
-                                    <div class="drop-zone"></div>
-                                </div>
-                            </div>
-                            <div class="theater-column" data-theater="T2">
-                                <div class="theater-header">T2</div>
-                                <div class="theater-content" data-date="${dateStr}" data-theater="T2">
-                                    <div class="snap-indicator"></div>
-                                    <div class="drop-zone"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            grid.innerHTML = html;
-
-            // Attach drop zone listeners
-            document.querySelectorAll('.drop-zone').forEach(zone => {
-                zone.addEventListener('dragover', handleDragOver);
-                zone.addEventListener('drop', handleDrop);
-                zone.addEventListener('dragleave', handleDragLeave);
-            });
-
-            // Render scheduled events
-            renderScheduledEvents();
-        }
-
-        // ===== RENDER SCHEDULED EVENTS =====
-        function renderScheduledEvents() {
-            document.querySelectorAll('.scheduled-event').forEach(el => el.remove());
-
-            schedule.forEach(event => {
-                const container = document.querySelector(
-                    `.theater-content[data-date="${event.date}"][data-theater="${event.theater}"]`
-                );
-                
-                if (!container) return;
-
-                const top = timeToPixels(event.startHour, event.startMinute);
-                const height = (event.duration / 15) * 20;
-
-                const eventClass = event.content_type === 'movie' 
-                    ? `movie-${event.theater.toLowerCase()}`
-                    : 'event';
-
-                const eventEl = document.createElement('div');
-                eventEl.className = `scheduled-event ${eventClass}`;
-                eventEl.style.top = `${top}px`;
-                eventEl.style.height = `${height}px`;
-                eventEl.draggable = true;
-                eventEl.dataset.scheduleId = event.id;
-                
-                const startTime = formatTime(new Date(2000, 0, 1, event.startHour, event.startMinute));
-                
-                eventEl.innerHTML = `
-                    <div class="delete-event" title="Delete event">×</div>
-                    <div class="event-title">${event.title}</div>
-                    <div class="event-time">${startTime} • ${formatDuration(event.duration)}</div>
-                `;
-
-                eventEl.addEventListener('dragstart', handleScheduledDragStart);
-                
-                // Delete button handler
-                const deleteBtn = eventEl.querySelector('.delete-event');
-                deleteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteScheduledEvent(event.id);
-                });
-
-                container.appendChild(eventEl);
-            });
-        }
-
-        function deleteScheduledEvent(eventId) {
-            schedule = schedule.filter(e => e.id !== eventId);
-            renderScheduledEvents();
-        }
-
-        // ===== DRAG & DROP HANDLERS =====
-        let dragPreview = null;
-        let dragOffsetY = 0; // Track offset from top of dragged element
-
-        function handleLibraryDragStart(e) {
-            const itemId = e.target.dataset.id;
-            draggedItem = library.find(item => item.id === itemId);
-            e.dataTransfer.effectAllowed = 'copy';
-            dragOffsetY = 0; // Library items start from cursor position
-        }
-
-        function handleScheduledDragStart(e) {
-            const scheduleId = e.target.dataset.scheduleId;
-            draggedItem = schedule.find(item => item.id === scheduleId);
-            draggedItem.isRescheduling = true;
-            e.dataTransfer.effectAllowed = 'move';
-            
-            // Calculate offset from top of element
-            const rect = e.target.getBoundingClientRect();
-            dragOffsetY = e.clientY - rect.top;
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = draggedItem?.isRescheduling ? 'move' : 'copy';
-
-            const zone = e.currentTarget;
-            const container = zone.parentElement;
-            const rect = container.getBoundingClientRect();
-            
-            // Calculate position from TOP of block, not cursor
-            const cursorY = e.clientY - rect.top;
-            const blockTopY = cursorY - dragOffsetY;
-            const snappedY = snapToGrid(blockTopY);
-
-            // Show snap indicator at the TOP of where block will be
-            const indicator = container.querySelector('.snap-indicator');
-            indicator.style.top = `${snappedY}px`;
-            indicator.classList.add('visible');
-
-            // Show drag preview with time at TOP of block
-            const time = pixelsToTime(snappedY);
-            const timeStr = `${time.hours > 12 ? time.hours - 12 : time.hours}:${time.minutes.toString().padStart(2, '0')} ${time.hours >= 12 ? 'PM' : 'AM'}`;
-            
-            if (!dragPreview) {
-                dragPreview = document.createElement('div');
-                dragPreview.className = 'drag-preview';
-                document.body.appendChild(dragPreview);
-            }
-            
-            dragPreview.textContent = draggedItem?.isRescheduling ? `Move to ${timeStr}` : `Drop at ${timeStr}`;
-            dragPreview.style.left = `${e.clientX + 10}px`;
-            dragPreview.style.top = `${e.clientY + 10}px`;
-
-            zone.classList.add('drag-over');
-        }
-
-        function handleDragLeave(e) {
-            const zone = e.currentTarget;
-            const indicator = zone.parentElement.querySelector('.snap-indicator');
-            indicator.classList.remove('visible');
-            zone.classList.remove('drag-over');
-
-            if (dragPreview) {
-                dragPreview.remove();
-                dragPreview = null;
-            }
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            
-            const zone = e.currentTarget;
-            const container = zone.parentElement;
-            const date = container.dataset.date;
-            const theater = container.dataset.theater;
-            const rect = container.getBoundingClientRect();
-            
-            // Calculate position from TOP of block
-            const cursorY = e.clientY - rect.top;
-            const blockTopY = cursorY - dragOffsetY;
-            const snappedY = snapToGrid(blockTopY);
-            const time = pixelsToTime(snappedY);
-
-            zone.classList.remove('drag-over');
-            const indicator = container.querySelector('.snap-indicator');
-            indicator.classList.remove('visible');
-
-            if (dragPreview) {
-                dragPreview.remove();
-                dragPreview = null;
-            }
-
-            if (!draggedItem) return;
-
-            if (draggedItem.isRescheduling) {
-                // Remove from old position
-                schedule = schedule.filter(item => item.id !== draggedItem.id);
-            }
-
-            // Add to schedule
-            const newEvent = {
-                id: draggedItem.isRescheduling ? draggedItem.id : `sched-${Date.now()}`,
-                supabaseId: draggedItem.id,
-                title: draggedItem.title,
-                content_type: draggedItem.content_type,
-                duration: draggedItem.runtime_minutes || 120,
-                date: date,
-                theater: theater,
-                startHour: time.hours,
-                startMinute: time.minutes,
-                googleEventId: draggedItem.googleEventId || null
-            };
-
-            schedule.push(newEvent);
-            renderScheduledEvents();
-
-            draggedItem = null;
-            dragOffsetY = 0;
-            
-            // NO status message when moving events!
-        }
-
-        // ===== GOOGLE CALENDAR API =====
-        function initGoogleAPI() {
-            gapi.load('client', async () => {
-                try {
-                    await gapi.client.init({
-                        apiKey: GOOGLE_API_KEY,
-                        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
-                    });
-                    gapiInitialized = true;
-                    console.log('Google Calendar API initialized');
-                    
-                    // Auto-sync on load
-                    syncWithGoogle();
-                } catch (error) {
-                    console.error('Error initializing Google API:', error);
-                    showStatus('Google Calendar connection failed', 'warning');
-                }
-            });
-        }
-
-        async function syncWithGoogle() {
-            if (!gapiInitialized) {
-                showStatus('Google Calendar not initialized', 'warning');
-                return;
-            }
-
-            showStatus('Syncing with Google Calendar...', 'info');
-
-            try {
-                const weekStart = new Date(currentWeekStart);
-                const weekEnd = new Date(weekStart);
-                const dayCount = getDayCount();
-                weekEnd.setDate(weekEnd.getDate() + dayCount);
-
-                let matchCount = 0;
-
-                // Sync each calendar
-                for (const [calName, calId] of Object.entries(CALENDAR_IDS)) {
-                    const response = await gapi.client.calendar.events.list({
-                        calendarId: calId,
-                        timeMin: weekStart.toISOString(),
-                        timeMax: weekEnd.toISOString(),
-                        singleEvents: true
-                    });
-
-                    const events = response.result.items || [];
-                    
-                    events.forEach(gEvent => {
-                        const supabaseId = gEvent.extendedProperties?.private?.['tsl-supabase-id'];
-                        if (!supabaseId) return;
-
-                        const existing = schedule.find(s => s.supabaseId === supabaseId);
-                        if (existing) {
-                            existing.googleEventId = gEvent.id;
-                            matchCount++;
-                        }
-                    });
-                }
-
-                showStatus(`Synced! Found ${matchCount} matching events.`, 'success');
-            } catch (error) {
-                console.error('Sync error:', error);
-                showStatus('Sync failed: ' + error.message, 'warning');
-            }
-        }
-
-        async function pushToGoogle() {
-            if (!gapiInitialized) {
-                showStatus('Google Calendar not initialized', 'warning');
-                return;
-            }
-
-            showStatus('Pushing to Google Calendar...', 'info');
-
-            try {
-                let createdCount = 0;
-                let updatedCount = 0;
-
-                for (const event of schedule) {
-                    const calendarId = event.content_type === 'event' 
-                        ? CALENDAR_IDS.events
-                        : event.theater === 'T1' 
-                            ? CALENDAR_IDS.theater1 
-                            : CALENDAR_IDS.theater2;
-
-                    const startDateTime = new Date(event.date);
-                    startDateTime.setHours(event.startHour, event.startMinute, 0);
-                    
-                    const endDateTime = new Date(startDateTime);
-                    endDateTime.setMinutes(endDateTime.getMinutes() + event.duration);
-
-                    const gEvent = {
-                        summary: event.title,
-                        start: {
-                            dateTime: startDateTime.toISOString(),
-                            timeZone: 'America/New_York'
-                        },
-                        end: {
-                            dateTime: endDateTime.toISOString(),
-                            timeZone: 'America/New_York'
-                        },
-                        extendedProperties: {
-                            private: {
-                                'tsl-supabase-id': event.supabaseId,
-                                'tsl-content-type': event.content_type,
-                                'tsl-theater': event.theater
-                            }
-                        }
-                    };
-
-                    if (event.googleEventId) {
-                        // Update existing
-                        await gapi.client.calendar.events.update({
-                            calendarId: calendarId,
-                            eventId: event.googleEventId,
-                            resource: gEvent
-                        });
-                        updatedCount++;
-                    } else {
-                        // Create new
-                        const response = await gapi.client.calendar.events.insert({
-                            calendarId: calendarId,
-                            resource: gEvent
-                        });
-                        event.googleEventId = response.result.id;
-                        createdCount++;
-                    }
-                }
-
-                showStatus(`Success! Created ${createdCount}, updated ${updatedCount} events.`, 'success');
-            } catch (error) {
-                console.error('Push error:', error);
-                showStatus('Push failed: ' + error.message, 'warning');
-            }
-        }
-
-        // ===== EVENT LISTENERS =====
-        document.getElementById('searchBox').addEventListener('input', renderLibrary);
-        document.getElementById('filterSelect').addEventListener('change', renderLibrary);
         
-        document.getElementById('prevWeekBtn').addEventListener('click', () => {
-            const dayCount = getDayCount();
-            currentWeekStart.setDate(currentWeekStart.getDate() - dayCount);
-            buildScheduleGrid();
-        });
+        eventDiv.appendChild(title);
+        eventDiv.appendChild(time);
+        eventDiv.appendChild(deleteBtn);
         
-        document.getElementById('nextWeekBtn').addEventListener('click', () => {
-            const dayCount = getDayCount();
-            currentWeekStart.setDate(currentWeekStart.getDate() + dayCount);
-            buildScheduleGrid();
-        });
+        // CRITICAL: Drag events on parent only
+        eventDiv.addEventListener('dragstart', handleDragStart);
+        eventDiv.addEventListener('dragend', handleDragEnd);
+        
+        grid.appendChild(eventDiv);
+      });
+    }
 
-        document.getElementById('viewModeSelect').addEventListener('change', (e) => {
-            viewMode = e.target.value;
-            currentWeekStart = getWeekStartForMode(viewMode);
-            buildScheduleGrid();
-        });
+    function handleDragStart(e) {
+      draggedItem = this;
+      
+      // CRITICAL: Calculate offset from TOP of block
+      const rect = this.getBoundingClientRect();
+      dragOffsetY = e.clientY - rect.top;
+      
+      // Set drag image to be the block itself
+      e.dataTransfer.effectAllowed = 'move';
+      
+      // Store data
+      if (this.classList.contains('library-item')) {
+        const index = Array.from(this.parentNode.children).indexOf(this);
+        e.dataTransfer.setData('source', 'library');
+        e.dataTransfer.setData('index', index);
+      } else {
+        e.dataTransfer.setData('source', 'scheduled');
+        e.dataTransfer.setData('eventId', this.dataset.eventId);
+      }
+      
+      this.style.opacity = '0.5';
+    }
 
-        document.getElementById('syncBtn').addEventListener('click', syncWithGoogle);
-        document.getElementById('pushBtn').addEventListener('click', pushToGoogle);
+    function handleDragEnd(e) {
+      if (draggedItem) {
+        draggedItem.style.opacity = '';
+        draggedItem = null;
+      }
+      hideSnapIndicator();
+    }
 
-        // ===== INITIALIZATION =====
-        async function init() {
-            await loadLibrary();
-            buildScheduleGrid();
-            initGoogleAPI();
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      if (!draggedItem) return;
+      
+      const grid = e.currentTarget;
+      const rect = grid.getBoundingClientRect();
+      
+      // CRITICAL: Calculate position from TOP of dragged block
+      const blockTopY = e.clientY - dragOffsetY;
+      const relativeY = blockTopY - rect.top;
+      
+      // Snap to 15-minute grid
+      const snappedY = snapToGrid(relativeY);
+      const minutes = (snappedY / PIXELS_PER_15MIN) * 15;
+      const hour = START_HOUR + Math.floor(minutes / 60);
+      const minute = minutes % 60;
+      
+      // Show snap indicator at TOP of where block will be placed
+      showSnapIndicator(grid, snappedY, hour, minute);
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      hideSnapIndicator();
+      
+      const source = e.dataTransfer.getData('source');
+      const grid = e.currentTarget;
+      const rect = grid.getBoundingClientRect();
+      
+      // CRITICAL: Calculate position from TOP of dragged block
+      const blockTopY = e.clientY - dragOffsetY;
+      const relativeY = blockTopY - rect.top;
+      
+      const snappedY = snapToGrid(relativeY);
+      const minutes = (snappedY / PIXELS_PER_15MIN) * 15;
+      const hour = START_HOUR + Math.floor(minutes / 60);
+      const minute = minutes % 60;
+      const date = grid.dataset.date;
+      
+      if (source === 'library') {
+        const index = parseInt(e.dataTransfer.getData('index'));
+        const item = libraryItems[index];
+        addScheduledEvent(item, date, hour, minute);
+      } else {
+        const eventId = e.dataTransfer.getData('eventId');
+        moveScheduledEvent(eventId, date, hour, minute);
+      }
+    }
+
+    function addScheduledEvent(item, date, hour, minute) {
+      const event = {
+        id: Date.now() + Math.random(),
+        ...item,
+        date,
+        startHour: hour,
+        startMinute: minute
+      };
+      scheduledEvents.push(event);
+      renderScheduler();
+    }
+
+    function moveScheduledEvent(eventId, date, hour, minute) {
+      const event = scheduledEvents.find(e => e.id == eventId);
+      if (event) {
+        event.date = date;
+        event.startHour = hour;
+        event.startMinute = minute;
+        renderScheduler();
+      }
+    }
+
+    function deleteScheduledEvent(eventId) {
+      scheduledEvents = scheduledEvents.filter(e => e.id != eventId);
+      renderScheduler();
+    }
+
+    function snapToGrid(y) {
+      return Math.max(0, Math.round(y / PIXELS_PER_15MIN) * PIXELS_PER_15MIN);
+    }
+
+    function showSnapIndicator(grid, y, hour, minute) {
+      const indicator = document.getElementById('snapIndicator');
+      const rect = grid.getBoundingClientRect();
+      indicator.style.display = 'block';
+      indicator.style.top = (rect.top + y) + 'px';
+      indicator.style.left = rect.left + 'px';
+      indicator.style.width = rect.width + 'px';
+      indicator.dataset.time = formatHour(hour) + ':' + String(minute).padStart(2, '0');
+    }
+
+    function hideSnapIndicator() {
+      document.getElementById('snapIndicator').style.display = 'none';
+    }
+
+    function showStatus(message, type = 'success') {
+      const popup = document.getElementById('statusPopup');
+      popup.textContent = message;
+      popup.className = 'status-popup ' + type + ' show';
+      setTimeout(() => {
+        popup.classList.remove('show');
+      }, 5000);
+    }
+
+    function getDaysToShow() {
+      const days = [];
+      const start = new Date(currentWeekStart);
+      
+      if (viewMode === 'weekend') {
+        // FRI, SAT, SUN, MON
+        for (let i = 0; i < 4; i++) {
+          const date = new Date(start);
+          date.setDate(start.getDate() + i);
+          days.push(date);
         }
+      } else if (viewMode === 'midweek') {
+        // TUE, WED, THU, FRI
+        for (let i = -3; i < 1; i++) {
+          const date = new Date(start);
+          date.setDate(start.getDate() + i);
+          days.push(date);
+        }
+      } else {
+        // Full week: MON-SUN
+        const monday = new Date(start);
+        monday.setDate(start.getDate() - 4);
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(monday);
+          date.setDate(monday.getDate() + i);
+          days.push(date);
+        }
+      }
+      
+      return days;
+    }
 
-        // Start the app
-        init();
-    </script>
+    function formatDate(date) {
+      const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+      return days[date.getDay()] + ' ' + (date.getMonth() + 1) + '/' + date.getDate();
+    }
+
+    function formatHour(hour) {
+      const h = hour % 12 || 12;
+      const ampm = hour < 12 ? 'AM' : 'PM';
+      return h + ':00 ' + ampm;
+    }
+
+    function getItemColor(item) {
+      // Simple hash-based color
+      const str = item.title || item.event_title || '';
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const h = hash % 360;
+      return `hsl(${h}, 65%, 60%)`;
+    }
+
+    function isLightColor(color) {
+      const hex = color.replace('#', '');
+      if (hex.length === 3) {
+        const r = parseInt(hex[0] + hex[0], 16);
+        const g = parseInt(hex[1] + hex[1], 16);
+        const b = parseInt(hex[2] + hex[2], 16);
+        return (r * 0.299 + g * 0.587 + b * 0.114) > 186;
+      }
+      return true;
+    }
+
+    function prevWeek() {
+      currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+      renderScheduler();
+    }
+
+    function nextWeek() {
+      currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+      renderScheduler();
+    }
+
+    document.getElementById('viewMode').addEventListener('change', (e) => {
+      viewMode = e.target.value;
+      renderScheduler();
+    });
+
+    async function syncFromGoogle() {
+      showStatus('Syncing from Google Calendar...', 'success');
+      // Implement Google Calendar sync
+    }
+
+    async function pushToGoogle() {
+      showStatus('Pushing to Google Calendar...', 'success');
+      // Implement Google Calendar push
+    }
+  </script>
 </body>
 </html>
