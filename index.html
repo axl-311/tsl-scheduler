@@ -160,13 +160,17 @@
         }
 
         .library-item {
-            padding: 12px;
+            padding: 14px 12px;
             margin-bottom: 8px;
             border-radius: 4px;
             cursor: grab;
             transition: transform 0.2s;
-            color: white;
+            color: #1a1a1a;
             font-weight: 500;
+            min-height: 70px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .library-item:hover {
@@ -183,16 +187,18 @@
 
         .library-item.event {
             background: #e74c43; /* Vibrant Red */
+            color: white;
         }
 
         .library-item-title {
             font-size: 14px;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
+            line-height: 1.3;
         }
 
         .library-item-duration {
             font-size: 12px;
-            opacity: 0.9;
+            opacity: 0.85;
         }
 
         .schedule-container {
@@ -227,7 +233,7 @@
         }
 
         .time-slot {
-            height: 40px; /* 15 minutes = 40px, so 1 hour = 160px */
+            height: 30px; /* 15 minutes = 30px, so 1 hour = 120px */
             border-bottom: 1px solid #e0e0e0;
             display: flex;
             align-items: flex-start;
@@ -281,7 +287,7 @@
         .theater-lane {
             border-right: 1px solid #e0e0e0;
             position: relative;
-            min-height: 1920px; /* 12 hours * 160px per hour */
+            min-height: 1440px; /* 12 hours * 120px per hour */
         }
 
         .theater-lane:last-child {
@@ -303,7 +309,7 @@
 
         .theater-content {
             position: relative;
-            height: 1920px; /* 12 hours * 160px */
+            height: 1440px; /* 12 hours * 120px */
         }
 
         .theater-lane.drag-over {
@@ -324,7 +330,7 @@
             position: absolute;
             left: 0;
             right: 0;
-            height: 40px; /* 15 minutes */
+            height: 30px; /* 15 minutes */
             border-bottom: 1px solid #f0f0f0;
         }
 
@@ -635,21 +641,36 @@
                 return;
             }
 
-            content.innerHTML = filteredLibrary.map(item => `
-                <div class="library-item ${item.content_type}" 
-                     draggable="true"
-                     data-id="${item.id}"
-                     data-supabase-id="${item.supabase_id || item.id}">
-                    <div class="library-item-title">${item.title}</div>
-                    <div class="library-item-duration">${item.duration || item.runtime_minutes || 'Duration TBD'} min</div>
-                </div>
-            `).join('');
+            content.innerHTML = filteredLibrary.map(item => {
+                const duration = item.duration || item.runtime_minutes;
+                const durationText = duration ? formatDuration(duration) : 'Duration TBD';
+                
+                return `
+                    <div class="library-item ${item.content_type}" 
+                         draggable="true"
+                         data-id="${item.id}"
+                         data-supabase-id="${item.supabase_id || item.id}">
+                        <div class="library-item-title">${item.title}</div>
+                        <div class="library-item-duration">${durationText}</div>
+                    </div>
+                `;
+            }).join('');
 
             // Setup drag handlers
             document.querySelectorAll('.library-item').forEach(item => {
                 item.addEventListener('dragstart', handleDragStart);
                 item.addEventListener('dragend', handleDragEnd);
             });
+        }
+
+        function formatDuration(minutes) {
+            if (!minutes) return 'Duration TBD';
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            if (hours > 0) {
+                return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+            }
+            return `${mins}m`;
         }
 
         // Week navigation
@@ -765,7 +786,7 @@
             const lines = [];
             for (let i = 0; i < 48; i++) { // 12 hours * 4 (15-min intervals)
                 const isHourMark = i % 4 === 0;
-                lines.push(`<div class="time-grid-line ${isHourMark ? 'hour-mark' : ''}" style="top: ${i * 40}px;"></div>`);
+                lines.push(`<div class="time-grid-line ${isHourMark ? 'hour-mark' : ''}" style="top: ${i * 30}px;"></div>`);
             }
             return `<div class="time-grid-lines">${lines.join('')}</div>`;
         }
@@ -795,6 +816,33 @@
             dragPreview.textContent = 'Drop to schedule';
             document.body.appendChild(dragPreview);
             dragPreview.style.display = 'none';
+        }
+
+        function handleScheduledEventDragStart(e) {
+            const supabaseId = e.target.dataset.supabaseId;
+            const eventTime = parseInt(e.target.dataset.eventTime);
+            
+            draggedItem = scheduledEvents.find(ev => 
+                ev.supabaseId === supabaseId && ev.actualDate.getTime() === eventTime
+            );
+            
+            if (draggedItem) {
+                // Mark as being moved (will be removed from old position on successful drop)
+                draggedItem._isMoving = true;
+                
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', e.target.innerHTML);
+                
+                e.target.style.opacity = '0.5';
+                e.target.classList.add('dragging');
+
+                // Create drag preview
+                dragPreview = document.createElement('div');
+                dragPreview.className = 'drag-preview';
+                dragPreview.textContent = 'Move to new time';
+                document.body.appendChild(dragPreview);
+                dragPreview.style.display = 'none';
+            }
         }
 
         function handleDragEnd(e) {
@@ -878,13 +926,13 @@
         }
 
         function getSnappedY(y) {
-            // Snap to 15-minute increments (40px = 15 min)
-            return Math.round(y / 40) * 40;
+            // Snap to 15-minute increments (30px = 15 min)
+            return Math.round(y / 30) * 30;
         }
 
         function getSnappedTime(y) {
-            // Convert Y position to time (40px = 15 min, starting at 12 PM)
-            const quarterHours = Math.round(y / 40);
+            // Convert Y position to time (30px = 15 min, starting at 12 PM)
+            const quarterHours = Math.round(y / 30);
             const hour = 12 + Math.floor(quarterHours / 4);
             const minutes = (quarterHours % 4) * 15;
             return { hour, minutes };
@@ -895,9 +943,17 @@
             eventDate.setDate(eventDate.getDate() + dayIndex);
             eventDate.setHours(time.hour, time.minutes, 0, 0);
 
-            const itemId = item.supabase_id || item.id;
+            const itemId = item.supabaseId || item.id;
 
-            // Check for duplicates
+            // If moving an existing event, remove it from old position
+            if (item._isMoving) {
+                scheduledEvents = scheduledEvents.filter(e => 
+                    !(e.supabaseId === itemId && e._isMoving)
+                );
+                delete item._isMoving;
+            }
+
+            // Check for duplicates at new position
             const exists = scheduledEvents.find(e => 
                 (e.supabaseId === itemId || e.id === itemId) &&
                 e.actualDate.getTime() === eventDate.getTime() &&
@@ -946,12 +1002,17 @@
             const el = document.createElement('div');
             el.className = `scheduled-event ${event.content_type} theater-${event.theater}`;
             if (event.modified) el.classList.add('modified');
+            
+            // Make draggable
+            el.draggable = true;
+            el.dataset.supabaseId = event.supabaseId;
+            el.dataset.eventTime = event.actualDate.getTime();
 
             const hours = event.actualDate.getHours();
             const minutes = event.actualDate.getMinutes();
-            const topPosition = ((hours - 12) * 4 + minutes / 15) * 40;
+            const topPosition = ((hours - 12) * 4 + minutes / 15) * 30;
             const duration = event.duration || 90;
-            const height = (duration / 15) * 40;
+            const height = (duration / 15) * 30;
 
             el.style.top = topPosition + 'px';
             el.style.height = height + 'px';
@@ -963,6 +1024,10 @@
                     <button class="event-btn" onclick="removeEvent('${event.supabaseId}', ${event.actualDate.getTime()})">×</button>
                 </div>
             `;
+
+            // Add drag handlers for re-dragging
+            el.addEventListener('dragstart', handleScheduledEventDragStart);
+            el.addEventListener('dragend', handleDragEnd);
 
             return el;
         }
