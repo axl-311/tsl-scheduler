@@ -205,36 +205,85 @@
             font-weight: 500;
         }
 
-        .status-message {
-            padding: 10px;
+        .view-mode-select {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
             border-radius: 4px;
-            margin-bottom: 15px;
             font-size: 13px;
+            cursor: pointer;
+            background: white;
+            margin-left: auto;
+        }
+
+        .status-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            min-width: 300px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
         }
 
         .status-success {
             background: #d4edda;
             color: #155724;
+            border-left: 4px solid #28a745;
         }
 
         .status-info {
             background: #d1ecf1;
             color: #0c5460;
+            border-left: 4px solid #17a2b8;
         }
 
         .status-warning {
             background: #fff3cd;
             color: #856404;
+            border-left: 4px solid #ffc107;
         }
 
         /* ===== GRID LAYOUT ===== */
         .schedule-grid {
             display: grid;
-            grid-template-columns: 60px repeat(7, 1fr);
+            grid-template-columns: 60px repeat(var(--day-count, 4), 1fr);
             gap: 0;
             border: 1px solid #ddd;
             border-radius: 6px;
             overflow: hidden;
+        }
+
+        .schedule-grid.full-week {
+            --day-count: 7;
+        }
+
+        .schedule-grid.four-day {
+            --day-count: 4;
         }
 
         .time-column {
@@ -245,7 +294,7 @@
         }
 
         .time-header {
-            height: 50px;
+            height: 76px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -261,7 +310,7 @@
         }
 
         .time-label {
-            height: 120px; /* 1 hour = 4 x 30px */
+            height: 80px; /* 1 hour = 4 x 20px */
             display: flex;
             align-items: flex-start;
             justify-content: center;
@@ -275,7 +324,13 @@
             display: flex;
             flex-direction: column;
             border-right: 1px solid #ddd;
-            min-width: 200px;
+            min-width: 180px;
+            max-width: 220px;
+        }
+
+        .schedule-grid.full-week .day-column {
+            min-width: 140px;
+            max-width: 160px;
         }
 
         .day-column:last-child {
@@ -283,7 +338,7 @@
         }
 
         .day-header {
-            height: 50px;
+            height: 48px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -320,7 +375,7 @@
         }
 
         .theater-header {
-            height: 30px;
+            height: 28px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -332,14 +387,14 @@
 
         .theater-content {
             position: relative;
-            height: 1440px; /* 12 hours × 120px/hour */
+            height: 960px; /* 12 hours × 80px/hour */
             background: 
                 repeating-linear-gradient(
                     to bottom,
                     transparent,
-                    transparent 29px,
-                    #f0f0f0 29px,
-                    #f0f0f0 30px
+                    transparent 19px,
+                    #f0f0f0 19px,
+                    #f0f0f0 20px
                 );
         }
 
@@ -463,9 +518,12 @@
                 <button id="prevWeekBtn">← Previous</button>
                 <span class="week-display" id="weekDisplay">Week of Nov 1</span>
                 <button id="nextWeekBtn">Next →</button>
+                <select class="view-mode-select" id="viewModeSelect">
+                    <option value="fri-mon">Weekend (FRI-MON)</option>
+                    <option value="tue-fri">Midweek (TUE-FRI)</option>
+                    <option value="full">Full Week (7 Days)</option>
+                </select>
             </div>
-
-            <div id="statusContainer"></div>
 
             <div class="schedule-grid" id="scheduleGrid">
                 <!-- Grid built dynamically -->
@@ -491,16 +549,69 @@
         // ===== STATE =====
         let library = [];
         let schedule = [];
-        let currentWeekStart = getMonday(new Date());
+        let currentWeekStart = getFriday(new Date());
         let draggedItem = null;
         let gapiInitialized = false;
+        let viewMode = 'fri-mon'; // 'fri-mon', 'tue-fri', or 'full'
 
         // ===== UTILITY FUNCTIONS =====
+        function getFriday(date) {
+            const d = new Date(date);
+            const day = d.getDay(); // 0=Sun, 5=Fri, 6=Sat
+            let diff;
+            
+            if (day === 5) {
+                diff = 0; // Already Friday
+            } else if (day === 6) {
+                diff = -1; // Saturday -> go back 1 day
+            } else {
+                diff = -(day + 2); // Sun-Thu -> go back to previous Friday
+            }
+            
+            d.setDate(d.getDate() + diff);
+            return d;
+        }
+
+        function getTuesday(date) {
+            const d = new Date(date);
+            const day = d.getDay(); // 0=Sun, 2=Tue
+            let diff;
+            
+            if (day === 2) {
+                diff = 0; // Already Tuesday
+            } else if (day < 2) {
+                diff = -(day + 5); // Sun-Mon -> go back to previous Tuesday
+            } else {
+                diff = -(day - 2); // Wed-Sat -> go back to this week's Tuesday
+            }
+            
+            d.setDate(d.getDate() + diff);
+            return d;
+        }
+
         function getMonday(date) {
             const d = new Date(date);
             const day = d.getDay();
             const diff = d.getDate() - day + (day === 0 ? -6 : 1);
             return new Date(d.setDate(diff));
+        }
+
+        function getWeekStartForMode(mode) {
+            const now = new Date();
+            switch(mode) {
+                case 'fri-mon':
+                    return getFriday(now);
+                case 'tue-fri':
+                    return getTuesday(now);
+                case 'full':
+                    return getMonday(now);
+                default:
+                    return getFriday(now);
+            }
+        }
+
+        function getDayCount() {
+            return viewMode === 'full' ? 7 : 4;
         }
 
         function formatDate(date) {
@@ -525,12 +636,12 @@
         }
 
         function snapToGrid(y) {
-            const gridSize = 30; // 15 minutes
+            const gridSize = 20; // 15 minutes
             return Math.round(y / gridSize) * gridSize;
         }
 
         function pixelsToTime(pixels, startHour = 12) {
-            const minutes = (pixels / 30) * 15;
+            const minutes = (pixels / 20) * 15;
             const totalMinutes = startHour * 60 + minutes;
             const hours = Math.floor(totalMinutes / 60);
             const mins = totalMinutes % 60;
@@ -539,14 +650,23 @@
 
         function timeToPixels(hours, minutes, startHour = 12) {
             const totalMinutes = (hours * 60 + minutes) - (startHour * 60);
-            return (totalMinutes / 15) * 30;
+            return (totalMinutes / 15) * 20;
         }
 
         function showStatus(message, type = 'info') {
-            const container = document.getElementById('statusContainer');
-            container.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+            // Remove any existing status messages
+            document.querySelectorAll('.status-message').forEach(el => el.remove());
+            
+            // Create new popup
+            const popup = document.createElement('div');
+            popup.className = `status-message status-${type}`;
+            popup.textContent = message;
+            document.body.appendChild(popup);
+            
+            // Auto-remove after 5 seconds
             setTimeout(() => {
-                container.innerHTML = '';
+                popup.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => popup.remove(), 300);
             }, 5000);
         }
 
@@ -636,12 +756,16 @@
         function buildScheduleGrid() {
             const grid = document.getElementById('scheduleGrid');
             const weekStart = new Date(currentWeekStart);
+            const dayCount = getDayCount();
+            
+            // Update grid class
+            grid.className = viewMode === 'full' ? 'schedule-grid full-week' : 'schedule-grid four-day';
             
             // Update week display
             const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekEnd.getDate() + 6);
+            weekEnd.setDate(weekEnd.getDate() + (dayCount - 1));
             document.getElementById('weekDisplay').textContent = 
-                `Week of ${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
+                `${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
 
             // Build grid HTML
             let html = '';
@@ -658,7 +782,7 @@
             html += '</div></div>';
 
             // Day columns
-            for (let i = 0; i < 7; i++) {
+            for (let i = 0; i < dayCount; i++) {
                 const date = new Date(weekStart);
                 date.setDate(date.getDate() + i);
                 const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
@@ -716,7 +840,7 @@
                 if (!container) return;
 
                 const top = timeToPixels(event.startHour, event.startMinute);
-                const height = (event.duration / 15) * 30;
+                const height = (event.duration / 15) * 20;
 
                 const eventClass = event.content_type === 'movie' 
                     ? `movie-${event.theater.toLowerCase()}`
@@ -882,7 +1006,8 @@
             try {
                 const weekStart = new Date(currentWeekStart);
                 const weekEnd = new Date(weekStart);
-                weekEnd.setDate(weekEnd.getDate() + 7);
+                const dayCount = getDayCount();
+                weekEnd.setDate(weekEnd.getDate() + dayCount);
 
                 let matchCount = 0;
 
@@ -991,12 +1116,20 @@
         document.getElementById('filterSelect').addEventListener('change', renderLibrary);
         
         document.getElementById('prevWeekBtn').addEventListener('click', () => {
-            currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+            const dayCount = getDayCount();
+            currentWeekStart.setDate(currentWeekStart.getDate() - dayCount);
             buildScheduleGrid();
         });
         
         document.getElementById('nextWeekBtn').addEventListener('click', () => {
-            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+            const dayCount = getDayCount();
+            currentWeekStart.setDate(currentWeekStart.getDate() + dayCount);
+            buildScheduleGrid();
+        });
+
+        document.getElementById('viewModeSelect').addEventListener('change', (e) => {
+            viewMode = e.target.value;
+            currentWeekStart = getWeekStartForMode(viewMode);
             buildScheduleGrid();
         });
 
