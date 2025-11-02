@@ -294,7 +294,7 @@
         }
 
         .time-header {
-            height: 76px;
+            height: 78px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -434,11 +434,39 @@
             font-weight: 600;
             font-size: 13px;
             margin-bottom: 2px;
+            padding-right: 20px;
         }
 
         .event-time {
             font-size: 11px;
             opacity: 0.8;
+        }
+
+        .delete-event {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 18px;
+            height: 18px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .scheduled-event:hover .delete-event {
+            opacity: 1;
+        }
+
+        .delete-event:hover {
+            background: rgba(0,0,0,0.4);
         }
 
         /* ===== DRAG & DROP HELPERS ===== */
@@ -856,22 +884,38 @@
                 const startTime = formatTime(new Date(2000, 0, 1, event.startHour, event.startMinute));
                 
                 eventEl.innerHTML = `
+                    <div class="delete-event" title="Delete event">×</div>
                     <div class="event-title">${event.title}</div>
                     <div class="event-time">${startTime} • ${formatDuration(event.duration)}</div>
                 `;
 
                 eventEl.addEventListener('dragstart', handleScheduledDragStart);
+                
+                // Delete button handler
+                const deleteBtn = eventEl.querySelector('.delete-event');
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteScheduledEvent(event.id);
+                });
+
                 container.appendChild(eventEl);
             });
         }
 
+        function deleteScheduledEvent(eventId) {
+            schedule = schedule.filter(e => e.id !== eventId);
+            renderScheduledEvents();
+        }
+
         // ===== DRAG & DROP HANDLERS =====
         let dragPreview = null;
+        let dragOffsetY = 0; // Track offset from top of dragged element
 
         function handleLibraryDragStart(e) {
             const itemId = e.target.dataset.id;
             draggedItem = library.find(item => item.id === itemId);
             e.dataTransfer.effectAllowed = 'copy';
+            dragOffsetY = 0; // Library items start from cursor position
         }
 
         function handleScheduledDragStart(e) {
@@ -879,6 +923,10 @@
             draggedItem = schedule.find(item => item.id === scheduleId);
             draggedItem.isRescheduling = true;
             e.dataTransfer.effectAllowed = 'move';
+            
+            // Calculate offset from top of element
+            const rect = e.target.getBoundingClientRect();
+            dragOffsetY = e.clientY - rect.top;
         }
 
         function handleDragOver(e) {
@@ -888,15 +936,18 @@
             const zone = e.currentTarget;
             const container = zone.parentElement;
             const rect = container.getBoundingClientRect();
-            const y = e.clientY - rect.top;
-            const snappedY = snapToGrid(y);
+            
+            // Calculate position from TOP of block, not cursor
+            const cursorY = e.clientY - rect.top;
+            const blockTopY = cursorY - dragOffsetY;
+            const snappedY = snapToGrid(blockTopY);
 
-            // Show snap indicator
+            // Show snap indicator at the TOP of where block will be
             const indicator = container.querySelector('.snap-indicator');
             indicator.style.top = `${snappedY}px`;
             indicator.classList.add('visible');
 
-            // Show drag preview
+            // Show drag preview with time at TOP of block
             const time = pixelsToTime(snappedY);
             const timeStr = `${time.hours > 12 ? time.hours - 12 : time.hours}:${time.minutes.toString().padStart(2, '0')} ${time.hours >= 12 ? 'PM' : 'AM'}`;
             
@@ -933,8 +984,11 @@
             const date = container.dataset.date;
             const theater = container.dataset.theater;
             const rect = container.getBoundingClientRect();
-            const y = e.clientY - rect.top;
-            const snappedY = snapToGrid(y);
+            
+            // Calculate position from TOP of block
+            const cursorY = e.clientY - rect.top;
+            const blockTopY = cursorY - dragOffsetY;
+            const snappedY = snapToGrid(blockTopY);
             const time = pixelsToTime(snappedY);
 
             zone.classList.remove('drag-over');
@@ -971,8 +1025,9 @@
             renderScheduledEvents();
 
             draggedItem = null;
+            dragOffsetY = 0;
             
-            showStatus('Event scheduled! Click "Push to Google" to save.', 'success');
+            // NO status message when moving events!
         }
 
         // ===== GOOGLE CALENDAR API =====
