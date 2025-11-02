@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v2.2</title>
+    <title>TSL Scheduler v3.0</title>
     <style>
         * {
             margin: 0;
@@ -12,7 +12,7 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
             background: #f5f5f5;
             padding: 20px;
         }
@@ -20,161 +20,77 @@
         .container {
             max-width: 1800px;
             margin: 0 auto;
+            display: flex;
+            gap: 20px;
+        }
+
+        /* ===== LIBRARY PANEL ===== */
+        .library-panel {
+            width: 320px;
             background: white;
             border-radius: 8px;
+            padding: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .header {
-            padding: 20px;
-            border-bottom: 1px solid #e0e0e0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        h1 {
-            font-size: 24px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-
-        .btn-primary {
-            background: #4CAF50;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #45a049;
-        }
-
-        .btn-secondary {
-            background: #2196F3;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #1976D2;
-        }
-
-        .btn-toggle {
-            background: #9E9E9E;
-            color: white;
-        }
-
-        .btn-toggle:hover {
-            background: #757575;
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .status {
-            padding: 8px 16px;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .status.synced {
-            background: #E8F5E9;
-            color: #2E7D32;
-        }
-
-        .status.needs-push {
-            background: #FFF3E0;
-            color: #E65100;
-        }
-
-        .main-content {
-            display: flex;
-            height: calc(100vh - 120px);
-        }
-
-        .library-panel {
-            width: 300px;
-            border-right: 1px solid #e0e0e0;
+            height: fit-content;
+            max-height: calc(100vh - 40px);
             overflow-y: auto;
-            padding: 20px;
+            position: sticky;
+            top: 20px;
         }
 
         .library-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             margin-bottom: 15px;
         }
 
         .library-header h2 {
             font-size: 18px;
             font-weight: 600;
-            color: #333;
+            margin-bottom: 10px;
         }
 
-        .library-count {
-            background: #e0e0e0;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #666;
-        }
-
-        .search-box {
+        .library-search {
             width: 100%;
-            padding: 10px;
+            padding: 8px 12px;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 14px;
             margin-bottom: 10px;
         }
 
-        .filter-select {
-            width: 100%;
-            padding: 10px;
+        .library-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .library-filter {
+            padding: 6px 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            font-size: 14px;
-            margin-bottom: 15px;
-            background: white;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .library-count {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .library-items {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .library-item {
-            padding: 14px 12px;
-            margin-bottom: 8px;
-            border-radius: 4px;
+            padding: 12px;
+            border-radius: 6px;
             cursor: grab;
-            transition: transform 0.2s;
-            color: #1a1a1a;
-            font-weight: 500;
             min-height: 70px;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-        }
-
-        .library-item:hover {
-            transform: translateX(5px);
+            gap: 4px;
         }
 
         .library-item:active {
@@ -182,247 +98,304 @@
         }
 
         .library-item.movie {
-            background: #a5dceb; /* Powder Blue */
+            background: #a5dceb;
+            border: 1px solid #8fc9db;
         }
 
         .library-item.event {
-            background: #e74c43; /* Vibrant Red */
+            background: #e74c43;
             color: white;
+            border: 1px solid #d43b32;
         }
 
         .library-item-title {
+            font-weight: 600;
             font-size: 14px;
-            margin-bottom: 6px;
-            line-height: 1.3;
+            color: #1a1a1a;
         }
 
-        .library-item-duration {
+        .library-item.event .library-item-title {
+            color: white;
+        }
+
+        .library-item-meta {
             font-size: 12px;
-            opacity: 0.85;
+            color: #4a4a4a;
         }
 
-        .schedule-container {
+        .library-item.event .library-item-meta {
+            color: rgba(255,255,255,0.9);
+        }
+
+        /* ===== SCHEDULE GRID ===== */
+        .schedule-panel {
             flex: 1;
-            overflow: auto;
+            background: white;
+            border-radius: 8px;
             padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        .week-header {
+        .schedule-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
         }
 
-        .week-nav {
-            display: flex;
-            gap: 10px;
-            align-items: center;
+        .schedule-title {
+            font-size: 18px;
+            font-weight: 600;
         }
 
-        .schedule-grid {
+        .schedule-controls {
             display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: #000;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #333;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .week-nav {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .week-nav button {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .week-nav button:hover {
+            background: #f5f5f5;
+        }
+
+        .week-display {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-message {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        /* ===== GRID LAYOUT ===== */
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: 60px repeat(7, 1fr);
             gap: 0;
-            min-width: fit-content;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            overflow: hidden;
         }
 
         .time-column {
-            width: 80px;
-            flex-shrink: 0;
-            padding-top: 60px; /* Match day header height */
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #ddd;
+            background: #fafafa;
         }
 
-        .time-slot {
-            height: 30px; /* 15 minutes = 30px, so 1 hour = 120px */
-            border-bottom: 1px solid #e0e0e0;
+        .time-header {
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 12px;
+            border-bottom: 2px solid #333;
+            background: #f0f0f0;
+        }
+
+        .time-labels {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .time-label {
+            height: 120px; /* 1 hour = 4 x 30px */
             display: flex;
             align-items: flex-start;
-            justify-content: flex-end;
-            padding-right: 10px;
-            font-size: 12px;
+            justify-content: center;
+            padding-top: 4px;
+            font-size: 11px;
             color: #666;
-        }
-
-        .time-slot.hour-mark {
-            border-bottom: 2px solid #ccc;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .days-container {
-            display: flex;
-            flex: 1;
+            border-bottom: 1px solid #e0e0e0;
         }
 
         .day-column {
-            min-width: 240px;
-            border-left: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #ddd;
+            min-width: 200px;
+        }
+
+        .day-column:last-child {
+            border-right: none;
         }
 
         .day-header {
-            height: 60px;
-            padding: 10px;
-            background: #f5f5f5;
-            border-bottom: 2px solid #ccc;
-            font-weight: 600;
-            text-align: center;
+            height: 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #f8f8f8;
+            border-bottom: 2px solid #333;
         }
 
         .day-name {
-            font-size: 14px;
-            color: #666;
+            font-weight: 600;
+            font-size: 13px;
         }
 
         .day-date {
-            font-size: 18px;
-            color: #333;
+            font-size: 11px;
+            color: #666;
         }
 
-        .theaters-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+        .theater-row {
+            display: flex;
             height: 100%;
         }
 
-        .theater-lane {
-            border-right: 1px solid #e0e0e0;
+        .theater-column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #ddd;
             position: relative;
-            min-height: 1440px; /* 12 hours * 120px per hour */
         }
 
-        .theater-lane:last-child {
+        .theater-column:last-child {
             border-right: none;
         }
 
         .theater-header {
-            position: sticky;
-            top: 0;
-            background: #fafafa;
-            padding: 8px;
-            text-align: center;
-            font-size: 12px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-weight: 600;
-            color: #666;
-            border-bottom: 1px solid #e0e0e0;
-            z-index: 1;
+            font-size: 11px;
+            background: #fafafa;
+            border-bottom: 2px solid #333;
         }
 
         .theater-content {
             position: relative;
-            height: 1440px; /* 12 hours * 120px */
+            height: 1440px; /* 12 hours × 120px/hour */
+            background: 
+                repeating-linear-gradient(
+                    to bottom,
+                    transparent,
+                    transparent 29px,
+                    #f0f0f0 29px,
+                    #f0f0f0 30px
+                );
         }
 
-        .theater-lane.drag-over {
-            background: #f0f0f0;
-            border: 2px dashed #2196F3;
-        }
-
-        .time-grid-lines {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        .time-grid-line {
-            position: absolute;
-            left: 0;
-            right: 0;
-            height: 30px; /* 15 minutes */
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .time-grid-line.hour-mark {
-            border-bottom: 1px solid #e0e0e0;
-        }
-
+        /* ===== SCHEDULED EVENTS ===== */
         .scheduled-event {
             position: absolute;
-            left: 5px;
-            right: 5px;
+            left: 4px;
+            right: 4px;
+            padding: 6px 8px;
             border-radius: 4px;
-            padding: 8px;
-            color: white;
             font-size: 12px;
-            cursor: move;
-            transition: box-shadow 0.2s;
-            z-index: 2;
+            cursor: grab;
+            border: 1px solid rgba(0,0,0,0.1);
+            z-index: 10;
         }
 
-        .scheduled-event:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            z-index: 3;
-        }
-
-        .scheduled-event.dragging {
-            opacity: 0.5;
+        .scheduled-event:active {
             cursor: grabbing;
         }
 
-        /* Theater 1 movies = Powder Blue */
-        .scheduled-event.movie.theater-1 {
+        .scheduled-event.movie-t1 {
             background: #a5dceb;
+            color: #1a1a1a;
         }
 
-        /* Theater 2 movies = Seafoam Green */
-        .scheduled-event.movie.theater-2 {
+        .scheduled-event.movie-t2 {
             background: #4bc4a5;
+            color: #1a1a1a;
         }
 
-        /* All events = Vibrant Red */
         .scheduled-event.event {
             background: #e74c43;
-        }
-
-        .scheduled-event.modified {
-            border: 2px solid #FF9800;
+            color: white;
         }
 
         .event-title {
             font-weight: 600;
-            margin-bottom: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-size: 13px;
+            margin-bottom: 2px;
         }
 
         .event-time {
             font-size: 11px;
-            opacity: 0.9;
-            margin-bottom: 4px;
+            opacity: 0.8;
         }
 
-        .event-actions {
-            display: flex;
-            gap: 5px;
-            margin-top: 4px;
-        }
-
-        .event-btn {
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 10px;
-            border: 1px solid rgba(255,255,255,0.5);
-            background: rgba(255,255,255,0.2);
-            color: white;
-            cursor: pointer;
-        }
-
-        .event-btn:hover {
-            background: rgba(255,255,255,0.3);
-        }
-
+        /* ===== DRAG & DROP HELPERS ===== */
         .drag-preview {
             position: fixed;
-            background: rgba(33, 150, 243, 0.8);
-            color: white;
             padding: 8px 12px;
+            background: rgba(0,0,0,0.8);
+            color: white;
             border-radius: 4px;
             font-size: 12px;
             pointer-events: none;
-            z-index: 10000;
+            z-index: 1000;
             white-space: nowrap;
         }
 
@@ -433,181 +406,191 @@
             height: 2px;
             background: #2196F3;
             pointer-events: none;
-            z-index: 1;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.1s;
         }
 
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
+        .snap-indicator.visible {
+            opacity: 1;
         }
 
-        .error {
-            background: #ffebee;
-            color: #c62828;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 20px;
+        .drop-zone {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .drop-zone.drag-over {
+            background: rgba(33, 150, 243, 0.1);
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>TSL Scheduler v2.2</h1>
-            <div class="button-group">
-                <div id="status" class="status synced">Initializing...</div>
-                <button id="syncBtn" class="btn-secondary" disabled>Sync with Google</button>
-                <button id="pushBtn" class="btn-primary" disabled>Push to Google</button>
+        <!-- LIBRARY PANEL -->
+        <div class="library-panel">
+            <div class="library-header">
+                <h2>Library</h2>
+                <input type="text" class="library-search" placeholder="Search programs..." id="searchBox">
             </div>
-        </div>
-
-        <div class="main-content">
-            <div class="library-panel">
-                <div class="library-header">
-                    <h2>Library</h2>
-                    <span class="library-count" id="libraryCount">(0)</span>
-                </div>
-                <input type="text" id="searchBox" class="search-box" placeholder="Search programs...">
-                <select id="filterSelect" class="filter-select">
+            <div class="library-controls">
+                <select class="library-filter" id="filterSelect">
                     <option value="recent">Recent (30 days)</option>
                     <option value="movies">Movies</option>
                     <option value="events">Events</option>
                 </select>
-                <div id="libraryContent" class="loading">Loading library...</div>
+                <span class="library-count" id="libraryCount">(0)</span>
+            </div>
+            <div class="library-items" id="libraryItems">
+                <!-- Items loaded dynamically -->
+            </div>
+        </div>
+
+        <!-- SCHEDULE PANEL -->
+        <div class="schedule-panel">
+            <div class="schedule-header">
+                <h1 class="schedule-title">TSL Scheduler</h1>
+                <div class="schedule-controls">
+                    <button class="btn btn-secondary" id="syncBtn">Sync with Google</button>
+                    <button class="btn btn-primary" id="pushBtn">Push to Google</button>
+                </div>
             </div>
 
-            <div class="schedule-container">
-                <div class="week-header">
-                    <div class="week-nav">
-                        <button id="prevWeek" class="btn-secondary">← Prev Week</button>
-                        <h2 id="weekDisplay">Week of ...</h2>
-                        <button id="nextWeek" class="btn-secondary">Next Week →</button>
-                    </div>
-                    <button id="toggleDaysBtn" class="btn-toggle">Hide Tues-Thurs</button>
-                </div>
-                <div id="scheduleGrid"></div>
+            <div class="week-nav">
+                <button id="prevWeekBtn">← Previous</button>
+                <span class="week-display" id="weekDisplay">Week of Nov 1</span>
+                <button id="nextWeekBtn">Next →</button>
+            </div>
+
+            <div id="statusContainer"></div>
+
+            <div class="schedule-grid" id="scheduleGrid">
+                <!-- Grid built dynamically -->
             </div>
         </div>
     </div>
 
+    <!-- Google Calendar API -->
     <script src="https://apis.google.com/js/api.js"></script>
+
     <script>
-        // Configuration
+        // ===== CONFIGURATION =====
         const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
         const GOOGLE_API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
+        
         const CALENDAR_IDS = {
             events: '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
             theater1: '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com',
             theater2: 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
         };
 
-        // State
+        // ===== STATE =====
         let library = [];
-        let filteredLibrary = [];
-        let scheduledEvents = [];
-        let currentWeekStart = null;
-        let hideTuesThurs = false;
-        let gapiReady = false;
+        let schedule = [];
+        let currentWeekStart = getMonday(new Date());
         let draggedItem = null;
-        let dragPreview = null;
-        let snapIndicator = null;
+        let gapiInitialized = false;
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', init);
-
-        async function init() {
-            setupEventListeners();
-            loadLocalState();
-            await loadLibrary();
-            await initGoogleAPI();
-            setCurrentWeek(new Date());
-            startAutoSave();
+        // ===== UTILITY FUNCTIONS =====
+        function getMonday(date) {
+            const d = new Date(date);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(d.setDate(diff));
         }
 
-        function setupEventListeners() {
-            document.getElementById('syncBtn').addEventListener('click', syncWithGoogle);
-            document.getElementById('pushBtn').addEventListener('click', pushToGoogle);
-            document.getElementById('prevWeek').addEventListener('click', () => changeWeek(-1));
-            document.getElementById('nextWeek').addEventListener('click', () => changeWeek(1));
-            document.getElementById('toggleDaysBtn').addEventListener('click', toggleDays);
-            document.getElementById('searchBox').addEventListener('input', filterLibrary);
-            document.getElementById('filterSelect').addEventListener('change', filterLibrary);
+        function formatDate(date) {
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
 
-        // Initialize Google API (NO OAUTH!)
-        async function initGoogleAPI() {
-            try {
-                await new Promise((resolve) => {
-                    gapi.load('client', resolve);
-                });
-
-                await gapi.client.init({
-                    apiKey: GOOGLE_API_KEY,
-                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
-                });
-
-                gapiReady = true;
-                document.getElementById('syncBtn').disabled = false;
-                document.getElementById('pushBtn').disabled = false;
-                updateStatus('Ready', true);
-                
-                console.log('Google API initialized successfully (public calendars, no auth)');
-            } catch (error) {
-                console.error('Error initializing Google API:', error);
-                updateStatus('Google API failed', false);
-            }
+        function formatDuration(minutes) {
+            if (!minutes) return '';
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            if (hours === 0) return `${mins}m`;
+            if (mins === 0) return `${hours}h`;
+            return `${hours}h ${mins}m`;
         }
 
-        // Load library from Supabase
+        function formatTime(date) {
+            return date.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+            });
+        }
+
+        function snapToGrid(y) {
+            const gridSize = 30; // 15 minutes
+            return Math.round(y / gridSize) * gridSize;
+        }
+
+        function pixelsToTime(pixels, startHour = 12) {
+            const minutes = (pixels / 30) * 15;
+            const totalMinutes = startHour * 60 + minutes;
+            const hours = Math.floor(totalMinutes / 60);
+            const mins = totalMinutes % 60;
+            return { hours, minutes: mins };
+        }
+
+        function timeToPixels(hours, minutes, startHour = 12) {
+            const totalMinutes = (hours * 60 + minutes) - (startHour * 60);
+            return (totalMinutes / 15) * 30;
+        }
+
+        function showStatus(message, type = 'info') {
+            const container = document.getElementById('statusContainer');
+            container.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 5000);
+        }
+
+        // ===== LOAD LIBRARY FROM SUPABASE =====
         async function loadLibrary() {
             try {
-                // Fetch movies
+                // Load movies
                 const moviesResponse = await fetch(`${SUPABASE_URL}/rest/v1/movies?select=*`, {
                     headers: {
                         'apikey': SUPABASE_KEY,
                         'Authorization': `Bearer ${SUPABASE_KEY}`
                     }
                 });
-
-                if (!moviesResponse.ok) throw new Error('Failed to load movies');
-
                 const movies = await moviesResponse.json();
-                
-                // Fetch events
+
+                // Load events
                 const eventsResponse = await fetch(`${SUPABASE_URL}/rest/v1/events?select=*`, {
                     headers: {
                         'apikey': SUPABASE_KEY,
                         'Authorization': `Bearer ${SUPABASE_KEY}`
                     }
                 });
-
-                if (!eventsResponse.ok) throw new Error('Failed to load events');
-
                 const events = await eventsResponse.json();
 
-                // Combine and add content_type field
+                // Combine and add content_type
                 library = [
-                    ...movies.map(m => ({ ...m, content_type: 'movie', duration: m.runtime_minutes })),
-                    ...events.map(e => ({ ...e, content_type: 'event', duration: e.runtime_minutes || e.duration }))
+                    ...movies.map(m => ({ ...m, content_type: 'movie' })),
+                    ...events.map(e => ({ ...e, content_type: 'event' }))
                 ];
 
-                filterLibrary();
-                
                 console.log('Library loaded:', library.length, 'programs');
+                renderLibrary();
             } catch (error) {
                 console.error('Error loading library:', error);
-                document.getElementById('libraryContent').innerHTML = `<div class="error">Failed to load library: ${error.message}</div>`;
+                showStatus('Failed to load library', 'warning');
             }
         }
 
-        // Filter library
-        function filterLibrary() {
+        // ===== RENDER LIBRARY =====
+        function renderLibrary() {
             const searchTerm = document.getElementById('searchBox').value.toLowerCase();
             const filter = document.getElementById('filterSelect').value;
-
-            filteredLibrary = library.filter(item => {
+            
+            let filtered = library.filter(item => {
                 // Search filter
                 if (searchTerm && !item.title.toLowerCase().includes(searchTerm)) {
                     return false;
@@ -616,671 +599,419 @@
                 // Type filter
                 if (filter === 'movies' && item.content_type !== 'movie') return false;
                 if (filter === 'events' && item.content_type !== 'event') return false;
-
+                
                 // Recent filter (30 days)
                 if (filter === 'recent') {
+                    const created = new Date(item.created_at);
                     const thirtyDaysAgo = new Date();
                     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                    const createdAt = new Date(item.created_at);
-                    if (createdAt < thirtyDaysAgo) return false;
+                    if (created < thirtyDaysAgo) return false;
                 }
 
                 return true;
             });
 
-            renderLibrary();
-        }
+            document.getElementById('libraryCount').textContent = `(${filtered.length})`;
 
-        // Render library
-        function renderLibrary() {
-            const content = document.getElementById('libraryContent');
-            document.getElementById('libraryCount').textContent = `(${filteredLibrary.length})`;
-
-            if (filteredLibrary.length === 0) {
-                content.innerHTML = '<div class="loading">No programs found</div>';
-                return;
-            }
-
-            content.innerHTML = filteredLibrary.map(item => {
-                const duration = item.duration || item.runtime_minutes;
-                const durationText = duration ? formatDuration(duration) : 'Duration TBD';
-                
-                return `
-                    <div class="library-item ${item.content_type}" 
-                         draggable="true"
-                         data-id="${item.id}"
-                         data-supabase-id="${item.supabase_id || item.id}">
-                        <div class="library-item-title">${item.title}</div>
-                        <div class="library-item-duration">${durationText}</div>
+            const container = document.getElementById('libraryItems');
+            container.innerHTML = filtered.map(item => `
+                <div class="library-item ${item.content_type}" 
+                     draggable="true" 
+                     data-id="${item.id}">
+                    <div class="library-item-title">${item.title}</div>
+                    <div class="library-item-meta">
+                        ${item.director || item.location || ''}
+                        ${item.runtime_minutes ? ' • ' + formatDuration(item.runtime_minutes) : ''}
                     </div>
-                `;
-            }).join('');
+                </div>
+            `).join('');
 
-            // Setup drag handlers
-            document.querySelectorAll('.library-item').forEach(item => {
-                item.addEventListener('dragstart', handleDragStart);
-                item.addEventListener('dragend', handleDragEnd);
+            // Attach drag listeners
+            document.querySelectorAll('.library-item').forEach(el => {
+                el.addEventListener('dragstart', handleLibraryDragStart);
             });
         }
 
-        function formatDuration(minutes) {
-            if (!minutes) return 'Duration TBD';
-            const hours = Math.floor(minutes / 60);
-            const mins = minutes % 60;
-            if (hours > 0) {
-                return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-            }
-            return `${mins}m`;
-        }
-
-        // Week navigation
-        function setCurrentWeek(date) {
-            const sunday = new Date(date);
-            sunday.setDate(sunday.getDate() - sunday.getDay());
-            sunday.setHours(0, 0, 0, 0);
-            currentWeekStart = sunday;
-            updateWeekDisplay();
-            renderSchedule();
-        }
-
-        function changeWeek(direction) {
-            const newDate = new Date(currentWeekStart);
-            newDate.setDate(newDate.getDate() + (direction * 7));
-            setCurrentWeek(newDate);
-        }
-
-        function updateWeekDisplay() {
-            const end = new Date(currentWeekStart);
-            end.setDate(end.getDate() + 6);
-            document.getElementById('weekDisplay').textContent = 
-                `Week of ${formatDate(currentWeekStart)} - ${formatDate(end)}`;
-        }
-
-        function toggleDays() {
-            hideTuesThurs = !hideTuesThurs;
-            document.getElementById('toggleDaysBtn').textContent = 
-                hideTuesThurs ? 'Show Tues-Thurs' : 'Hide Tues-Thurs';
-            renderSchedule();
-        }
-
-        // Render schedule
-        function renderSchedule() {
+        // ===== BUILD SCHEDULE GRID =====
+        function buildScheduleGrid() {
             const grid = document.getElementById('scheduleGrid');
-            const days = getDaysToShow();
+            const weekStart = new Date(currentWeekStart);
+            
+            // Update week display
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            document.getElementById('weekDisplay').textContent = 
+                `Week of ${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
 
-            grid.innerHTML = `
-                <div class="schedule-grid">
-                    <div class="time-column">
-                        ${renderTimeColumn()}
-                    </div>
-                    <div class="days-container">
-                        ${days.map(renderDay).join('')}
-                    </div>
-                </div>
-            `;
+            // Build grid HTML
+            let html = '';
 
-            setupDropZones();
+            // Time column
+            html += '<div class="time-column">';
+            html += '<div class="time-header">Time</div>';
+            html += '<div class="time-labels">';
+            for (let hour = 12; hour < 24; hour++) {
+                const displayHour = hour > 12 ? hour - 12 : hour;
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                html += `<div class="time-label">${displayHour}:00 ${ampm}</div>`;
+            }
+            html += '</div></div>';
+
+            // Day columns
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(weekStart);
+                date.setDate(date.getDate() + i);
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+                const dayDate = formatDate(date);
+                const dateStr = date.toISOString().split('T')[0];
+
+                html += `
+                    <div class="day-column" data-date="${dateStr}">
+                        <div class="day-header">
+                            <div class="day-name">${dayName}</div>
+                            <div class="day-date">${dayDate}</div>
+                        </div>
+                        <div class="theater-row">
+                            <div class="theater-column" data-theater="T1">
+                                <div class="theater-header">T1</div>
+                                <div class="theater-content" data-date="${dateStr}" data-theater="T1">
+                                    <div class="snap-indicator"></div>
+                                    <div class="drop-zone"></div>
+                                </div>
+                            </div>
+                            <div class="theater-column" data-theater="T2">
+                                <div class="theater-header">T2</div>
+                                <div class="theater-content" data-date="${dateStr}" data-theater="T2">
+                                    <div class="snap-indicator"></div>
+                                    <div class="drop-zone"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            grid.innerHTML = html;
+
+            // Attach drop zone listeners
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.addEventListener('dragover', handleDragOver);
+                zone.addEventListener('drop', handleDrop);
+                zone.addEventListener('dragleave', handleDragLeave);
+            });
+
+            // Render scheduled events
             renderScheduledEvents();
         }
 
-        function getDaysToShow() {
-            const days = [];
-            for (let i = 0; i < 7; i++) {
-                if (hideTuesThurs && (i >= 2 && i <= 4)) continue;
-                const date = new Date(currentWeekStart);
-                date.setDate(date.getDate() + i);
-                days.push({ date, dayIndex: i });
-            }
-            return days;
-        }
+        // ===== RENDER SCHEDULED EVENTS =====
+        function renderScheduledEvents() {
+            document.querySelectorAll('.scheduled-event').forEach(el => el.remove());
 
-        function renderTimeColumn() {
-            const times = [];
-            for (let hour = 12; hour < 24; hour++) { // 12 PM to 12 AM (12 hours)
-                const displayHour = hour > 12 ? hour - 12 : hour;
-                const ampm = 'PM';
+            schedule.forEach(event => {
+                const container = document.querySelector(
+                    `.theater-content[data-date="${event.date}"][data-theater="${event.theater}"]`
+                );
                 
-                // Hour mark (shown)
-                times.push(`<div class="time-slot hour-mark">${displayHour}:00 ${ampm}</div>`);
+                if (!container) return;
+
+                const top = timeToPixels(event.startHour, event.startMinute);
+                const height = (event.duration / 15) * 30;
+
+                const eventClass = event.content_type === 'movie' 
+                    ? `movie-${event.theater.toLowerCase()}`
+                    : 'event';
+
+                const eventEl = document.createElement('div');
+                eventEl.className = `scheduled-event ${eventClass}`;
+                eventEl.style.top = `${top}px`;
+                eventEl.style.height = `${height}px`;
+                eventEl.draggable = true;
+                eventEl.dataset.scheduleId = event.id;
                 
-                // 15-minute marks (not shown)
-                times.push(`<div class="time-slot"></div>`);
-                times.push(`<div class="time-slot"></div>`);
-                times.push(`<div class="time-slot"></div>`);
-            }
-            return times.join('');
-        }
+                const startTime = formatTime(new Date(2000, 0, 1, event.startHour, event.startMinute));
+                
+                eventEl.innerHTML = `
+                    <div class="event-title">${event.title}</div>
+                    <div class="event-time">${startTime} • ${formatDuration(event.duration)}</div>
+                `;
 
-        function renderDay(day) {
-            const dayName = day.date.toLocaleDateString('en-US', { weekday: 'short' });
-            const dayDate = day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-            return `
-                <div class="day-column" data-day="${day.dayIndex}">
-                    <div class="day-header">
-                        <div class="day-name">${dayName}</div>
-                        <div class="day-date">${dayDate}</div>
-                    </div>
-                    <div class="theaters-grid">
-                        ${renderTheater(day.dayIndex, 1)}
-                        ${renderTheater(day.dayIndex, 2)}
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderTheater(dayIndex, theaterNumber) {
-            return `
-                <div class="theater-lane" 
-                     data-day="${dayIndex}" 
-                     data-theater="${theaterNumber}">
-                    <div class="theater-header">T${theaterNumber}</div>
-                    <div class="theater-content">
-                        ${renderTimeGridLines()}
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderTimeGridLines() {
-            const lines = [];
-            for (let i = 0; i < 48; i++) { // 12 hours * 4 (15-min intervals)
-                const isHourMark = i % 4 === 0;
-                lines.push(`<div class="time-grid-line ${isHourMark ? 'hour-mark' : ''}" style="top: ${i * 30}px;"></div>`);
-            }
-            return `<div class="time-grid-lines">${lines.join('')}</div>`;
-        }
-
-        // Setup drop zones
-        function setupDropZones() {
-            document.querySelectorAll('.theater-lane').forEach(lane => {
-                lane.addEventListener('dragover', handleDragOver);
-                lane.addEventListener('dragleave', handleDragLeave);
-                lane.addEventListener('drop', handleDrop);
+                eventEl.addEventListener('dragstart', handleScheduledDragStart);
+                container.appendChild(eventEl);
             });
         }
 
-        // Drag handlers
-        function handleDragStart(e) {
-            const itemId = e.target.dataset.supabaseId || e.target.dataset.id;
-            draggedItem = library.find(item => (item.supabase_id || item.id) === itemId);
-            
-            e.dataTransfer.effectAllowed = 'copy';
-            e.dataTransfer.setData('text/html', e.target.innerHTML);
-            
-            e.target.style.opacity = '0.5';
+        // ===== DRAG & DROP HANDLERS =====
+        let dragPreview = null;
 
-            // Create drag preview element
-            dragPreview = document.createElement('div');
-            dragPreview.className = 'drag-preview';
-            dragPreview.textContent = 'Drop to schedule';
-            document.body.appendChild(dragPreview);
-            dragPreview.style.display = 'none';
+        function handleLibraryDragStart(e) {
+            const itemId = e.target.dataset.id;
+            draggedItem = library.find(item => item.id === itemId);
+            e.dataTransfer.effectAllowed = 'copy';
         }
 
-        function handleScheduledEventDragStart(e) {
-            const supabaseId = e.target.dataset.supabaseId;
-            const eventTime = parseInt(e.target.dataset.eventTime);
-            
-            draggedItem = scheduledEvents.find(ev => 
-                ev.supabaseId === supabaseId && ev.actualDate.getTime() === eventTime
-            );
-            
-            if (draggedItem) {
-                // Mark as being moved (will be removed from old position on successful drop)
-                draggedItem._isMoving = true;
-                
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/html', e.target.innerHTML);
-                
-                e.target.style.opacity = '0.5';
-                e.target.classList.add('dragging');
+        function handleScheduledDragStart(e) {
+            const scheduleId = e.target.dataset.scheduleId;
+            draggedItem = schedule.find(item => item.id === scheduleId);
+            draggedItem.isRescheduling = true;
+            e.dataTransfer.effectAllowed = 'move';
+        }
 
-                // Create drag preview
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = draggedItem?.isRescheduling ? 'move' : 'copy';
+
+            const zone = e.currentTarget;
+            const container = zone.parentElement;
+            const rect = container.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const snappedY = snapToGrid(y);
+
+            // Show snap indicator
+            const indicator = container.querySelector('.snap-indicator');
+            indicator.style.top = `${snappedY}px`;
+            indicator.classList.add('visible');
+
+            // Show drag preview
+            const time = pixelsToTime(snappedY);
+            const timeStr = `${time.hours > 12 ? time.hours - 12 : time.hours}:${time.minutes.toString().padStart(2, '0')} ${time.hours >= 12 ? 'PM' : 'AM'}`;
+            
+            if (!dragPreview) {
                 dragPreview = document.createElement('div');
                 dragPreview.className = 'drag-preview';
-                dragPreview.textContent = 'Move to new time';
                 document.body.appendChild(dragPreview);
-                dragPreview.style.display = 'none';
+            }
+            
+            dragPreview.textContent = draggedItem?.isRescheduling ? `Move to ${timeStr}` : `Drop at ${timeStr}`;
+            dragPreview.style.left = `${e.clientX + 10}px`;
+            dragPreview.style.top = `${e.clientY + 10}px`;
+
+            zone.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            const zone = e.currentTarget;
+            const indicator = zone.parentElement.querySelector('.snap-indicator');
+            indicator.classList.remove('visible');
+            zone.classList.remove('drag-over');
+
+            if (dragPreview) {
+                dragPreview.remove();
+                dragPreview = null;
             }
         }
 
-        function handleDragEnd(e) {
-            e.target.style.opacity = '1';
-            draggedItem = null;
+        function handleDrop(e) {
+            e.preventDefault();
             
+            const zone = e.currentTarget;
+            const container = zone.parentElement;
+            const date = container.dataset.date;
+            const theater = container.dataset.theater;
+            const rect = container.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const snappedY = snapToGrid(y);
+            const time = pixelsToTime(snappedY);
+
+            zone.classList.remove('drag-over');
+            const indicator = container.querySelector('.snap-indicator');
+            indicator.classList.remove('visible');
+
             if (dragPreview) {
                 dragPreview.remove();
                 dragPreview = null;
             }
 
-            if (snapIndicator) {
-                snapIndicator.remove();
-                snapIndicator = null;
-            }
-
-            document.querySelectorAll('.theater-lane').forEach(lane => {
-                lane.classList.remove('drag-over');
-            });
-        }
-
-        function handleDragOver(e) {
-            if (!draggedItem) return;
-            
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-
-            const lane = e.currentTarget;
-            lane.classList.add('drag-over');
-
-            // Show drag preview with snap time
-            if (dragPreview) {
-                const rect = lane.querySelector('.theater-content').getBoundingClientRect();
-                const y = e.clientY - rect.top;
-                const snapTime = getSnappedTime(y);
-                
-                dragPreview.textContent = `Drop at ${formatTime(snapTime)}`;
-                dragPreview.style.left = e.clientX + 20 + 'px';
-                dragPreview.style.top = e.clientY + 20 + 'px';
-                dragPreview.style.display = 'block';
-            }
-
-            // Show snap indicator
-            showSnapIndicator(lane, e);
-        }
-
-        function handleDragLeave(e) {
-            e.currentTarget.classList.remove('drag-over');
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            e.stopPropagation();
-
             if (!draggedItem) return;
 
-            const lane = e.currentTarget;
-            lane.classList.remove('drag-over');
-
-            const dayIndex = parseInt(lane.dataset.day);
-            const theater = parseInt(lane.dataset.theater);
-            const rect = lane.querySelector('.theater-content').getBoundingClientRect();
-            const y = e.clientY - rect.top;
-            const snapTime = getSnappedTime(y);
-
-            scheduleEvent(draggedItem, dayIndex, snapTime, theater);
-        }
-
-        function showSnapIndicator(lane, e) {
-            const rect = lane.querySelector('.theater-content').getBoundingClientRect();
-            const y = e.clientY - rect.top;
-            const snappedY = getSnappedY(y);
-
-            if (!snapIndicator) {
-                snapIndicator = document.createElement('div');
-                snapIndicator.className = 'snap-indicator';
-                lane.querySelector('.theater-content').appendChild(snapIndicator);
+            if (draggedItem.isRescheduling) {
+                // Remove from old position
+                schedule = schedule.filter(item => item.id !== draggedItem.id);
             }
 
-            snapIndicator.style.top = snappedY + 'px';
-        }
-
-        function getSnappedY(y) {
-            // Snap to 15-minute increments (30px = 15 min)
-            return Math.round(y / 30) * 30;
-        }
-
-        function getSnappedTime(y) {
-            // Convert Y position to time (30px = 15 min, starting at 12 PM)
-            const quarterHours = Math.round(y / 30);
-            const hour = 12 + Math.floor(quarterHours / 4);
-            const minutes = (quarterHours % 4) * 15;
-            return { hour, minutes };
-        }
-
-        function scheduleEvent(item, dayIndex, time, theater) {
-            const eventDate = new Date(currentWeekStart);
-            eventDate.setDate(eventDate.getDate() + dayIndex);
-            eventDate.setHours(time.hour, time.minutes, 0, 0);
-
-            const itemId = item.supabaseId || item.id;
-
-            // If moving an existing event, remove it from old position
-            if (item._isMoving) {
-                scheduledEvents = scheduledEvents.filter(e => 
-                    !(e.supabaseId === itemId && e._isMoving)
-                );
-                delete item._isMoving;
-            }
-
-            // Check for duplicates at new position
-            const exists = scheduledEvents.find(e => 
-                (e.supabaseId === itemId || e.id === itemId) &&
-                e.actualDate.getTime() === eventDate.getTime() &&
-                e.theater === theater
-            );
-
-            if (exists) {
-                alert('This program is already scheduled at this time and theater!');
-                return;
-            }
-
+            // Add to schedule
             const newEvent = {
-                ...item,
-                supabaseId: itemId,
-                actualDate: eventDate,
+                id: draggedItem.isRescheduling ? draggedItem.id : `sched-${Date.now()}`,
+                supabaseId: draggedItem.id,
+                title: draggedItem.title,
+                content_type: draggedItem.content_type,
+                duration: draggedItem.runtime_minutes || 120,
+                date: date,
                 theater: theater,
-                modified: true
+                startHour: time.hours,
+                startMinute: time.minutes,
+                googleEventId: draggedItem.googleEventId || null
             };
 
-            scheduledEvents.push(newEvent);
+            schedule.push(newEvent);
             renderScheduledEvents();
-            updateStatus();
-            saveLocalState();
+
+            draggedItem = null;
+            
+            showStatus('Event scheduled! Click "Push to Google" to save.', 'success');
         }
 
-        // Render scheduled events
-        function renderScheduledEvents() {
-            document.querySelectorAll('.scheduled-event').forEach(el => el.remove());
-
-            scheduledEvents.forEach(event => {
-                const dayIndex = (event.actualDate.getDay() - currentWeekStart.getDay() + 7) % 7;
-                
-                // Skip if day is hidden
-                if (hideTuesThurs && (dayIndex >= 2 && dayIndex <= 4)) return;
-
-                const lane = document.querySelector(`.theater-lane[data-day="${dayIndex}"][data-theater="${event.theater}"]`);
-                if (!lane) return;
-
-                const content = lane.querySelector('.theater-content');
-                const eventEl = createEventElement(event);
-                content.appendChild(eventEl);
+        // ===== GOOGLE CALENDAR API =====
+        function initGoogleAPI() {
+            gapi.load('client', async () => {
+                try {
+                    await gapi.client.init({
+                        apiKey: GOOGLE_API_KEY,
+                        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
+                    });
+                    gapiInitialized = true;
+                    console.log('Google Calendar API initialized');
+                    
+                    // Auto-sync on load
+                    syncWithGoogle();
+                } catch (error) {
+                    console.error('Error initializing Google API:', error);
+                    showStatus('Google Calendar connection failed', 'warning');
+                }
             });
         }
 
-        function createEventElement(event) {
-            const el = document.createElement('div');
-            el.className = `scheduled-event ${event.content_type} theater-${event.theater}`;
-            if (event.modified) el.classList.add('modified');
-            
-            // Make draggable
-            el.draggable = true;
-            el.dataset.supabaseId = event.supabaseId;
-            el.dataset.eventTime = event.actualDate.getTime();
-
-            const hours = event.actualDate.getHours();
-            const minutes = event.actualDate.getMinutes();
-            const topPosition = ((hours - 12) * 4 + minutes / 15) * 30;
-            const duration = event.duration || 90;
-            const height = (duration / 15) * 30;
-
-            el.style.top = topPosition + 'px';
-            el.style.height = height + 'px';
-
-            el.innerHTML = `
-                <div class="event-title">${event.title}</div>
-                <div class="event-time">${formatTime({ hour: hours, minutes: minutes })}</div>
-                <div class="event-actions">
-                    <button class="event-btn" onclick="removeEvent('${event.supabaseId}', ${event.actualDate.getTime()})">×</button>
-                </div>
-            `;
-
-            // Add drag handlers for re-dragging
-            el.addEventListener('dragstart', handleScheduledEventDragStart);
-            el.addEventListener('dragend', handleDragEnd);
-
-            return el;
-        }
-
-        // Event actions
-        window.removeEvent = function(supabaseId, dateTime) {
-            scheduledEvents = scheduledEvents.filter(e => 
-                !(e.supabaseId === supabaseId && e.actualDate.getTime() === dateTime)
-            );
-            renderScheduledEvents();
-            updateStatus();
-            saveLocalState();
-        };
-
-        // Google Calendar integration (NO OAUTH!)
         async function syncWithGoogle() {
-            if (!gapiReady) {
-                alert('Google API not ready yet!');
+            if (!gapiInitialized) {
+                showStatus('Google Calendar not initialized', 'warning');
                 return;
             }
 
-            try {
-                updateStatus('Syncing with Google...', false);
+            showStatus('Syncing with Google Calendar...', 'info');
 
-                const weekEnd = new Date(currentWeekStart);
+            try {
+                const weekStart = new Date(currentWeekStart);
+                const weekEnd = new Date(weekStart);
                 weekEnd.setDate(weekEnd.getDate() + 7);
 
-                let allGoogleEvents = [];
+                let matchCount = 0;
 
-                // Fetch from all three calendars
-                for (const [key, calendarId] of Object.entries(CALENDAR_IDS)) {
-                    try {
-                        const response = await gapi.client.calendar.events.list({
-                            calendarId: calendarId,
-                            timeMin: currentWeekStart.toISOString(),
-                            timeMax: weekEnd.toISOString(),
-                            singleEvents: true,
-                            orderBy: 'startTime'
-                        });
+                // Sync each calendar
+                for (const [calName, calId] of Object.entries(CALENDAR_IDS)) {
+                    const response = await gapi.client.calendar.events.list({
+                        calendarId: calId,
+                        timeMin: weekStart.toISOString(),
+                        timeMax: weekEnd.toISOString(),
+                        singleEvents: true
+                    });
 
-                        const events = response.result.items || [];
-                        
-                        // Determine theater from calendar
-                        let theater = null;
-                        if (key === 'theater1') theater = 1;
-                        else if (key === 'theater2') theater = 2;
-                        
-                        allGoogleEvents.push(...events.map(e => ({ ...e, _theater: theater, _calendar: key })));
-                        
-                        console.log(`Loaded ${events.length} events from ${key} calendar`);
-                    } catch (err) {
-                        console.warn(`Failed to load ${key} calendar:`, err);
-                    }
+                    const events = response.result.items || [];
+                    
+                    events.forEach(gEvent => {
+                        const supabaseId = gEvent.extendedProperties?.private?.['tsl-supabase-id'];
+                        if (!supabaseId) return;
+
+                        const existing = schedule.find(s => s.supabaseId === supabaseId);
+                        if (existing) {
+                            existing.googleEventId = gEvent.id;
+                            matchCount++;
+                        }
+                    });
                 }
 
-                let matchedCount = 0;
-
-                // Match Google events to scheduled events
-                allGoogleEvents.forEach(ge => {
-                    const supabaseId = ge.extendedProperties?.private?.['tsl-supabase-id'];
-                    if (!supabaseId || !ge._theater) return;
-
-                    const eventDate = new Date(ge.start.dateTime);
-                    const existing = scheduledEvents.find(se => 
-                        se.supabaseId === supabaseId && 
-                        se.actualDate.getTime() === eventDate.getTime() &&
-                        se.theater === ge._theater
-                    );
-
-                    if (existing) {
-                        existing.googleEventId = ge.id;
-                        existing.modified = false;
-                        matchedCount++;
-                    }
-                });
-
-                renderScheduledEvents();
-                updateStatus(`Synced: ${matchedCount} events matched`, true);
-                saveLocalState();
-
-                console.log(`Sync complete: ${allGoogleEvents.length} total events, ${matchedCount} matched`);
-
+                showStatus(`Synced! Found ${matchCount} matching events.`, 'success');
             } catch (error) {
                 console.error('Sync error:', error);
-                updateStatus('Sync failed', false);
-                alert('Failed to sync with Google: ' + error.message);
+                showStatus('Sync failed: ' + error.message, 'warning');
             }
         }
 
         async function pushToGoogle() {
-            if (!gapiReady) {
-                alert('Google API not ready yet!');
+            if (!gapiInitialized) {
+                showStatus('Google Calendar not initialized', 'warning');
                 return;
             }
 
-            const eventsToPush = scheduledEvents.filter(e => e.modified || !e.googleEventId);
-            
-            if (eventsToPush.length === 0) {
-                alert('No changes to push!');
-                return;
-            }
+            showStatus('Pushing to Google Calendar...', 'info');
 
             try {
-                updateStatus(`Pushing ${eventsToPush.length} events...`, false);
+                let createdCount = 0;
+                let updatedCount = 0;
 
-                for (const event of eventsToPush) {
+                for (const event of schedule) {
+                    const calendarId = event.content_type === 'event' 
+                        ? CALENDAR_IDS.events
+                        : event.theater === 'T1' 
+                            ? CALENDAR_IDS.theater1 
+                            : CALENDAR_IDS.theater2;
+
+                    const startDateTime = new Date(event.date);
+                    startDateTime.setHours(event.startHour, event.startMinute, 0);
+                    
+                    const endDateTime = new Date(startDateTime);
+                    endDateTime.setMinutes(endDateTime.getMinutes() + event.duration);
+
+                    const gEvent = {
+                        summary: event.title,
+                        start: {
+                            dateTime: startDateTime.toISOString(),
+                            timeZone: 'America/New_York'
+                        },
+                        end: {
+                            dateTime: endDateTime.toISOString(),
+                            timeZone: 'America/New_York'
+                        },
+                        extendedProperties: {
+                            private: {
+                                'tsl-supabase-id': event.supabaseId,
+                                'tsl-content-type': event.content_type,
+                                'tsl-theater': event.theater
+                            }
+                        }
+                    };
+
                     if (event.googleEventId) {
-                        await updateGoogleEvent(event);
+                        // Update existing
+                        await gapi.client.calendar.events.update({
+                            calendarId: calendarId,
+                            eventId: event.googleEventId,
+                            resource: gEvent
+                        });
+                        updatedCount++;
                     } else {
-                        await createGoogleEvent(event);
+                        // Create new
+                        const response = await gapi.client.calendar.events.insert({
+                            calendarId: calendarId,
+                            resource: gEvent
+                        });
+                        event.googleEventId = response.result.id;
+                        createdCount++;
                     }
                 }
 
-                updateStatus('All events pushed!', true);
-                saveLocalState();
-
+                showStatus(`Success! Created ${createdCount}, updated ${updatedCount} events.`, 'success');
             } catch (error) {
                 console.error('Push error:', error);
-                updateStatus('Push failed', false);
-                alert('Failed to push to Google: ' + error.message);
+                showStatus('Push failed: ' + error.message, 'warning');
             }
         }
 
-        async function createGoogleEvent(event) {
-            const endTime = new Date(event.actualDate);
-            endTime.setMinutes(endTime.getMinutes() + (event.duration || 90));
+        // ===== EVENT LISTENERS =====
+        document.getElementById('searchBox').addEventListener('input', renderLibrary);
+        document.getElementById('filterSelect').addEventListener('change', renderLibrary);
+        
+        document.getElementById('prevWeekBtn').addEventListener('click', () => {
+            currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+            buildScheduleGrid();
+        });
+        
+        document.getElementById('nextWeekBtn').addEventListener('click', () => {
+            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+            buildScheduleGrid();
+        });
 
-            // Use theater-specific calendar
-            const calendarId = event.theater === 1 ? CALENDAR_IDS.theater1 : CALENDAR_IDS.theater2;
+        document.getElementById('syncBtn').addEventListener('click', syncWithGoogle);
+        document.getElementById('pushBtn').addEventListener('click', pushToGoogle);
 
-            const googleEvent = {
-                summary: event.title,
-                start: { dateTime: event.actualDate.toISOString() },
-                end: { dateTime: endTime.toISOString() },
-                description: event.synopsis || event.logline || event.description || '',
-                location: `Theater ${event.theater}`,
-                extendedProperties: {
-                    private: {
-                        'tsl-supabase-id': event.supabaseId || event.id,
-                        'tsl-supabase-table': event.content_type === 'movie' ? 'movies' : 'events',
-                        'tsl-webpage-url': event.webpage_url || ''
-                    }
-                }
-            };
-
-            const response = await gapi.client.calendar.events.insert({
-                calendarId: calendarId,
-                resource: googleEvent
-            });
-
-            event.googleEventId = response.result.id;
-            event.modified = false;
-            
-            console.log('Created event:', event.title, 'in', calendarId);
+        // ===== INITIALIZATION =====
+        async function init() {
+            await loadLibrary();
+            buildScheduleGrid();
+            initGoogleAPI();
         }
 
-        async function updateGoogleEvent(event) {
-            const endTime = new Date(event.actualDate);
-            endTime.setMinutes(endTime.getMinutes() + (event.duration || 90));
-
-            // Use theater-specific calendar
-            const calendarId = event.theater === 1 ? CALENDAR_IDS.theater1 : CALENDAR_IDS.theater2;
-
-            const googleEvent = {
-                summary: event.title,
-                start: { dateTime: event.actualDate.toISOString() },
-                end: { dateTime: endTime.toISOString() },
-                description: event.synopsis || event.logline || event.description || '',
-                location: `Theater ${event.theater}`,
-                extendedProperties: {
-                    private: {
-                        'tsl-supabase-id': event.supabaseId || event.id,
-                        'tsl-supabase-table': event.content_type === 'movie' ? 'movies' : 'events',
-                        'tsl-webpage-url': event.webpage_url || ''
-                    }
-                }
-            };
-
-            await gapi.client.calendar.events.update({
-                calendarId: calendarId,
-                eventId: event.googleEventId,
-                resource: googleEvent
-            });
-
-            event.modified = false;
-            
-            console.log('Updated event:', event.title);
-        }
-
-        // Status and state management
-        function updateStatus(message, success) {
-            const statusEl = document.getElementById('status');
-            if (typeof message === 'string') {
-                statusEl.textContent = message;
-                statusEl.className = success ? 'status synced' : 'status needs-push';
-            } else {
-                const modifiedCount = scheduledEvents.filter(e => e.modified || !e.googleEventId).length;
-                if (modifiedCount === 0) {
-                    statusEl.textContent = 'All synced';
-                    statusEl.className = 'status synced';
-                } else {
-                    statusEl.textContent = `${modifiedCount} events need push`;
-                    statusEl.className = 'status needs-push';
-                }
-            }
-        }
-
-        function saveLocalState() {
-            const state = {
-                scheduledEvents: scheduledEvents.map(e => ({
-                    ...e,
-                    actualDate: e.actualDate.toISOString()
-                })),
-                currentWeekStart: currentWeekStart.toISOString(),
-                hideTuesThurs
-            };
-            localStorage.setItem('tslSchedulerState', JSON.stringify(state));
-        }
-
-        function loadLocalState() {
-            const saved = localStorage.getItem('tslSchedulerState');
-            if (!saved) return;
-
-            try {
-                const state = JSON.parse(saved);
-                scheduledEvents = state.scheduledEvents.map(e => ({
-                    ...e,
-                    actualDate: new Date(e.actualDate)
-                }));
-                if (state.currentWeekStart) {
-                    currentWeekStart = new Date(state.currentWeekStart);
-                }
-                hideTuesThurs = state.hideTuesThurs || false;
-            } catch (error) {
-                console.error('Error loading state:', error);
-            }
-        }
-
-        function startAutoSave() {
-            setInterval(saveLocalState, 30000); // Every 30 seconds
-        }
-
-        // Utility functions
-        function formatDate(date) {
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        }
-
-        function formatTime(time) {
-            const hour = time.hour > 12 ? time.hour - 12 : time.hour;
-            const ampm = time.hour >= 12 ? 'PM' : 'AM';
-            const minutes = time.minutes.toString().padStart(2, '0');
-            return `${hour}:${minutes} ${ampm}`;
-        }
+        // Start the app
+        init();
     </script>
 </body>
 </html>
