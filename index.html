@@ -196,11 +196,22 @@
             background: #f0f0f2;
             transition: all 0.2s;
             user-select: none;
+            border-left: 4px solid transparent;
+        }
+
+        .library-item.movie {
+            border-left-color: #007aff;
+            background: #e8f4ff;
+        }
+
+        .library-item.event {
+            border-left-color: #e74c43;
+            background: #ffe8e6;
         }
 
         .library-item:hover {
-            background: #e0e0e2;
             transform: translateX(2px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
         .library-item-title {
@@ -219,7 +230,7 @@
             flex: 1;
             background: white;
             border-radius: 12px;
-            padding: 20px;
+            padding: 20px 20px 20px 80px; /* Extra left padding for time labels */
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             overflow-x: auto;
         }
@@ -278,12 +289,14 @@
 
         .time-label {
             position: absolute;
-            left: -60px;
-            width: 50px;
+            left: -65px;
+            width: 55px;
             text-align: right;
-            font-size: 12px;
-            color: #86868b;
-            top: -8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #1d1d1f;
+            top: -10px;
+            padding-right: 8px;
         }
 
         /* Event Blocks */
@@ -452,6 +465,12 @@
                     <span>Library</span>
                     <span class="library-count" id="libCount">(0)</span>
                 </div>
+                <select class="library-search" id="recentFilter" style="margin-bottom: 10px;">
+                    <option value="all">All Items</option>
+                    <option value="30" selected>Recent (30 days)</option>
+                    <option value="7">This Week (7 days)</option>
+                    <option value="1">Today</option>
+                </select>
                 <input type="text" class="library-search" id="search" placeholder="Search...">
                 <div class="library-items" id="library">
                     <div class="empty-state">
@@ -565,13 +584,11 @@
         // IMPORT FROM DATABASE
         // ============================================
         
-        document.getElementById('importBtn').onclick = async () => {
+        async function importFromSupabase() {
             try {
-                showToast('Loading from database...');
-                
                 const [movies, events] = await Promise.all([
-                    supabase.from('movies').select('*').order('title'),
-                    supabase.from('events').select('*').order('event_name')
+                    supabase.from('movies').select('*').order('updated_at', { ascending: false }),
+                    supabase.from('events').select('*').order('updated_at', { ascending: false })
                 ]);
 
                 library = [];
@@ -584,7 +601,8 @@
                             duration: m.runtime_minutes || 120,
                             type: 'movie',
                             supabaseId: m.id,
-                            table: 'movies'
+                            table: 'movies',
+                            updatedAt: m.updated_at || m.created_at
                         });
                     });
                 }
@@ -597,7 +615,8 @@
                             duration: e.duration_minutes || 120,
                             type: 'event',
                             supabaseId: e.id,
-                            table: 'events'
+                            table: 'events',
+                            updatedAt: e.updated_at || e.created_at
                         });
                     });
                 }
@@ -608,7 +627,9 @@
                 console.error('Import error:', error);
                 showToast('Failed to load from database');
             }
-        };
+        }
+        
+        document.getElementById('importBtn').onclick = importFromSupabase;
 
         // ============================================
         // LIBRARY RENDERING
@@ -617,10 +638,24 @@
         function renderLibrary() {
             const container = document.getElementById('library');
             const search = document.getElementById('search').value.toLowerCase();
+            const recentFilter = document.getElementById('recentFilter').value;
             
-            const filtered = library.filter(item => 
+            let filtered = library.filter(item => 
                 item.title.toLowerCase().includes(search)
             );
+            
+            // Apply recent filter
+            if (recentFilter !== 'all') {
+                const daysAgo = parseInt(recentFilter);
+                const cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+                
+                filtered = filtered.filter(item => {
+                    if (!item.updatedAt) return true; // Include items without timestamp
+                    const itemDate = new Date(item.updatedAt);
+                    return itemDate >= cutoffDate;
+                });
+            }
 
             document.getElementById('libCount').textContent = `(${filtered.length})`;
 
@@ -635,7 +670,7 @@
             }
 
             container.innerHTML = filtered.map(item => `
-                <div class="library-item" draggable="true" data-item='${JSON.stringify(item)}'>
+                <div class="library-item ${item.type}" draggable="true" data-item='${JSON.stringify(item)}'>
                     <div class="library-item-title">${item.title}</div>
                     <div class="library-item-info">${formatDuration(item.duration)} · ${item.type}</div>
                 </div>
@@ -645,12 +680,14 @@
             document.querySelectorAll('.library-item').forEach(el => {
                 el.addEventListener('dragstart', e => {
                     draggedItem = JSON.parse(e.target.dataset.item);
+                    dragOffset = 0; // Snap from top when dragging from library
                     e.dataTransfer.effectAllowed = 'move';
                 });
             });
         }
 
         document.getElementById('search').oninput = renderLibrary;
+        document.getElementById('recentFilter').onchange = renderLibrary;
 
         // ============================================
         // UTILITIES
@@ -694,13 +731,16 @@
                                 <div class="theater">
                                     <div class="theater-header">T${theater}</div>
                                     <div class="theater-grid" data-day="${i}" data-theater="${theater}">
-                                        ${Array.from({length: 12}, (_, hour) => `
+                                        ${Array.from({length: 12}, (_, hour) => {
+                                            const displayHour = (hour + 12) > 12 ? (hour + 12) - 12 : (hour + 12);
+                                            const period = (hour + 12) >= 12 ? 'PM' : 'AM';
+                                            return `
                                             <div class="time-slot">
-                                                ${theater === 1 && hour % 2 === 0 ? 
-                                                    `<div class="time-label">${(hour + 12) > 12 ? (hour + 12) - 12 : (hour + 12)}${(hour + 12) >= 12 ? 'P' : 'A'}</div>` 
+                                                ${theater === 1 ? 
+                                                    `<div class="time-label">${displayHour}${period}</div>` 
                                                     : ''}
                                             </div>
-                                        `).join('')}
+                                        `}).join('')}
                                     </div>
                                 </div>
                             `).join('')}
@@ -730,7 +770,13 @@
             e.dataTransfer.dropEffect = 'move';
             
             const rect = this.getBoundingClientRect();
-            const y = e.clientY - rect.top;
+            let y = e.clientY - rect.top;
+            
+            // Adjust for drag offset (snap from TOP of block)
+            if (dragOffset > 0) {
+                y = y - dragOffset;
+            }
+            
             const snappedY = Math.round(y / 20) * 20; // Snap to 15min intervals (20px = 15min)
             
             let preview = this.querySelector('.drag-preview');
@@ -765,7 +811,13 @@
             if (!draggedItem) return;
             
             const rect = this.getBoundingClientRect();
-            const y = e.clientY - rect.top;
+            let y = e.clientY - rect.top;
+            
+            // Adjust for drag offset (snap from TOP of block)
+            if (dragOffset > 0) {
+                y = y - dragOffset;
+            }
+            
             const snappedY = Math.round(y / 20) * 20;
             
             const day = parseInt(this.dataset.day);
@@ -794,6 +846,9 @@
                 scheduleId: `sched-${Date.now()}`,
                 fromSchedule: false  // Reset flag
             });
+            
+            // Reset drag offset
+            dragOffset = 0;
             
             renderSchedule();
             showToast(`${draggedItem.fromSchedule ? 'Moved' : 'Scheduled'}: ${draggedItem.title}`);
@@ -896,6 +951,9 @@
         // ============================================
         
         setWeek(0);
+        
+        // Auto-load from Supabase
+        importFromSupabase();
         
         // Load Google API
         const script = document.createElement('script');
