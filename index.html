@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v2.1</title>
+    <title>TSL Scheduler v2.2</title>
     <style>
         * {
             margin: 0;
@@ -73,15 +73,6 @@
 
         .btn-secondary:hover {
             background: #1976D2;
-        }
-
-        .btn-danger {
-            background: #f44336;
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #da190b;
         }
 
         .btn-toggle {
@@ -232,6 +223,7 @@
         .time-column {
             width: 80px;
             flex-shrink: 0;
+            padding-top: 60px; /* Match day header height */
         }
 
         .time-slot {
@@ -456,13 +448,11 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>TSL Scheduler v2.1</h1>
+            <h1>TSL Scheduler v2.2</h1>
             <div class="button-group">
-                <div id="status" class="status synced">Ready</div>
-                <button id="connectBtn" class="btn-primary">Connect Google Calendar</button>
-                <button id="signOutBtn" class="btn-danger" style="display: none;">Sign Out</button>
-                <button id="syncBtn" class="btn-secondary" style="display: none;" disabled>Sync with Google</button>
-                <button id="pushBtn" class="btn-primary" style="display: none;" disabled>Push to Google</button>
+                <div id="status" class="status synced">Initializing...</div>
+                <button id="syncBtn" class="btn-secondary" disabled>Sync with Google</button>
+                <button id="pushBtn" class="btn-primary" disabled>Push to Google</button>
             </div>
         </div>
 
@@ -495,13 +485,14 @@
         </div>
     </div>
 
+    <script src="https://apis.google.com/js/api.js"></script>
     <script>
         // Configuration
         const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
-        const GOOGLE_CLIENT_ID = '10045666629-hnbmuhthec0jb7vqph3mqldi90p4f0is.apps.googleusercontent.com';
         const GOOGLE_API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
         const CALENDAR_IDS = {
+            events: '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
             theater1: '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com',
             theater2: 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
         };
@@ -512,8 +503,7 @@
         let scheduledEvents = [];
         let currentWeekStart = null;
         let hideTuesThurs = false;
-        let isSignedIn = false;
-        let gapiInitialized = false;
+        let gapiReady = false;
         let draggedItem = null;
         let dragPreview = null;
         let snapIndicator = null;
@@ -525,13 +515,12 @@
             setupEventListeners();
             loadLocalState();
             await loadLibrary();
+            await initGoogleAPI();
             setCurrentWeek(new Date());
             startAutoSave();
         }
 
         function setupEventListeners() {
-            document.getElementById('connectBtn').addEventListener('click', handleAuthClick);
-            document.getElementById('signOutBtn').addEventListener('click', handleSignOut);
             document.getElementById('syncBtn').addEventListener('click', syncWithGoogle);
             document.getElementById('pushBtn').addEventListener('click', pushToGoogle);
             document.getElementById('prevWeek').addEventListener('click', () => changeWeek(-1));
@@ -539,6 +528,30 @@
             document.getElementById('toggleDaysBtn').addEventListener('click', toggleDays);
             document.getElementById('searchBox').addEventListener('input', filterLibrary);
             document.getElementById('filterSelect').addEventListener('change', filterLibrary);
+        }
+
+        // Initialize Google API (NO OAUTH!)
+        async function initGoogleAPI() {
+            try {
+                await new Promise((resolve) => {
+                    gapi.load('client', resolve);
+                });
+
+                await gapi.client.init({
+                    apiKey: GOOGLE_API_KEY,
+                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
+                });
+
+                gapiReady = true;
+                document.getElementById('syncBtn').disabled = false;
+                document.getElementById('pushBtn').disabled = false;
+                updateStatus('Ready', true);
+                
+                console.log('Google API initialized successfully (public calendars, no auth)');
+            } catch (error) {
+                console.error('Error initializing Google API:', error);
+                updateStatus('Google API failed', false);
+            }
         }
 
         // Load library from Supabase
@@ -704,7 +717,7 @@
             const times = [];
             for (let hour = 12; hour < 24; hour++) { // 12 PM to 12 AM (12 hours)
                 const displayHour = hour > 12 ? hour - 12 : hour;
-                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const ampm = 'PM';
                 
                 // Hour mark (shown)
                 times.push(`<div class="time-slot hour-mark">${displayHour}:00 ${ampm}</div>`);
@@ -814,7 +827,7 @@
 
             // Show drag preview with snap time
             if (dragPreview) {
-                const rect = lane.getBoundingClientRect();
+                const rect = lane.querySelector('.theater-content').getBoundingClientRect();
                 const y = e.clientY - rect.top;
                 const snapTime = getSnappedTime(y);
                 
@@ -843,7 +856,7 @@
 
             const dayIndex = parseInt(lane.dataset.day);
             const theater = parseInt(lane.dataset.theater);
-            const rect = lane.getBoundingClientRect();
+            const rect = lane.querySelector('.theater-content').getBoundingClientRect();
             const y = e.clientY - rect.top;
             const snapTime = getSnappedTime(y);
 
@@ -851,7 +864,7 @@
         }
 
         function showSnapIndicator(lane, e) {
-            const rect = lane.getBoundingClientRect();
+            const rect = lane.querySelector('.theater-content').getBoundingClientRect();
             const y = e.clientY - rect.top;
             const snappedY = getSnappedY(y);
 
@@ -948,7 +961,6 @@
                 <div class="event-time">${formatTime({ hour: hours, minutes: minutes })}</div>
                 <div class="event-actions">
                     <button class="event-btn" onclick="removeEvent('${event.supabaseId}', ${event.actualDate.getTime()})">×</button>
-                    <button class="event-btn" onclick="toggleTBD('${event.supabaseId}', ${event.actualDate.getTime()})">TBD</button>
                 </div>
             `;
 
@@ -965,79 +977,12 @@
             saveLocalState();
         };
 
-        window.toggleTBD = function(supabaseId, dateTime) {
-            const event = scheduledEvents.find(e => 
-                e.supabaseId === supabaseId && e.actualDate.getTime() === dateTime
-            );
-            if (event) {
-                event.isTBD = !event.isTBD;
-                event.modified = true;
-                renderScheduledEvents();
-                updateStatus();
-                saveLocalState();
-            }
-        };
-
-        // Google Calendar integration
-        function handleAuthClick() {
-            loadGoogleAPI();
-        }
-
-        function loadGoogleAPI() {
-            const script = document.createElement('script');
-            script.src = 'https://apis.google.com/js/api.js';
-            script.onload = () => {
-                gapi.load('client:auth2', initGoogleClient);
-            };
-            document.body.appendChild(script);
-        }
-
-        async function initGoogleClient() {
-            try {
-                await gapi.client.init({
-                    apiKey: GOOGLE_API_KEY,
-                    clientId: GOOGLE_CLIENT_ID,
-                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-                    scope: 'https://www.googleapis.com/auth/calendar'
-                });
-
-                const authInstance = gapi.auth2.getAuthInstance();
-                authInstance.isSignedIn.listen(updateSignInStatus);
-                
-                if (authInstance.isSignedIn.get()) {
-                    updateSignInStatus(true);
-                } else {
-                    await authInstance.signIn();
-                }
-                
-                gapiInitialized = true;
-            } catch (error) {
-                console.error('Error initializing Google API:', error);
-                alert('Failed to connect to Google Calendar: ' + error.message);
-            }
-        }
-
-        function updateSignInStatus(signedIn) {
-            isSignedIn = signedIn;
-            document.getElementById('connectBtn').style.display = signedIn ? 'none' : 'block';
-            document.getElementById('signOutBtn').style.display = signedIn ? 'block' : 'none';
-            document.getElementById('syncBtn').style.display = signedIn ? 'block' : 'none';
-            document.getElementById('pushBtn').style.display = signedIn ? 'block' : 'none';
-            
-            if (signedIn) {
-                document.getElementById('syncBtn').disabled = false;
-                document.getElementById('pushBtn').disabled = false;
-                // Auto-sync on connect
-                syncWithGoogle();
-            }
-        }
-
-        function handleSignOut() {
-            gapi.auth2.getAuthInstance().signOut();
-        }
-
+        // Google Calendar integration (NO OAUTH!)
         async function syncWithGoogle() {
-            if (!isSignedIn) return;
+            if (!gapiReady) {
+                alert('Google API not ready yet!');
+                return;
+            }
 
             try {
                 updateStatus('Syncing with Google...', false);
@@ -1047,20 +992,30 @@
 
                 let allGoogleEvents = [];
 
-                // Fetch from both theater calendars
-                for (const [theaterKey, calendarId] of Object.entries(CALENDAR_IDS)) {
-                    const response = await gapi.client.calendar.events.list({
-                        calendarId: calendarId,
-                        timeMin: currentWeekStart.toISOString(),
-                        timeMax: weekEnd.toISOString(),
-                        singleEvents: true,
-                        orderBy: 'startTime'
-                    });
+                // Fetch from all three calendars
+                for (const [key, calendarId] of Object.entries(CALENDAR_IDS)) {
+                    try {
+                        const response = await gapi.client.calendar.events.list({
+                            calendarId: calendarId,
+                            timeMin: currentWeekStart.toISOString(),
+                            timeMax: weekEnd.toISOString(),
+                            singleEvents: true,
+                            orderBy: 'startTime'
+                        });
 
-                    const events = response.result.items || [];
-                    // Tag events with which theater they came from
-                    const theater = theaterKey === 'theater1' ? 1 : 2;
-                    allGoogleEvents.push(...events.map(e => ({ ...e, _theater: theater })));
+                        const events = response.result.items || [];
+                        
+                        // Determine theater from calendar
+                        let theater = null;
+                        if (key === 'theater1') theater = 1;
+                        else if (key === 'theater2') theater = 2;
+                        
+                        allGoogleEvents.push(...events.map(e => ({ ...e, _theater: theater, _calendar: key })));
+                        
+                        console.log(`Loaded ${events.length} events from ${key} calendar`);
+                    } catch (err) {
+                        console.warn(`Failed to load ${key} calendar:`, err);
+                    }
                 }
 
                 let matchedCount = 0;
@@ -1068,7 +1023,7 @@
                 // Match Google events to scheduled events
                 allGoogleEvents.forEach(ge => {
                     const supabaseId = ge.extendedProperties?.private?.['tsl-supabase-id'];
-                    if (!supabaseId) return;
+                    if (!supabaseId || !ge._theater) return;
 
                     const eventDate = new Date(ge.start.dateTime);
                     const existing = scheduledEvents.find(se => 
@@ -1088,6 +1043,8 @@
                 updateStatus(`Synced: ${matchedCount} events matched`, true);
                 saveLocalState();
 
+                console.log(`Sync complete: ${allGoogleEvents.length} total events, ${matchedCount} matched`);
+
             } catch (error) {
                 console.error('Sync error:', error);
                 updateStatus('Sync failed', false);
@@ -1096,7 +1053,10 @@
         }
 
         async function pushToGoogle() {
-            if (!isSignedIn) return;
+            if (!gapiReady) {
+                alert('Google API not ready yet!');
+                return;
+            }
 
             const eventsToPush = scheduledEvents.filter(e => e.modified || !e.googleEventId);
             
@@ -1155,6 +1115,8 @@
 
             event.googleEventId = response.result.id;
             event.modified = false;
+            
+            console.log('Created event:', event.title, 'in', calendarId);
         }
 
         async function updateGoogleEvent(event) {
@@ -1186,26 +1148,26 @@
             });
 
             event.modified = false;
+            
+            console.log('Updated event:', event.title);
         }
 
         // Status and state management
-        function updateStatus() {
-            const modifiedCount = scheduledEvents.filter(e => e.modified || !e.googleEventId).length;
-            const statusEl = document.getElementById('status');
-            
-            if (modifiedCount === 0) {
-                statusEl.textContent = 'All synced';
-                statusEl.className = 'status synced';
-            } else {
-                statusEl.textContent = `${modifiedCount} events need push`;
-                statusEl.className = 'status needs-push';
-            }
-        }
-
         function updateStatus(message, success) {
             const statusEl = document.getElementById('status');
-            statusEl.textContent = message;
-            statusEl.className = success ? 'status synced' : 'status needs-push';
+            if (typeof message === 'string') {
+                statusEl.textContent = message;
+                statusEl.className = success ? 'status synced' : 'status needs-push';
+            } else {
+                const modifiedCount = scheduledEvents.filter(e => e.modified || !e.googleEventId).length;
+                if (modifiedCount === 0) {
+                    statusEl.textContent = 'All synced';
+                    statusEl.className = 'status synced';
+                } else {
+                    statusEl.textContent = `${modifiedCount} events need push`;
+                    statusEl.className = 'status needs-push';
+                }
+            }
         }
 
         function saveLocalState() {
