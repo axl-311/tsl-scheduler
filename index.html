@@ -764,6 +764,11 @@
                     dragOffset = 0;
                     e.dataTransfer.effectAllowed = 'move';
                 });
+                
+                // Cleanup previews when drag ends
+                el.addEventListener('dragend', () => {
+                    document.querySelectorAll('.drag-preview').forEach(p => p.remove());
+                });
             });
         }
 
@@ -849,6 +854,9 @@
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             
+            // Remove ALL existing previews first (cleanup from other grids)
+            document.querySelectorAll('.drag-preview').forEach(p => p.remove());
+            
             const rect = this.getBoundingClientRect();
             let y = e.clientY - rect.top;
             
@@ -858,12 +866,10 @@
             
             const snappedY = Math.round(y / 20) * 20;
             
-            let preview = this.querySelector('.drag-preview');
-            if (!preview) {
-                preview = document.createElement('div');
-                preview.className = 'drag-preview';
-                this.appendChild(preview);
-            }
+            // Create fresh preview in current grid
+            const preview = document.createElement('div');
+            preview.className = 'drag-preview';
+            this.appendChild(preview);
             
             const hour = Math.floor(snappedY / 80) + 12;
             const min = Math.round((snappedY % 80) / 80 * 60);
@@ -875,17 +881,17 @@
         }
 
         function handleDragLeave(e) {
-            if (e.target.classList.contains('theater-grid')) {
-                const preview = this.querySelector('.drag-preview');
-                if (preview) preview.remove();
+            // Only cleanup if leaving the grid entirely (not just moving to child elements)
+            if (!e.currentTarget.contains(e.relatedTarget)) {
+                document.querySelectorAll('.drag-preview').forEach(p => p.remove());
             }
         }
 
         function handleDrop(e) {
             e.preventDefault();
             
-            const preview = this.querySelector('.drag-preview');
-            if (preview) preview.remove();
+            // Remove ALL previews everywhere
+            document.querySelectorAll('.drag-preview').forEach(p => p.remove());
             
             if (!draggedItem) return;
             
@@ -936,8 +942,32 @@
         // ============================================
         
         function renderScheduledEvents() {
+            // Calculate the date range for current week (Fri-Mon)
+            const weekStart = new Date(currentWeek);
+            weekStart.setHours(0, 0, 0, 0);
+            
+            const weekEnd = new Date(currentWeek);
+            weekEnd.setDate(weekEnd.getDate() + 3); // Friday + 3 = Monday
+            weekEnd.setHours(23, 59, 59, 999);
+            
+            console.log(`Week range: ${weekStart.toDateString()} - ${weekEnd.toDateString()}`);
+            
+            // Filter and render events that fall in this week
             scheduled.forEach((event) => {
-                const grid = document.querySelector(`[data-day="${event.day}"][data-theater="${event.theater}"]`);
+                const eventDate = new Date(event.startTime);
+                
+                // Check if event falls within current week
+                if (eventDate < weekStart || eventDate > weekEnd) {
+                    return; // Skip events not in this week
+                }
+                
+                // Calculate which day column (0-3) based on actual date
+                const eventDayStart = new Date(eventDate);
+                eventDayStart.setHours(0, 0, 0, 0);
+                const daysDiff = Math.floor((eventDayStart - weekStart) / (1000 * 60 * 60 * 24));
+                
+                // Find the grid for this day and theater
+                const grid = document.querySelector(`[data-day="${daysDiff}"][data-theater="${event.theater}"]`);
                 if (!grid) return;
                 
                 const block = document.createElement('div');
@@ -962,6 +992,11 @@
                     dragOffset = e.clientY - rect.top;
                     draggedItem = { ...event, fromSchedule: true, scheduleId: event.scheduleId };
                     e.dataTransfer.effectAllowed = 'move';
+                });
+                
+                // Cleanup previews when drag ends
+                block.addEventListener('dragend', () => {
+                    document.querySelectorAll('.drag-preview').forEach(p => p.remove());
                 });
                 
                 block.querySelector('.delete-btn').addEventListener('click', (e) => {
