@@ -235,7 +235,7 @@
         }
 
         .time-slot {
-            height: 60px; /* 15 minutes = 60px, so 1 hour = 240px */
+            height: 40px; /* 15 minutes = 40px, so 1 hour = 160px */
             border-bottom: 1px solid #e0e0e0;
             display: flex;
             align-items: flex-start;
@@ -257,7 +257,7 @@
         }
 
         .day-column {
-            min-width: 280px;
+            min-width: 240px;
             border-left: 1px solid #e0e0e0;
         }
 
@@ -289,7 +289,7 @@
         .theater-lane {
             border-right: 1px solid #e0e0e0;
             position: relative;
-            min-height: 3840px; /* 16 hours * 240px per hour */
+            min-height: 1920px; /* 12 hours * 160px per hour */
         }
 
         .theater-lane:last-child {
@@ -311,7 +311,7 @@
 
         .theater-content {
             position: relative;
-            height: 3840px; /* 16 hours * 240px */
+            height: 1920px; /* 12 hours * 160px */
         }
 
         .theater-lane.drag-over {
@@ -332,7 +332,7 @@
             position: absolute;
             left: 0;
             right: 0;
-            height: 60px; /* 15 minutes */
+            height: 40px; /* 15 minutes */
             border-bottom: 1px solid #f0f0f0;
         }
 
@@ -500,8 +500,11 @@
         const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
         const GOOGLE_CLIENT_ID = '10045666629-hnbmuhthec0jb7vqph3mqldi90p4f0is.apps.googleusercontent.com';
-        const GOOGLE_API_KEY = 'AIzaSyAFxVjmtI-IiZb8xvjt0w3i8PaChbfD_dQ';
-        const CALENDAR_ID = 'c_d4e8a1b7e0e9c8f5b3d2a1c9e8f7b6d5a4c3b2a1@group.calendar.google.com';
+        const GOOGLE_API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
+        const CALENDAR_IDS = {
+            theater1: '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com',
+            theater2: 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
+        };
 
         // State
         let library = [];
@@ -541,16 +544,36 @@
         // Load library from Supabase
         async function loadLibrary() {
             try {
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/movies?select=*`, {
+                // Fetch movies
+                const moviesResponse = await fetch(`${SUPABASE_URL}/rest/v1/movies?select=*`, {
                     headers: {
                         'apikey': SUPABASE_KEY,
                         'Authorization': `Bearer ${SUPABASE_KEY}`
                     }
                 });
 
-                if (!response.ok) throw new Error('Failed to load library');
+                if (!moviesResponse.ok) throw new Error('Failed to load movies');
 
-                library = await response.json();
+                const movies = await moviesResponse.json();
+                
+                // Fetch events
+                const eventsResponse = await fetch(`${SUPABASE_URL}/rest/v1/events?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+
+                if (!eventsResponse.ok) throw new Error('Failed to load events');
+
+                const events = await eventsResponse.json();
+
+                // Combine and add content_type field
+                library = [
+                    ...movies.map(m => ({ ...m, content_type: 'movie', duration: m.runtime_minutes })),
+                    ...events.map(e => ({ ...e, content_type: 'event', duration: e.runtime_minutes || e.duration }))
+                ];
+
                 filterLibrary();
                 
                 console.log('Library loaded:', library.length, 'programs');
@@ -603,9 +626,9 @@
                 <div class="library-item ${item.content_type}" 
                      draggable="true"
                      data-id="${item.id}"
-                     data-supabase-id="${item.supabase_id}">
+                     data-supabase-id="${item.supabase_id || item.id}">
                     <div class="library-item-title">${item.title}</div>
-                    <div class="library-item-duration">${item.duration || 'Duration TBD'} min</div>
+                    <div class="library-item-duration">${item.duration || item.runtime_minutes || 'Duration TBD'} min</div>
                 </div>
             `).join('');
 
@@ -679,9 +702,9 @@
 
         function renderTimeColumn() {
             const times = [];
-            for (let hour = 12; hour < 28; hour++) { // 12 PM to 12 AM (next day)
-                const displayHour = hour > 24 ? hour - 24 : hour > 12 ? hour - 12 : hour;
-                const ampm = hour >= 24 || hour < 12 ? 'AM' : 'PM';
+            for (let hour = 12; hour < 24; hour++) { // 12 PM to 12 AM (12 hours)
+                const displayHour = hour > 12 ? hour - 12 : hour;
+                const ampm = hour >= 12 ? 'PM' : 'AM';
                 
                 // Hour mark (shown)
                 times.push(`<div class="time-slot hour-mark">${displayHour}:00 ${ampm}</div>`);
@@ -727,9 +750,9 @@
 
         function renderTimeGridLines() {
             const lines = [];
-            for (let i = 0; i < 64; i++) { // 16 hours * 4 (15-min intervals)
+            for (let i = 0; i < 48; i++) { // 12 hours * 4 (15-min intervals)
                 const isHourMark = i % 4 === 0;
-                lines.push(`<div class="time-grid-line ${isHourMark ? 'hour-mark' : ''}" style="top: ${i * 60}px;"></div>`);
+                lines.push(`<div class="time-grid-line ${isHourMark ? 'hour-mark' : ''}" style="top: ${i * 40}px;"></div>`);
             }
             return `<div class="time-grid-lines">${lines.join('')}</div>`;
         }
@@ -745,8 +768,8 @@
 
         // Drag handlers
         function handleDragStart(e) {
-            const itemId = e.target.dataset.supabaseId;
-            draggedItem = library.find(item => item.supabase_id === itemId);
+            const itemId = e.target.dataset.supabaseId || e.target.dataset.id;
+            draggedItem = library.find(item => (item.supabase_id || item.id) === itemId);
             
             e.dataTransfer.effectAllowed = 'copy';
             e.dataTransfer.setData('text/html', e.target.innerHTML);
@@ -842,13 +865,13 @@
         }
 
         function getSnappedY(y) {
-            // Snap to 15-minute increments (60px = 15 min)
-            return Math.round(y / 60) * 60;
+            // Snap to 15-minute increments (40px = 15 min)
+            return Math.round(y / 40) * 40;
         }
 
         function getSnappedTime(y) {
-            // Convert Y position to time (60px = 15 min, starting at 12 PM)
-            const quarterHours = Math.round(y / 60);
+            // Convert Y position to time (40px = 15 min, starting at 12 PM)
+            const quarterHours = Math.round(y / 40);
             const hour = 12 + Math.floor(quarterHours / 4);
             const minutes = (quarterHours % 4) * 15;
             return { hour, minutes };
@@ -859,9 +882,11 @@
             eventDate.setDate(eventDate.getDate() + dayIndex);
             eventDate.setHours(time.hour, time.minutes, 0, 0);
 
+            const itemId = item.supabase_id || item.id;
+
             // Check for duplicates
             const exists = scheduledEvents.find(e => 
-                e.supabaseId === item.supabase_id &&
+                (e.supabaseId === itemId || e.id === itemId) &&
                 e.actualDate.getTime() === eventDate.getTime() &&
                 e.theater === theater
             );
@@ -873,7 +898,7 @@
 
             const newEvent = {
                 ...item,
-                supabaseId: item.supabase_id,
+                supabaseId: itemId,
                 actualDate: eventDate,
                 theater: theater,
                 modified: true
@@ -911,9 +936,9 @@
 
             const hours = event.actualDate.getHours();
             const minutes = event.actualDate.getMinutes();
-            const topPosition = ((hours - 12) * 4 + minutes / 15) * 60;
+            const topPosition = ((hours - 12) * 4 + minutes / 15) * 40;
             const duration = event.duration || 90;
-            const height = (duration / 15) * 60;
+            const height = (duration / 15) * 40;
 
             el.style.top = topPosition + 'px';
             el.style.height = height + 'px';
@@ -1020,26 +1045,36 @@
                 const weekEnd = new Date(currentWeekStart);
                 weekEnd.setDate(weekEnd.getDate() + 7);
 
-                const response = await gapi.client.calendar.events.list({
-                    calendarId: CALENDAR_ID,
-                    timeMin: currentWeekStart.toISOString(),
-                    timeMax: weekEnd.toISOString(),
-                    singleEvents: true,
-                    orderBy: 'startTime'
-                });
+                let allGoogleEvents = [];
 
-                const googleEvents = response.result.items || [];
+                // Fetch from both theater calendars
+                for (const [theaterKey, calendarId] of Object.entries(CALENDAR_IDS)) {
+                    const response = await gapi.client.calendar.events.list({
+                        calendarId: calendarId,
+                        timeMin: currentWeekStart.toISOString(),
+                        timeMax: weekEnd.toISOString(),
+                        singleEvents: true,
+                        orderBy: 'startTime'
+                    });
+
+                    const events = response.result.items || [];
+                    // Tag events with which theater they came from
+                    const theater = theaterKey === 'theater1' ? 1 : 2;
+                    allGoogleEvents.push(...events.map(e => ({ ...e, _theater: theater })));
+                }
+
                 let matchedCount = 0;
 
                 // Match Google events to scheduled events
-                googleEvents.forEach(ge => {
+                allGoogleEvents.forEach(ge => {
                     const supabaseId = ge.extendedProperties?.private?.['tsl-supabase-id'];
                     if (!supabaseId) return;
 
                     const eventDate = new Date(ge.start.dateTime);
                     const existing = scheduledEvents.find(se => 
                         se.supabaseId === supabaseId && 
-                        se.actualDate.getTime() === eventDate.getTime()
+                        se.actualDate.getTime() === eventDate.getTime() &&
+                        se.theater === ge._theater
                     );
 
                     if (existing) {
@@ -1095,19 +1130,18 @@
             const endTime = new Date(event.actualDate);
             endTime.setMinutes(endTime.getMinutes() + (event.duration || 90));
 
-            const calendarId = event.isTBD ? 
-                'a2fb3f87e3b3b33e32c370d47e45c3a4e5f9a4c6b8e7d6c5b4a3d2e1f0c8b7a6@group.calendar.google.com' : 
-                CALENDAR_ID;
+            // Use theater-specific calendar
+            const calendarId = event.theater === 1 ? CALENDAR_IDS.theater1 : CALENDAR_IDS.theater2;
 
             const googleEvent = {
                 summary: event.title,
                 start: { dateTime: event.actualDate.toISOString() },
                 end: { dateTime: endTime.toISOString() },
-                description: event.description || '',
+                description: event.synopsis || event.logline || event.description || '',
                 location: `Theater ${event.theater}`,
                 extendedProperties: {
                     private: {
-                        'tsl-supabase-id': event.supabaseId,
+                        'tsl-supabase-id': event.supabaseId || event.id,
                         'tsl-supabase-table': event.content_type === 'movie' ? 'movies' : 'events',
                         'tsl-webpage-url': event.webpage_url || ''
                     }
@@ -1127,19 +1161,18 @@
             const endTime = new Date(event.actualDate);
             endTime.setMinutes(endTime.getMinutes() + (event.duration || 90));
 
-            const calendarId = event.isTBD ? 
-                'a2fb3f87e3b3b33e32c370d47e45c3a4e5f9a4c6b8e7d6c5b4a3d2e1f0c8b7a6@group.calendar.google.com' : 
-                CALENDAR_ID;
+            // Use theater-specific calendar
+            const calendarId = event.theater === 1 ? CALENDAR_IDS.theater1 : CALENDAR_IDS.theater2;
 
             const googleEvent = {
                 summary: event.title,
                 start: { dateTime: event.actualDate.toISOString() },
                 end: { dateTime: endTime.toISOString() },
-                description: event.description || '',
+                description: event.synopsis || event.logline || event.description || '',
                 location: `Theater ${event.theater}`,
                 extendedProperties: {
                     private: {
-                        'tsl-supabase-id': event.supabaseId,
+                        'tsl-supabase-id': event.supabaseId || event.id,
                         'tsl-supabase-table': event.content_type === 'movie' ? 'movies' : 'events',
                         'tsl-webpage-url': event.webpage_url || ''
                     }
