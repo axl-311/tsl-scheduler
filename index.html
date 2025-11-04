@@ -612,6 +612,7 @@
             const friday = getFridayOfWeek(currentWeek);
             const weekKey = formatDate(friday);
             lockedWeeks[weekKey] = true;
+            console.log('🔒 Locking week:', weekKey, 'lockedWeeks:', lockedWeeks);
             saveLockedWeeksToStorage();
             updateWeekDisplay();
             renderSchedule();
@@ -633,12 +634,14 @@
 
         function saveLockedWeeksToStorage() {
             localStorage.setItem('tsl-locked-weeks', JSON.stringify(lockedWeeks));
+            console.log('💾 Saved locked weeks to localStorage:', lockedWeeks);
         }
 
         function loadLockedWeeksFromStorage() {
             const saved = localStorage.getItem('tsl-locked-weeks');
             if (saved) {
                 lockedWeeks = JSON.parse(saved);
+                console.log('📂 Loaded locked weeks from localStorage:', lockedWeeks);
             }
         }
 
@@ -677,6 +680,8 @@
             
             const weekKey = formatDate(friday);
             const isLocked = lockedWeeks[weekKey] || false;
+            
+            console.log('🔄 updateWeekDisplay - weekKey:', weekKey, 'isLocked:', isLocked, 'lockedWeeks:', lockedWeeks);
             
             const lockStatus = isLocked 
                 ? ' <span style="color: #ff4444; font-weight: bold;">🔒 LOCKED</span>' 
@@ -1291,25 +1296,27 @@
                 
                 saveToLocalStorage();
                 
+                // NEW: Always lock week after push (regardless of outcome)
+                lockCurrentWeek();
+                
                 // RE-ENABLE BUTTON
                 pushBtn.disabled = false;
                 pushBtn.textContent = 'Push to Google';
                 
-                if (errors === 0) {
-                    // NEW: Lock the week after successful push (even if all skipped)
-                    lockCurrentWeek();
-                    if (created > 0) {
-                        showToast(`✓ Pushed: ${created} created, ${skipped} skipped - Week locked!`);
-                    } else {
-                        showToast(`✓ All events already in Google: ${skipped} skipped - Week locked!`);
-                    }
+                if (errors === 0 && created > 0) {
+                    showToast(`✓ Pushed: ${created} created, ${skipped} skipped - Week locked!`);
+                } else if (errors === 0) {
+                    showToast(`✓ All events in Google: ${skipped} skipped - Week locked!`);
                 } else {
-                    showToast(`⚠ Pushed: ${created} created, ${skipped} skipped, ${errors} failed`);
+                    showToast(`⚠ Pushed: ${created} created, ${skipped} skipped, ${errors} failed - Week locked!`);
                 }
                 
             } catch (error) {
                 console.error('Push error:', error);
-                showToast('Failed to push to Google Calendar');
+                
+                // NEW: Lock week even on catastrophic failure
+                lockCurrentWeek();
+                showToast('Failed to push to Google Calendar - Week locked anyway');
                 
                 // RE-ENABLE BUTTON
                 pushBtn.disabled = false;
