@@ -1061,11 +1061,16 @@
                 return;
             }
             
+            // DISABLE BUTTON DURING PUSH
+            const pushBtn = document.getElementById('pushBtn');
+            pushBtn.disabled = true;
+            pushBtn.textContent = 'Pushing...';
+            
             showToast(`Pushing ${scheduled.length} events to Google Calendar...`);
             
             try {
                 let created = 0;
-                let updated = 0;
+                let skipped = 0;
                 let errors = 0;
                 
                 for (const event of scheduled) {
@@ -1100,6 +1105,9 @@
                         };
                         
                         let existingEventId = null;
+                        let shouldSkip = false;
+                        
+                        // FIRST: Check if we have a saved googleEventId
                         if (event.googleEventId) {
                             try {
                                 const checkResponse = await gapi.client.calendar.events.get({
@@ -1107,22 +1115,56 @@
                                     eventId: event.googleEventId
                                 });
                                 if (checkResponse.status === 200) {
-                                    existingEventId = event.googleEventId;
+                                    // Event exists and we know about it - skip
+                                    shouldSkip = true;
+                                    console.log(`Skipping: ${event.title} (already in Google)`);
                                 }
                             } catch (e) {
-                                console.log('Event not found, will create new');
+                                console.log('Saved event ID not found, will search for duplicates');
                             }
                         }
                         
-                        if (existingEventId) {
-                            await gapi.client.calendar.events.update({
-                                calendarId: calendarId,
-                                eventId: existingEventId,
-                                resource: googleEvent
-                            });
-                            updated++;
-                            console.log(`Updated: ${event.title}`);
+                        // SECOND: If no saved ID, search for duplicate by title + time
+                        if (!shouldSkip && !event.googleEventId) {
+                            try {
+                                const searchResponse = await gapi.client.calendar.events.list({
+                                    calendarId: calendarId,
+                                    timeMin: startTime.toISOString(),
+                                    timeMax: endTime.toISOString(),
+                                    q: event.title,
+                                    singleEvents: true
+                                });
+                                
+                                if (searchResponse.result.items && searchResponse.result.items.length > 0) {
+                                    // Found existing event with same title and time
+                                    const match = searchResponse.result.items.find(item => 
+                                        item.summary === event.title &&
+                                        item.start.dateTime === startTime.toISOString()
+                                    );
+                                    
+                                    if (match) {
+                                        shouldSkip = true;
+                                        existingEventId = match.id;
+                                        
+                                        // Save the ID so we don't search next time
+                                        const idx = scheduled.findIndex(e => e.scheduleId === event.scheduleId);
+                                        if (idx !== -1) {
+                                            scheduled[idx].googleEventId = match.id;
+                                        }
+                                        
+                                        console.log(`Skipping: ${event.title} (duplicate found in Google)`);
+                                    }
+                                }
+                            } catch (e) {
+                                console.log('Search failed, will create new event');
+                            }
+                        }
+                        
+                        if (shouldSkip) {
+                            // SKIP - event already exists with same title and time
+                            skipped++;
                         } else {
+                            // CREATE new event
                             const response = await gapi.client.calendar.events.insert({
                                 calendarId: calendarId,
                                 resource: googleEvent
@@ -1145,15 +1187,23 @@
                 
                 saveToLocalStorage();
                 
+                // RE-ENABLE BUTTON
+                pushBtn.disabled = false;
+                pushBtn.textContent = 'Push to Google';
+                
                 if (errors === 0) {
-                    showToast(`✓ Pushed to Google: ${created} created, ${updated} updated`);
+                    showToast(`✓ Pushed: ${created} created, ${skipped} skipped`);
                 } else {
-                    showToast(`⚠ Pushed with errors: ${created} created, ${updated} updated, ${errors} failed`);
+                    showToast(`⚠ Pushed: ${created} created, ${skipped} skipped, ${errors} failed`);
                 }
                 
             } catch (error) {
                 console.error('Push error:', error);
                 showToast('Failed to push to Google Calendar');
+                
+                // RE-ENABLE BUTTON
+                pushBtn.disabled = false;
+                pushBtn.textContent = 'Push to Google';
             }
         };
 
