@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v2.3 - Per-Week Locking</title>
+    <title>TSL Scheduler v2.4 - WordPress Database</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
@@ -442,7 +442,7 @@
             <div>
                 <h1>
                     TSL Scheduler
-                    <span class="version">v2.3 LOCKED</span>
+                    <span class="version">v2.4</span>
                 </h1>
             </div>
             <div class="header-actions">
@@ -454,13 +454,13 @@
         <!-- Controls -->
         <div class="controls">
             <div class="week-nav">
-                <button class="btn btn-secondary" id="prevWeek">← Prev</button>
+                <button class="btn btn-secondary" id="prevWeek">Prev</button>
                 <div class="week-display" id="weekDisplay">Loading...</div>
-                <button class="btn btn-secondary" id="nextWeek">Next →</button>
+                <button class="btn btn-secondary" id="nextWeek">Next</button>
+                <button class="btn btn-secondary" id="lockStatusBtn" style="min-width: 100px; cursor: default;" disabled>DRAFT</button>
             </div>
             <div class="control-actions">
-                <button class="btn btn-primary" id="importBtn">Import from Database</button>
-                <button class="btn btn-warning" id="unlockBtn" style="display:none;">🔓 Unlock Week</button>
+                <button class="btn btn-warning" id="unlockBtn" style="display:none;">Unlock Week</button>
                 <button class="btn btn-primary" id="pushBtn" disabled>Push to Google</button>
                 <button class="btn btn-secondary" id="clearBtn">Clear Schedule</button>
             </div>
@@ -501,6 +501,8 @@
         // CONFIGURATION
         // ============================================
         
+        const WORDPRESS_URL = 'https://timeandspace.org'; // YOUR WORDPRESS SITE
+        
         const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
         
@@ -535,7 +537,7 @@
         // ============================================
         
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.log('TSL Scheduler v2.3 - Per-Week Locking');
+        console.log('TSL Scheduler v2.4 - WordPress Database Storage');
 
         // ============================================
         // GOOGLE API
@@ -612,11 +614,11 @@
             const friday = getFridayOfWeek(currentWeek);
             const weekKey = formatDate(friday);
             lockedWeeks[weekKey] = true;
-            console.log('🔒 Locking week:', weekKey, 'lockedWeeks:', lockedWeeks);
-            saveLockedWeeksToStorage();
+            console.log('Locking week:', weekKey, 'lockedWeeks:', lockedWeeks);
+            saveToWordPress();
             updateWeekDisplay();
             renderSchedule();
-            showToast('Week locked! 🔒');
+            showToast('Week locked');
         }
 
         function unlockCurrentWeek() {
@@ -626,23 +628,10 @@
             const friday = getFridayOfWeek(currentWeek);
             const weekKey = formatDate(friday);
             delete lockedWeeks[weekKey];
-            saveLockedWeeksToStorage();
+            saveToWordPress();
             updateWeekDisplay();
             renderSchedule();
-            showToast('Week unlocked! 📝');
-        }
-
-        function saveLockedWeeksToStorage() {
-            localStorage.setItem('tsl-locked-weeks', JSON.stringify(lockedWeeks));
-            console.log('💾 Saved locked weeks to localStorage:', lockedWeeks);
-        }
-
-        function loadLockedWeeksFromStorage() {
-            const saved = localStorage.getItem('tsl-locked-weeks');
-            if (saved) {
-                lockedWeeks = JSON.parse(saved);
-                console.log('📂 Loaded locked weeks from localStorage:', lockedWeeks);
-            }
+            showToast('Week unlocked');
         }
 
         // ============================================
@@ -681,15 +670,25 @@
             const weekKey = formatDate(friday);
             const isLocked = lockedWeeks[weekKey] || false;
             
-            console.log('🔄 updateWeekDisplay - weekKey:', weekKey, 'isLocked:', isLocked, 'lockedWeeks:', lockedWeeks);
-            
-            const lockStatus = isLocked 
-                ? ' <span style="color: #ff4444; font-weight: bold;">🔒 LOCKED</span>' 
-                : ' <span style="color: #4CAF50; font-weight: bold;">📝 DRAFT</span>';
+            console.log('updateWeekDisplay - weekKey:', weekKey, 'isLocked:', isLocked, 'lockedWeeks:', lockedWeeks);
             
             const options = { month: 'short', day: 'numeric', year: 'numeric' };
             document.getElementById('weekDisplay').innerHTML = 
-                `${currentWeek.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}${lockStatus}`;
+                `${currentWeek.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
+            
+            // Update lock status indicator (display-only, not clickable)
+            const lockStatusBtn = document.getElementById('lockStatusBtn');
+            if (isLocked) {
+                lockStatusBtn.textContent = 'LOCKED';
+                lockStatusBtn.style.background = '#ff4444';
+                lockStatusBtn.style.color = 'white';
+                lockStatusBtn.style.opacity = '1';
+            } else {
+                lockStatusBtn.textContent = 'DRAFT';
+                lockStatusBtn.style.background = '#4CAF50';
+                lockStatusBtn.style.color = 'white';
+                lockStatusBtn.style.opacity = '1';
+            }
             
             // Update push button state
             const pushBtn = document.getElementById('pushBtn');
@@ -697,13 +696,13 @@
             
             if (isLocked) {
                 pushBtn.disabled = true;
-                pushBtn.textContent = '🔒 Week Locked';
+                pushBtn.textContent = 'Week Locked';
                 pushBtn.style.opacity = '0.5';
                 pushBtn.style.cursor = 'not-allowed';
                 unlockBtn.style.display = 'inline-block';
             } else {
                 pushBtn.disabled = !accessToken;
-                pushBtn.textContent = '📤 Push to Google';
+                pushBtn.textContent = 'Push to Google';
                 pushBtn.style.opacity = '1';
                 pushBtn.style.cursor = 'pointer';
                 unlockBtn.style.display = 'none';
@@ -715,23 +714,45 @@
         document.getElementById('unlockBtn').onclick = unlockCurrentWeek;
 
         // ============================================
-        // SAVE/LOAD TO LOCALSTORAGE
+        // SAVE/LOAD TO WORDPRESS DATABASE
         // ============================================
         
-        function saveToLocalStorage() {
+        async function saveToWordPress() {
             try {
-                localStorage.setItem('tsl-scheduled-events', JSON.stringify(scheduled));
-                console.log('Saved to localStorage:', scheduled.length, 'events');
+                const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/save`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        events: scheduled,
+                        lockedWeeks: lockedWeeks
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to save to WordPress');
+                }
+                
+                console.log('Saved to WordPress:', scheduled.length, 'events');
             } catch (error) {
-                console.error('Failed to save to localStorage:', error);
+                console.error('Failed to save to WordPress:', error);
+                showToast('Warning: Failed to save to database');
             }
         }
         
-        function loadFromLocalStorage() {
+        async function loadFromWordPress() {
             try {
-                const saved = localStorage.getItem('tsl-scheduled-events');
-                if (saved) {
-                    scheduled = JSON.parse(saved);
+                const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/load`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load from WordPress');
+                }
+                
+                const data = await response.json();
+                
+                if (data.events && Array.isArray(data.events)) {
+                    scheduled = data.events;
                     scheduled.forEach(event => {
                         if (event.startTime) {
                             event.startTime = new Date(event.startTime);
@@ -740,20 +761,27 @@
                             event.actualDate = new Date(event.actualDate);
                         }
                     });
-                    console.log('Loaded from localStorage:', scheduled.length, 'events');
+                    console.log('Loaded from WordPress:', scheduled.length, 'events');
                     renderSchedule();
-                    showToast(`Restored ${scheduled.length} scheduled events`);
+                    showToast(`Loaded ${scheduled.length} scheduled events from database`);
+                }
+                
+                if (data.lockedWeeks) {
+                    lockedWeeks = data.lockedWeeks;
+                    console.log('Loaded locked weeks from WordPress:', lockedWeeks);
+                    updateWeekDisplay();
                 }
             } catch (error) {
-                console.error('Failed to load from localStorage:', error);
+                console.error('Failed to load from WordPress:', error);
+                showToast('Warning: Failed to load from database');
             }
         }
         
-        function clearLocalStorage() {
+        function clearSchedule() {
             if (confirm('Clear all scheduled events? This cannot be undone.')) {
-                localStorage.removeItem('tsl-scheduled-events');
                 scheduled = [];
                 renderSchedule();
+                saveToWordPress();
                 showToast('Schedule cleared');
             }
         }
@@ -808,8 +836,6 @@
                 showToast('Failed to load from database');
             }
         }
-        
-        document.getElementById('importBtn').onclick = importFromSupabase;
 
         // ============================================
         // LIBRARY RENDERING - FIXED FOR SPECIAL CHARS
@@ -994,9 +1020,9 @@
         function handleDrop(e) {
             e.preventDefault();
             
-            // NEW: Check if week is locked
+            // Check if week is locked
             if (isCurrentWeekLocked()) {
-                showToast('⚠️ Week is locked! Unlock it first to make changes.');
+                showToast('Week is locked! Unlock it first to make changes.');
                 document.querySelectorAll('.drag-preview').forEach(p => p.remove());
                 return;
             }
@@ -1054,7 +1080,7 @@
                 dragOffset = 0;
                 
                 renderSchedule();
-                saveToLocalStorage();
+                saveToWordPress();
                 showToast(`${draggedItem.fromSchedule ? 'Moved' : 'Scheduled'}: ${draggedItem.title}`);
                 
             } catch (error) {
@@ -1142,9 +1168,9 @@
         // ============================================
         
         function deleteEvent(scheduleId) {
-            // NEW: Check if week is locked
+            // Check if week is locked
             if (isCurrentWeekLocked()) {
-                showToast('⚠️ Week is locked! Unlock it first to delete events.');
+                showToast('Week is locked! Unlock it first to delete events.');
                 return;
             }
             
@@ -1155,7 +1181,7 @@
             if (confirm(`Delete ${event.title}?`)) {
                 scheduled.splice(index, 1);
                 renderSchedule();
-                saveToLocalStorage();
+                saveToWordPress();
                 showToast('Event deleted');
             }
         }
@@ -1294,9 +1320,9 @@
                     }
                 }
                 
-                saveToLocalStorage();
+                saveToWordPress();
                 
-                // NEW: Always lock week after push (regardless of outcome)
+                // Always lock week after push (regardless of outcome)
                 lockCurrentWeek();
                 
                 // RE-ENABLE BUTTON
@@ -1304,11 +1330,11 @@
                 pushBtn.textContent = 'Push to Google';
                 
                 if (errors === 0 && created > 0) {
-                    showToast(`✓ Pushed: ${created} created, ${skipped} skipped - Week locked!`);
+                    showToast(`Pushed: ${created} created, ${skipped} skipped - Week locked`);
                 } else if (errors === 0) {
-                    showToast(`✓ All events in Google: ${skipped} skipped - Week locked!`);
+                    showToast(`All events in Google: ${skipped} skipped - Week locked`);
                 } else {
-                    showToast(`⚠ Pushed: ${created} created, ${skipped} skipped, ${errors} failed - Week locked!`);
+                    showToast(`Pushed: ${created} created, ${skipped} skipped, ${errors} failed - Week locked`);
                 }
                 
             } catch (error) {
@@ -1328,12 +1354,11 @@
         // START THE APP
         // ============================================
         
-        loadLockedWeeksFromStorage(); // NEW: Load locked weeks
         setWeek(0);
-        loadFromLocalStorage();
-        importFromSupabase();
+        loadFromWordPress(); // Load events and locked weeks from WordPress
+        importFromSupabase(); // Auto-import library on startup
         
-        document.getElementById('clearBtn').onclick = clearLocalStorage;
+        document.getElementById('clearBtn').onclick = clearSchedule;
         
         const gapiScript = document.createElement('script');
         gapiScript.src = 'https://apis.google.com/js/api.js';
