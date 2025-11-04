@@ -723,25 +723,64 @@
         // ============================================
         
         function renderLibrary() {
-            const container = document.getElementById('library');
-            const search = document.getElementById('search').value.toLowerCase();
-            const recentFilter = document.getElementById('recentFilter').value;
-            
-            let filtered = library.filter(item => 
-                item.title.toLowerCase().includes(search)
-            );
-            
-            if (recentFilter !== 'all') {
-                const daysAgo = parseInt(recentFilter);
-                const cutoffDate = new Date();
-                cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
-                
-                filtered = filtered.filter(item => {
-                    if (!item.updatedAt) return true;
-                    const itemDate = new Date(item.updatedAt);
-                    return itemDate >= cutoffDate;
-                });
-            }
+    const container = document.getElementById('library');
+    const search = document.getElementById('search').value.toLowerCase();
+    const recentFilter = document.getElementById('recentFilter').value;
+    
+    let filtered = library.filter(item => 
+        item.title.toLowerCase().includes(search)
+    );
+    
+    if (recentFilter !== 'all') {
+        const daysAgo = parseInt(recentFilter);
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+        
+        filtered = filtered.filter(item => {
+            if (!item.updatedAt) return true;
+            const itemDate = new Date(item.updatedAt);
+            return itemDate >= cutoffDate;
+        });
+    }
+
+    document.getElementById('libCount').textContent = `(${filtered.length})`;
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🔍</div>
+                <div>No items found</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = filtered.map((item, index) => {
+        // Store item data by index instead of in attribute
+        window.libraryItemsCache = window.libraryItemsCache || {};
+        window.libraryItemsCache[index] = item;
+        
+        return `
+            <div class="library-item ${item.type}" draggable="true" data-item-index="${index}">
+                <div class="library-item-title">${item.title}</div>
+                <div class="library-item-info">${formatDuration(item.duration)} · ${item.type}</div>
+            </div>
+        `;
+    }).join('');
+
+    document.querySelectorAll('.library-item').forEach(el => {
+        el.addEventListener('dragstart', e => {
+            const index = parseInt(e.target.dataset.itemIndex);
+            draggedItem = window.libraryItemsCache[index];
+            dragOffset = 0;
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        
+        el.addEventListener('dragend', () => {
+            document.querySelectorAll('.drag-preview').forEach(p => p.remove());
+        });
+    });
+}
 
             document.getElementById('libCount').textContent = `(${filtered.length})`;
 
