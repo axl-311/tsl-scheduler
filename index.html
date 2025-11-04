@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v2.1 - Date Fixed</title>
+    <title>TSL Scheduler v2.2 - Fixed JSON Escaping</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
@@ -433,7 +433,7 @@
             <div>
                 <h1>
                     TSL Scheduler
-                    <span class="version">v2.1 FIXED</span>
+                    <span class="version">v2.2 FIXED</span>
                 </h1>
             </div>
             <div class="header-actions">
@@ -516,13 +516,16 @@
         let scheduled = [];
         let draggedItem = null;
         let dragOffset = 0;
+        
+        // FIXED: Cache for library items to avoid JSON in HTML attributes
+        window.libraryItemsCache = {};
 
         // ============================================
         // INITIALIZE
         // ============================================
         
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.log('TSL Scheduler v2.1 - Date Fixed initialized');
+        console.log('TSL Scheduler v2.2 - JSON Escaping Fixed');
 
         // ============================================
         // GOOGLE API
@@ -578,28 +581,22 @@
         };
 
         // ============================================
-        // WEEK NAVIGATION - FIXED FOR CUMULATIVE NAVIGATION
+        // WEEK NAVIGATION
         // ============================================
         
-        let weekOffset = 0; // Track cumulative offset from today
+        let weekOffset = 0;
         
         function setWeek(offset) {
-            // Update the offset cumulatively
             weekOffset += offset;
             
-            // Start from today
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
-            // Find Friday of current week
             const day = today.getDay();
             const daysFromFriday = (day + 2) % 7;
             
-            // Set to Friday of this week
             currentWeek = new Date(today);
             currentWeek.setDate(today.getDate() - daysFromFriday);
-            
-            // Apply cumulative offset
             currentWeek.setDate(currentWeek.getDate() + (weekOffset * 7));
             
             updateWeekDisplay();
@@ -607,14 +604,13 @@
         }
         
         function resetWeek() {
-            // Reset to current week
             weekOffset = 0;
             setWeek(0);
         }
 
         function updateWeekDisplay() {
             const end = new Date(currentWeek);
-            end.setDate(end.getDate() + 3); // Friday + 3 = Monday
+            end.setDate(end.getDate() + 3);
             const options = { month: 'short', day: 'numeric', year: 'numeric' };
             document.getElementById('weekDisplay').textContent = 
                 `${currentWeek.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
@@ -682,10 +678,11 @@
                 
                 if (movies.data) {
                     movies.data.forEach(m => {
+                        if (!m.title) return;
                         library.push({
                             id: `movie-${m.id}`,
                             title: m.title,
-                            duration: m.runtime_minutes || 120,
+                            duration: parseInt(m.runtime_minutes) || 120,
                             type: 'movie',
                             supabaseId: m.id,
                             table: 'movies',
@@ -696,10 +693,11 @@
                 
                 if (events.data) {
                     events.data.forEach(e => {
+                        if (!e.event_name) return;
                         library.push({
                             id: `event-${e.id}`,
                             title: e.event_name,
-                            duration: e.duration_minutes || 120,
+                            duration: parseInt(e.duration_minutes) || 120,
                             type: 'event',
                             supabaseId: e.id,
                             table: 'events',
@@ -719,68 +717,29 @@
         document.getElementById('importBtn').onclick = importFromSupabase;
 
         // ============================================
-        // LIBRARY RENDERING
+        // LIBRARY RENDERING - FIXED FOR SPECIAL CHARS
         // ============================================
         
         function renderLibrary() {
-    const container = document.getElementById('library');
-    const search = document.getElementById('search').value.toLowerCase();
-    const recentFilter = document.getElementById('recentFilter').value;
-    
-    let filtered = library.filter(item => 
-        item.title.toLowerCase().includes(search)
-    );
-    
-    if (recentFilter !== 'all') {
-        const daysAgo = parseInt(recentFilter);
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
-        
-        filtered = filtered.filter(item => {
-            if (!item.updatedAt) return true;
-            const itemDate = new Date(item.updatedAt);
-            return itemDate >= cutoffDate;
-        });
-    }
-
-    document.getElementById('libCount').textContent = `(${filtered.length})`;
-
-    if (filtered.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">🔍</div>
-                <div>No items found</div>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = filtered.map((item, index) => {
-        // Store item data by index instead of in attribute
-        window.libraryItemsCache = window.libraryItemsCache || {};
-        window.libraryItemsCache[index] = item;
-        
-        return `
-            <div class="library-item ${item.type}" draggable="true" data-item-index="${index}">
-                <div class="library-item-title">${item.title}</div>
-                <div class="library-item-info">${formatDuration(item.duration)} · ${item.type}</div>
-            </div>
-        `;
-    }).join('');
-
-    document.querySelectorAll('.library-item').forEach(el => {
-        el.addEventListener('dragstart', e => {
-            const index = parseInt(e.target.dataset.itemIndex);
-            draggedItem = window.libraryItemsCache[index];
-            dragOffset = 0;
-            e.dataTransfer.effectAllowed = 'move';
-        });
-        
-        el.addEventListener('dragend', () => {
-            document.querySelectorAll('.drag-preview').forEach(p => p.remove());
-        });
-    });
-}
+            const container = document.getElementById('library');
+            const search = document.getElementById('search').value.toLowerCase();
+            const recentFilter = document.getElementById('recentFilter').value;
+            
+            let filtered = library.filter(item => 
+                item.title.toLowerCase().includes(search)
+            );
+            
+            if (recentFilter !== 'all') {
+                const daysAgo = parseInt(recentFilter);
+                const cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+                
+                filtered = filtered.filter(item => {
+                    if (!item.updatedAt) return true;
+                    const itemDate = new Date(item.updatedAt);
+                    return itemDate >= cutoffDate;
+                });
+            }
 
             document.getElementById('libCount').textContent = `(${filtered.length})`;
 
@@ -794,21 +753,27 @@
                 return;
             }
 
-            container.innerHTML = filtered.map(item => `
-                <div class="library-item ${item.type}" draggable="true" data-item='${JSON.stringify(item)}'>
-                    <div class="library-item-title">${item.title}</div>
-                    <div class="library-item-info">${formatDuration(item.duration)} · ${item.type}</div>
-                </div>
-            `).join('');
+            // FIXED: Use cache instead of JSON in HTML attributes
+            container.innerHTML = filtered.map((item, index) => {
+                window.libraryItemsCache[index] = item;
+                
+                return `
+                    <div class="library-item ${item.type}" draggable="true" data-item-index="${index}">
+                        <div class="library-item-title">${item.title}</div>
+                        <div class="library-item-info">${formatDuration(item.duration)} · ${item.type}</div>
+                    </div>
+                `;
+            }).join('');
 
             document.querySelectorAll('.library-item').forEach(el => {
                 el.addEventListener('dragstart', e => {
-                    draggedItem = JSON.parse(e.target.dataset.item);
+                    const index = parseInt(e.target.dataset.itemIndex);
+                    draggedItem = window.libraryItemsCache[index];
                     dragOffset = 0;
                     e.dataTransfer.effectAllowed = 'move';
+                    console.log('Dragging:', draggedItem.title);
                 });
                 
-                // Cleanup previews when drag ends
                 el.addEventListener('dragend', () => {
                     document.querySelectorAll('.drag-preview').forEach(p => p.remove());
                 });
@@ -840,7 +805,7 @@
         }
 
         // ============================================
-        // SCHEDULE RENDERING - FIXED DATES
+        // SCHEDULE RENDERING
         // ============================================
         
         function renderSchedule() {
@@ -850,7 +815,7 @@
             let html = '';
             for (let i = 0; i < 4; i++) {
                 const date = new Date(currentWeek);
-                date.setDate(date.getDate() + i); // FIXED: Friday + 0, +1, +2, +3
+                date.setDate(date.getDate() + i);
                 
                 html += `
                     <div class="day-column">
@@ -869,7 +834,7 @@
                                                     `<div class="time-label">${displayHour}${period}</div>` 
                                                     : ''}
                                             </div>
-                                        `}).join('')}
+                                        `;}).join('')}
                                     </div>
                                 </div>
                             `).join('')}
@@ -897,7 +862,6 @@
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             
-            // Remove ALL existing previews first (cleanup from other grids)
             document.querySelectorAll('.drag-preview').forEach(p => p.remove());
             
             const rect = this.getBoundingClientRect();
@@ -909,7 +873,6 @@
             
             const snappedY = Math.round(y / 20) * 20;
             
-            // Create fresh preview in current grid
             const preview = document.createElement('div');
             preview.className = 'drag-preview';
             this.appendChild(preview);
@@ -924,7 +887,6 @@
         }
 
         function handleDragLeave(e) {
-            // Only cleanup if leaving the grid entirely (not just moving to child elements)
             if (!e.currentTarget.contains(e.relatedTarget)) {
                 document.querySelectorAll('.drag-preview').forEach(p => p.remove());
             }
@@ -933,51 +895,66 @@
         function handleDrop(e) {
             e.preventDefault();
             
-            // Remove ALL previews everywhere
             document.querySelectorAll('.drag-preview').forEach(p => p.remove());
             
-            if (!draggedItem) return;
-            
-            const rect = this.getBoundingClientRect();
-            let y = e.clientY - rect.top;
-            
-            if (dragOffset > 0) {
-                y = y - dragOffset;
+            if (!draggedItem) {
+                console.error('No dragged item');
+                return;
             }
             
-            const snappedY = Math.round(y / 20) * 20;
+            // Validate dragged item
+            if (!draggedItem.title || !draggedItem.duration) {
+                console.error('Invalid dragged item:', draggedItem);
+                showToast('Error: Invalid event data');
+                return;
+            }
             
-            const day = parseInt(this.dataset.day);
-            const theater = parseInt(this.dataset.theater);
-            const hour = Math.floor(snappedY / 80) + 12;
-            const min = Math.round((snappedY % 80) / 80 * 60);
-            
-            const date = new Date(currentWeek);
-            date.setDate(date.getDate() + day); // FIXED: Friday + day offset
-            date.setHours(hour, min, 0, 0);
-            
-            if (draggedItem.fromSchedule && draggedItem.scheduleId) {
-                const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
-                if (index !== -1) {
-                    scheduled.splice(index, 1);
+            try {
+                const rect = this.getBoundingClientRect();
+                let y = e.clientY - rect.top;
+                
+                if (dragOffset > 0) {
+                    y = y - dragOffset;
                 }
+                
+                const snappedY = Math.round(y / 20) * 20;
+                
+                const day = parseInt(this.dataset.day);
+                const theater = parseInt(this.dataset.theater);
+                const hour = Math.floor(snappedY / 80) + 12;
+                const min = Math.round((snappedY % 80) / 80 * 60);
+                
+                const date = new Date(currentWeek);
+                date.setDate(date.getDate() + day);
+                date.setHours(hour, min, 0, 0);
+                
+                if (draggedItem.fromSchedule && draggedItem.scheduleId) {
+                    const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
+                    if (index !== -1) {
+                        scheduled.splice(index, 1);
+                    }
+                }
+                
+                scheduled.push({
+                    ...draggedItem,
+                    day,
+                    theater,
+                    startTime: date,
+                    position: snappedY,
+                    scheduleId: `sched-${Date.now()}`,
+                    fromSchedule: false
+                });
+                
+                dragOffset = 0;
+                
+                renderSchedule();
+                saveToLocalStorage();
+                showToast(`${draggedItem.fromSchedule ? 'Moved' : 'Scheduled'}: ${draggedItem.title}`);
+                
+            } catch (error) {
+                console.error('Drop error:', error);
+                showToast('Error scheduling event');
             }
-            
-            scheduled.push({
-                ...draggedItem,
-                day,
-                theater,
-                startTime: date,
-                position: snappedY,
-                scheduleId: `sched-${Date.now()}`,
-                fromSchedule: false
-            });
-            
-            dragOffset = 0;
-            
-            renderSchedule();
-            saveToLocalStorage();
-            showToast(`${draggedItem.fromSchedule ? 'Moved' : 'Scheduled'}: ${draggedItem.title}`);
         }
 
         // ============================================
@@ -985,31 +962,24 @@
         // ============================================
         
         function renderScheduledEvents() {
-            // Calculate the date range for current week (Fri-Mon)
             const weekStart = new Date(currentWeek);
             weekStart.setHours(0, 0, 0, 0);
             
             const weekEnd = new Date(currentWeek);
-            weekEnd.setDate(weekEnd.getDate() + 3); // Friday + 3 = Monday
+            weekEnd.setDate(weekEnd.getDate() + 3);
             weekEnd.setHours(23, 59, 59, 999);
             
-            console.log(`Week range: ${weekStart.toDateString()} - ${weekEnd.toDateString()}`);
-            
-            // Filter and render events that fall in this week
             scheduled.forEach((event) => {
                 const eventDate = new Date(event.startTime);
                 
-                // Check if event falls within current week
                 if (eventDate < weekStart || eventDate > weekEnd) {
-                    return; // Skip events not in this week
+                    return;
                 }
                 
-                // Calculate which day column (0-3) based on actual date
                 const eventDayStart = new Date(eventDate);
                 eventDayStart.setHours(0, 0, 0, 0);
                 const daysDiff = Math.floor((eventDayStart - weekStart) / (1000 * 60 * 60 * 24));
                 
-                // Find the grid for this day and theater
                 const grid = document.querySelector(`[data-day="${daysDiff}"][data-theater="${event.theater}"]`);
                 if (!grid) return;
                 
@@ -1019,8 +989,8 @@
                 block.style.height = `${event.duration * 80 / 60}px`;
                 block.draggable = true;
                 
-                const hour = event.startTime.getHours();
-                const min = event.startTime.getMinutes();
+                const hour = eventDate.getHours();
+                const min = eventDate.getMinutes();
                 const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
                 const period = hour >= 12 ? 'PM' : 'AM';
                 
@@ -1037,7 +1007,6 @@
                     e.dataTransfer.effectAllowed = 'move';
                 });
                 
-                // Cleanup previews when drag ends
                 block.addEventListener('dragend', () => {
                     document.querySelectorAll('.drag-preview').forEach(p => p.remove());
                 });
