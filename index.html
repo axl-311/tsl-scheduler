@@ -1295,12 +1295,14 @@
                 pushBtn.disabled = false;
                 pushBtn.textContent = 'Push to Google';
                 
-                if (errors === 0 && created > 0) {
-                    // NEW: Lock the week after successful push
+                if (errors === 0) {
+                    // NEW: Lock the week after successful push (even if all skipped)
                     lockCurrentWeek();
-                    showToast(`✓ Pushed: ${created} created, ${skipped} skipped - Week locked!`);
-                } else if (errors === 0) {
-                    showToast(`✓ All events already pushed: ${skipped} skipped`);
+                    if (created > 0) {
+                        showToast(`✓ Pushed: ${created} created, ${skipped} skipped - Week locked!`);
+                    } else {
+                        showToast(`✓ All events already in Google: ${skipped} skipped - Week locked!`);
+                    }
                 } else {
                     showToast(`⚠ Pushed: ${created} created, ${skipped} skipped, ${errors} failed`);
                 }
