@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v2.2 - Fixed JSON Escaping</title>
+    <title>TSL Scheduler v2.3 - Per-Week Locking</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
@@ -106,6 +106,15 @@
             background: #30a852;
         }
 
+        .btn-warning {
+            background: #ff9500;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #e68600;
+        }
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -132,7 +141,7 @@
         .week-display {
             font-size: 16px;
             font-weight: 500;
-            min-width: 250px;
+            min-width: 350px;
             text-align: center;
         }
 
@@ -433,7 +442,7 @@
             <div>
                 <h1>
                     TSL Scheduler
-                    <span class="version">v2.2 FIXED</span>
+                    <span class="version">v2.3 LOCKED</span>
                 </h1>
             </div>
             <div class="header-actions">
@@ -451,7 +460,7 @@
             </div>
             <div class="control-actions">
                 <button class="btn btn-primary" id="importBtn">Import from Database</button>
-                <button class="btn btn-primary" id="syncBtn" disabled>Sync Google</button>
+                <button class="btn btn-warning" id="unlockBtn" style="display:none;">🔓 Unlock Week</button>
                 <button class="btn btn-primary" id="pushBtn" disabled>Push to Google</button>
                 <button class="btn btn-secondary" id="clearBtn">Clear Schedule</button>
             </div>
@@ -516,6 +525,7 @@
         let scheduled = [];
         let draggedItem = null;
         let dragOffset = 0;
+        let lockedWeeks = {}; // NEW: Track locked weeks by Friday date string
         
         // FIXED: Cache for library items to avoid JSON in HTML attributes
         window.libraryItemsCache = {};
@@ -525,7 +535,7 @@
         // ============================================
         
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.log('TSL Scheduler v2.2 - JSON Escaping Fixed');
+        console.log('TSL Scheduler v2.3 - Per-Week Locking');
 
         // ============================================
         // GOOGLE API
@@ -550,8 +560,7 @@
                         accessToken = response.access_token;
                         document.getElementById('status').textContent = 'Connected';
                         document.getElementById('status').classList.add('connected');
-                        document.getElementById('syncBtn').disabled = false;
-                        document.getElementById('pushBtn').disabled = false;
+                        updateWeekDisplay(); // Update button states
                         showToast('Connected to Google Calendar');
                     }
                 },
@@ -568,8 +577,7 @@
                 accessToken = null;
                 document.getElementById('status').textContent = 'Not connected';
                 document.getElementById('status').classList.remove('connected');
-                document.getElementById('syncBtn').disabled = true;
-                document.getElementById('pushBtn').disabled = true;
+                updateWeekDisplay(); // Update button states
                 showToast('Disconnected from Google Calendar');
             } else {
                 if (window.tokenClient) {
@@ -579,6 +587,60 @@
                 }
             }
         };
+
+        // ============================================
+        // WEEK LOCKING SYSTEM - NEW!
+        // ============================================
+        
+        function getFridayOfWeek(date) {
+            const d = new Date(date);
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function isCurrentWeekLocked() {
+            const friday = getFridayOfWeek(currentWeek);
+            const weekKey = formatDate(friday);
+            return lockedWeeks[weekKey] || false;
+        }
+
+        function lockCurrentWeek() {
+            const friday = getFridayOfWeek(currentWeek);
+            const weekKey = formatDate(friday);
+            lockedWeeks[weekKey] = true;
+            saveLockedWeeksToStorage();
+            updateWeekDisplay();
+            renderSchedule();
+            showToast('Week locked! 🔒');
+        }
+
+        function unlockCurrentWeek() {
+            if (!confirm('Unlock this week for editing? You will need to re-push to Google after making changes.')) {
+                return;
+            }
+            const friday = getFridayOfWeek(currentWeek);
+            const weekKey = formatDate(friday);
+            delete lockedWeeks[weekKey];
+            saveLockedWeeksToStorage();
+            updateWeekDisplay();
+            renderSchedule();
+            showToast('Week unlocked! 📝');
+        }
+
+        function saveLockedWeeksToStorage() {
+            localStorage.setItem('tsl-locked-weeks', JSON.stringify(lockedWeeks));
+        }
+
+        function loadLockedWeeksFromStorage() {
+            const saved = localStorage.getItem('tsl-locked-weeks');
+            if (saved) {
+                lockedWeeks = JSON.parse(saved);
+            }
+        }
 
         // ============================================
         // WEEK NAVIGATION
@@ -609,15 +671,43 @@
         }
 
         function updateWeekDisplay() {
+            const friday = getFridayOfWeek(currentWeek);
             const end = new Date(currentWeek);
             end.setDate(end.getDate() + 3);
+            
+            const weekKey = formatDate(friday);
+            const isLocked = lockedWeeks[weekKey] || false;
+            
+            const lockStatus = isLocked 
+                ? ' <span style="color: #ff4444; font-weight: bold;">🔒 LOCKED</span>' 
+                : ' <span style="color: #4CAF50; font-weight: bold;">📝 DRAFT</span>';
+            
             const options = { month: 'short', day: 'numeric', year: 'numeric' };
-            document.getElementById('weekDisplay').textContent = 
-                `${currentWeek.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
+            document.getElementById('weekDisplay').innerHTML = 
+                `${currentWeek.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}${lockStatus}`;
+            
+            // Update push button state
+            const pushBtn = document.getElementById('pushBtn');
+            const unlockBtn = document.getElementById('unlockBtn');
+            
+            if (isLocked) {
+                pushBtn.disabled = true;
+                pushBtn.textContent = '🔒 Week Locked';
+                pushBtn.style.opacity = '0.5';
+                pushBtn.style.cursor = 'not-allowed';
+                unlockBtn.style.display = 'inline-block';
+            } else {
+                pushBtn.disabled = !accessToken;
+                pushBtn.textContent = '📤 Push to Google';
+                pushBtn.style.opacity = '1';
+                pushBtn.style.cursor = 'pointer';
+                unlockBtn.style.display = 'none';
+            }
         }
 
         document.getElementById('prevWeek').onclick = () => setWeek(-1);
         document.getElementById('nextWeek').onclick = () => setWeek(1);
+        document.getElementById('unlockBtn').onclick = unlockCurrentWeek;
 
         // ============================================
         // SAVE/LOAD TO LOCALSTORAGE
@@ -811,6 +901,7 @@
         function renderSchedule() {
             const container = document.getElementById('schedule');
             const days = ['Friday', 'Saturday', 'Sunday', 'Monday'];
+            const isLocked = isCurrentWeekLocked();
             
             let html = '';
             for (let i = 0; i < 4; i++) {
@@ -824,7 +915,7 @@
                             ${[1, 2].map(theater => `
                                 <div class="theater">
                                     <div class="theater-header">T${theater}</div>
-                                    <div class="theater-grid" data-day="${i}" data-theater="${theater}">
+                                    <div class="theater-grid" data-day="${i}" data-theater="${theater}" ${isLocked ? 'style="opacity: 0.7;"' : ''}>
                                         ${Array.from({length: 12}, (_, hour) => {
                                             const displayHour = (hour + 12) > 12 ? (hour + 12) - 12 : (hour + 12);
                                             const period = (hour + 12) >= 12 ? 'PM' : 'AM';
@@ -845,11 +936,14 @@
             
             container.innerHTML = html;
             
-            document.querySelectorAll('.theater-grid').forEach(grid => {
-                grid.addEventListener('dragover', handleDragOver);
-                grid.addEventListener('dragleave', handleDragLeave);
-                grid.addEventListener('drop', handleDrop);
-            });
+            // Only enable drag/drop if week is NOT locked
+            if (!isLocked) {
+                document.querySelectorAll('.theater-grid').forEach(grid => {
+                    grid.addEventListener('dragover', handleDragOver);
+                    grid.addEventListener('dragleave', handleDragLeave);
+                    grid.addEventListener('drop', handleDrop);
+                });
+            }
             
             renderScheduledEvents();
         }
@@ -894,6 +988,13 @@
 
         function handleDrop(e) {
             e.preventDefault();
+            
+            // NEW: Check if week is locked
+            if (isCurrentWeekLocked()) {
+                showToast('⚠️ Week is locked! Unlock it first to make changes.');
+                document.querySelectorAll('.drag-preview').forEach(p => p.remove());
+                return;
+            }
             
             document.querySelectorAll('.drag-preview').forEach(p => p.remove());
             
@@ -969,6 +1070,8 @@
             weekEnd.setDate(weekEnd.getDate() + 3);
             weekEnd.setHours(23, 59, 59, 999);
             
+            const isLocked = isCurrentWeekLocked();
+            
             scheduled.forEach((event) => {
                 const eventDate = new Date(event.startTime);
                 
@@ -987,7 +1090,11 @@
                 block.className = `event-block ${event.type === 'movie' ? `movie-t${event.theater}` : 'event'}`;
                 block.style.top = `${event.position}px`;
                 block.style.height = `${event.duration * 80 / 60}px`;
-                block.draggable = true;
+                
+                // Only make draggable if week is NOT locked
+                if (!isLocked) {
+                    block.draggable = true;
+                }
                 
                 const hour = eventDate.getHours();
                 const min = eventDate.getMinutes();
@@ -997,24 +1104,29 @@
                 block.innerHTML = `
                     <div class="event-title">${event.title}</div>
                     <div class="event-time">${displayHour}:${min.toString().padStart(2,'0')} ${period} · ${formatDuration(event.duration)}</div>
-                    <button class="delete-btn">×</button>
+                    ${!isLocked ? '<button class="delete-btn">×</button>' : ''}
                 `;
                 
-                block.addEventListener('dragstart', e => {
-                    const rect = block.getBoundingClientRect();
-                    dragOffset = e.clientY - rect.top;
-                    draggedItem = { ...event, fromSchedule: true, scheduleId: event.scheduleId };
-                    e.dataTransfer.effectAllowed = 'move';
-                });
-                
-                block.addEventListener('dragend', () => {
-                    document.querySelectorAll('.drag-preview').forEach(p => p.remove());
-                });
-                
-                block.querySelector('.delete-btn').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteEvent(event.scheduleId);
-                });
+                if (!isLocked) {
+                    block.addEventListener('dragstart', e => {
+                        const rect = block.getBoundingClientRect();
+                        dragOffset = e.clientY - rect.top;
+                        draggedItem = { ...event, fromSchedule: true, scheduleId: event.scheduleId };
+                        e.dataTransfer.effectAllowed = 'move';
+                    });
+                    
+                    block.addEventListener('dragend', () => {
+                        document.querySelectorAll('.drag-preview').forEach(p => p.remove());
+                    });
+                    
+                    const deleteBtn = block.querySelector('.delete-btn');
+                    if (deleteBtn) {
+                        deleteBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            deleteEvent(event.scheduleId);
+                        });
+                    }
+                }
                 
                 grid.appendChild(block);
             });
@@ -1025,6 +1137,12 @@
         // ============================================
         
         function deleteEvent(scheduleId) {
+            // NEW: Check if week is locked
+            if (isCurrentWeekLocked()) {
+                showToast('⚠️ Week is locked! Unlock it first to delete events.');
+                return;
+            }
+            
             const index = scheduled.findIndex(e => e.scheduleId === scheduleId);
             if (index === -1) return;
             
@@ -1038,17 +1156,8 @@
         }
 
         // ============================================
-        // GOOGLE CALENDAR SYNC
+        // GOOGLE CALENDAR PUSH
         // ============================================
-        
-        document.getElementById('syncBtn').onclick = async () => {
-            if (!accessToken) {
-                showToast('Please connect to Google first');
-                return;
-            }
-            
-            showToast('Google sync coming soon!');
-        };
 
         document.getElementById('pushBtn').onclick = async () => {
             if (!accessToken) {
@@ -1104,10 +1213,9 @@
                             }
                         };
                         
-                        let existingEventId = null;
                         let shouldSkip = false;
                         
-                        // FIRST: Check if we have a saved googleEventId
+                        // Check if we have a saved googleEventId
                         if (event.googleEventId) {
                             try {
                                 const checkResponse = await gapi.client.calendar.events.get({
@@ -1115,7 +1223,6 @@
                                     eventId: event.googleEventId
                                 });
                                 if (checkResponse.status === 200) {
-                                    // Event exists and we know about it - skip
                                     shouldSkip = true;
                                     console.log(`Skipping: ${event.title} (already in Google)`);
                                 }
@@ -1124,7 +1231,7 @@
                             }
                         }
                         
-                        // SECOND: If no saved ID, search for duplicate by title + time
+                        // If no saved ID, search for duplicate by title + time
                         if (!shouldSkip && !event.googleEventId) {
                             try {
                                 const searchResponse = await gapi.client.calendar.events.list({
@@ -1136,7 +1243,6 @@
                                 });
                                 
                                 if (searchResponse.result.items && searchResponse.result.items.length > 0) {
-                                    // Found existing event with same title and time
                                     const match = searchResponse.result.items.find(item => 
                                         item.summary === event.title &&
                                         item.start.dateTime === startTime.toISOString()
@@ -1144,7 +1250,6 @@
                                     
                                     if (match) {
                                         shouldSkip = true;
-                                        existingEventId = match.id;
                                         
                                         // Save the ID so we don't search next time
                                         const idx = scheduled.findIndex(e => e.scheduleId === event.scheduleId);
@@ -1161,7 +1266,6 @@
                         }
                         
                         if (shouldSkip) {
-                            // SKIP - event already exists with same title and time
                             skipped++;
                         } else {
                             // CREATE new event
@@ -1191,8 +1295,12 @@
                 pushBtn.disabled = false;
                 pushBtn.textContent = 'Push to Google';
                 
-                if (errors === 0) {
-                    showToast(`✓ Pushed: ${created} created, ${skipped} skipped`);
+                if (errors === 0 && created > 0) {
+                    // NEW: Lock the week after successful push
+                    lockCurrentWeek();
+                    showToast(`✓ Pushed: ${created} created, ${skipped} skipped - Week locked!`);
+                } else if (errors === 0) {
+                    showToast(`✓ All events already pushed: ${skipped} skipped`);
                 } else {
                     showToast(`⚠ Pushed: ${created} created, ${skipped} skipped, ${errors} failed`);
                 }
@@ -1211,6 +1319,7 @@
         // START THE APP
         // ============================================
         
+        loadLockedWeeksFromStorage(); // NEW: Load locked weeks
         setWeek(0);
         loadFromLocalStorage();
         importFromSupabase();
