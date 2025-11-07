@@ -422,6 +422,7 @@
           // Construct full URL
           const link = `${baseUrl}/${postType}/${slug}`;
           a.href = link;
+          a.target = '_parent'; // Break out of iframe
 
           let timeText='';
           if(ev.start.dateTime){
