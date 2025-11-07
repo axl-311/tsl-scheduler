@@ -384,12 +384,23 @@
           const a=document.createElement('a');
           a.className = `event ${ev.calendarType}`;
 
-          let link = ev.htmlLink || '#';
-          if(ev.description){
-            const m = ev.description.match(/https?:\/\/[^\s<>"{}|\\^`[\]]+/i);
-            if(m && m[0]) link = m[0];
+          // Generate slug from event title
+          const title = ev.summary || 'Untitled Event';
+          const slug = title.toLowerCase()
+            .replace(/[^\w\s-]/g, '') // Remove special chars
+            .replace(/\s+/g, '-')      // Replace spaces with hyphens
+            .replace(/--+/g, '-')      // Replace multiple hyphens
+            .trim();
+
+          // Determine post type based on calendar
+          let postType = 'movies'; // default
+          if(ev.calendarType === 'special-events') {
+            postType = 'events';
           }
-          a.href = link; a.target='_blank'; a.rel='noopener noreferrer';
+
+          // Use relative URL (works on staging and live)
+          const link = `/${postType}/${slug}`;
+          a.href = link;
 
           let timeText='';
           if(ev.start.dateTime){
