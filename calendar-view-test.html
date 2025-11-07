@@ -398,8 +398,29 @@
             postType = 'events';
           }
 
-          // Use relative URL (works on staging and live)
-          const link = `/${postType}/${slug}`;
+          // Smart domain detection
+          const currentDomain = window.location.hostname;
+          let baseUrl = '';
+          
+          // If on GitHub Pages, point to WordPress staging
+          if(currentDomain.includes('github.io')) {
+            baseUrl = 'https://new.site.sesmultimedia.com';
+          }
+          // If on staging, use relative URLs
+          else if(currentDomain.includes('new.site.sesmultimedia.com')) {
+            baseUrl = '';
+          }
+          // If on live site, use relative URLs
+          else if(currentDomain.includes('timeandspace.org')) {
+            baseUrl = '';
+          }
+          // Default fallback
+          else {
+            baseUrl = '';
+          }
+
+          // Construct full URL
+          const link = `${baseUrl}/${postType}/${slug}`;
           a.href = link;
 
           let timeText='';
