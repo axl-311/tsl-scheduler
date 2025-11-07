@@ -407,7 +407,6 @@
             const t=new Date(ev.start.dateTime);
             timeText = t.toLocaleTimeString('en-US',{hour:'numeric', minute:'2-digit', hour12:true});
           }
-          const title = ev.summary || 'Untitled Event';
           a.innerHTML = `<div>${title}</div>${timeText?`<div class="event-time">${timeText}</div>`:''}`;
           cell.appendChild(a);
         });
