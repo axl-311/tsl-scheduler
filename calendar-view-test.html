@@ -26,9 +26,9 @@
     color: var(--tsl-gray-900);
     -webkit-font-smoothing:antialiased;
     -moz-osx-font-smoothing:grayscale;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: "avenir-next-lt-pro", "Avenir Next", sans-serif;
     line-height:1.35;
-    letter-spacing:0;
+    letter-spacing:-0.015em;
   }
 
   .calendar-wrap{
@@ -47,7 +47,7 @@
     display:flex; align-items:baseline; gap:12px; margin-bottom:30px;
   }
   .brand h1{
-    font-size:36px; font-weight:600; letter-spacing:0; color:var(--tsl-black);
+    font-size:36px; font-weight:500; letter-spacing:0; color:var(--tsl-black);
   }
   .status{
     font-size:10px; text-transform:uppercase; letter-spacing:.06em;
@@ -62,7 +62,7 @@
     align-items:center;
   }
   .month-display{
-    font-size:20px; font-weight:600;
+    font-size:20px; font-weight:500;
   }
 
   .controls{
@@ -74,8 +74,9 @@
   }
   .view-btn{
     appearance:none; border:none; background:var(--tsl-white); color:var(--tsl-black);
-    font:500 14px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font:500 14px/1 "avenir-next-lt-pro", "Avenir Next", sans-serif;
     padding:8px 16px; cursor:pointer; transition:background .2s ease, color .2s ease;
+    letter-spacing:-0.015em;
   }
   .view-btn + .view-btn{ border-left:1px solid var(--tsl-black); }
   .view-btn:hover{ background:#f5f5f5; }
@@ -84,8 +85,9 @@
   .nav-btn{
     appearance:none; background:var(--tsl-white);
     border:1px solid var(--tsl-black); color:var(--tsl-black);
-    font:500 14px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font:500 14px/1 "avenir-next-lt-pro", "Avenir Next", sans-serif;
     padding:8px 16px; cursor:pointer; transition:background .2s ease;
+    letter-spacing:-0.015em;
   }
   .nav-btn:hover{ background:#f5f5f5; }
 
@@ -107,7 +109,7 @@
     margin-top:20px; margin-bottom:60px;
   }
   .day-header{
-    font:500 11px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font:500 11px/1 "avenir-next-lt-pro", "Avenir Next", sans-serif;
     letter-spacing:.08em; text-transform:uppercase; color:var(--tsl-black);
     padding:12px 8px; text-align:center; background:var(--tsl-gray-100);
     border-right:1px solid #ddd; border-bottom:1px solid #ddd;
@@ -121,7 +123,9 @@
   }
   .other-month{ background:#fafafa; color:#bbb; }
   .day-number{
-    font:500 12px/1 "Helvetica Neue", Helvetica, Arial, sans-serif; color:var(--tsl-black); margin-bottom:4px;
+    font:500 12px/1 "avenir-next-lt-pro", "Avenir Next", sans-serif; 
+    color:var(--tsl-black); margin-bottom:4px;
+    letter-spacing:-0.015em;
   }
   .today{
     background:#fff8f7;
@@ -134,14 +138,31 @@
     background:var(--tsl-white);
     border:1px solid #ddd;
     padding:6px 8px;
-    font:500 11px/1.25 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font:500 11px/1.25 "avenir-next-lt-pro", "Avenir Next", sans-serif;
     transition:border-color .2s ease, background .2s ease;
+    letter-spacing:-0.015em;
   }
   .event:hover{ border-color:#000; background:#fafafa; }
-  .event-time{ font:400 10px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif; color:var(--tsl-gray-700); margin-top:3px; }
+  .event-time{ 
+    font:400 10px/1.2 "avenir-next-lt-pro", "Avenir Next", sans-serif; 
+    color:var(--tsl-gray-700); margin-top:3px;
+    letter-spacing:-0.015em;
+  }
 
   .event.special-events{ border-left:3px solid var(--tsl-red); }
   .event.movies{ border-left:3px solid var(--tsl-blue); }
+
+  /* Past event styling */
+  .event.past{
+    opacity:0.5;
+    pointer-events:none;
+    cursor:default;
+    color:var(--tsl-gray-600);
+  }
+  .event.past:hover{
+    border-color:#ddd;
+    background:var(--tsl-white);
+  }
 
   .calendar-grid.week-view{
     border:none; gap:12px; grid-template-columns:repeat(7, 1fr);
@@ -153,7 +174,8 @@
   .calendar-grid.week-view .day-cell .day-header-inline{
     background:var(--tsl-gray-100); border:1px solid #ddd;
     padding:10px 8px; margin-bottom:12px;
-    font:500 12px/1 "Helvetica Neue", Helvetica, Arial, sans-serif; text-transform:uppercase; letter-spacing:.06em;
+    font:500 12px/1 "avenir-next-lt-pro", "Avenir Next", sans-serif; 
+    text-transform:uppercase; letter-spacing:.06em;
   }
 
   .loading{
@@ -384,16 +406,25 @@
           const a=document.createElement('a');
           a.className = `event ${ev.calendarType}`;
 
+          // Check if event is in the past
+          const eventDateTime = new Date(ev.start.dateTime || ev.start.date);
+          const now = new Date();
+          const isPast = eventDateTime < now;
+          
+          if(isPast){
+            a.classList.add('past');
+          }
+
           // Generate slug from event title
           const title = ev.summary || 'Untitled Event';
           const slug = title.toLowerCase()
-            .replace(/[^\w\s-]/g, '') // Remove special chars
-            .replace(/\s+/g, '-')      // Replace spaces with hyphens
-            .replace(/--+/g, '-')      // Replace multiple hyphens
+            .replace(/[^\w\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/--+/g, '-')
             .trim();
 
           // Determine post type based on calendar
-          let postType = 'movies'; // default
+          let postType = 'movies';
           if(ev.calendarType === 'special-events') {
             postType = 'events';
           }
@@ -402,27 +433,22 @@
           const currentDomain = window.location.hostname;
           let baseUrl = '';
           
-          // If on GitHub Pages, point to WordPress staging
           if(currentDomain.includes('github.io')) {
             baseUrl = 'https://new.site.sesmultimedia.com';
           }
-          // If on staging, use relative URLs
           else if(currentDomain.includes('new.site.sesmultimedia.com')) {
             baseUrl = '';
           }
-          // If on live site, use relative URLs
           else if(currentDomain.includes('timeandspace.org')) {
             baseUrl = '';
           }
-          // Default fallback
           else {
             baseUrl = '';
           }
 
-          // Construct full URL
           const link = `${baseUrl}/${postType}/${slug}`;
           a.href = link;
-          a.target = '_parent'; // Break out of iframe
+          a.target = '_parent';
 
           let timeText='';
           if(ev.start.dateTime){
