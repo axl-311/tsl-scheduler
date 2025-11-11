@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v2.4 - WordPress Database</title>
+    <title>TSL Scheduler v2.5 - Direct WordPress</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
@@ -60,11 +60,6 @@
             padding: 8px 16px;
             border-radius: 20px;
             font-size: 14px;
-            background: #e8e8e8;
-            color: #86868b;
-        }
-
-        .status.connected {
             background: #e8f5e9;
             color: #2e7d32;
         }
@@ -442,12 +437,11 @@
             <div>
                 <h1>
                     TSL Scheduler
-                    <span class="version">v2.4</span>
+                    <span class="version">v2.5</span>
                 </h1>
             </div>
             <div class="header-actions">
-                <div class="status" id="status">Not connected</div>
-                <button class="btn btn-success" id="authBtn">Connect Google</button>
+                <div class="status">WordPress Connected</div>
             </div>
         </div>
 
@@ -461,7 +455,7 @@
             </div>
             <div class="control-actions">
                 <button class="btn btn-warning" id="unlockBtn" style="display:none;">Unlock Week</button>
-                <button class="btn btn-primary" id="pushBtn" disabled>Push to Google</button>
+                <button class="btn btn-success" id="lockBtn">Save & Lock Week</button>
                 <button class="btn btn-secondary" id="clearBtn">Clear Schedule</button>
             </div>
         </div>
@@ -501,35 +495,23 @@
         // CONFIGURATION
         // ============================================
         
-        const WORDPRESS_URL = 'https://new.site.sesmultimedia.com'; // NEW SITE
+        const WORDPRESS_URL = 'https://new.site.sesmultimedia.com';
         
         const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
-        
-        const CLIENT_ID = '805806936738-svig4rs4b96t849n81b7e5hi8p44qo0v.apps.googleusercontent.com';
-        const API_KEY = 'AIzaSyDzisAik43Rr1xTJXg2bHXNF_XRTjjZsh8';
-        const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
-        
-        const CALENDARS = {
-            'events': '1ed95b09dcc5ea1a1e13267b6654eca3c892fc79c23e2e9edc1e271411967255@group.calendar.google.com',
-            'theater-1': '007f10222d517076d028161a4cda7108e75444c18ef7ac0d79aee420313d1a7b@group.calendar.google.com',
-            'theater-2': 'ed801a88ce91b43543ef4e87c34d1405a6e053c5254e55e2871f0d305ecc32c4@group.calendar.google.com'
-        };
 
         // ============================================
         // STATE
         // ============================================
         
         let supabase = null;
-        let accessToken = null;
         let currentWeek = new Date();
         let library = [];
         let scheduled = [];
         let draggedItem = null;
         let dragOffset = 0;
-        let lockedWeeks = {}; // NEW: Track locked weeks by Friday date string
+        let lockedWeeks = {};
         
-        // FIXED: Cache for library items to avoid JSON in HTML attributes
         window.libraryItemsCache = {};
 
         // ============================================
@@ -537,61 +519,10 @@
         // ============================================
         
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.log('TSL Scheduler v2.4 - WordPress Database Storage');
+        console.log('TSL Scheduler v2.5 - Direct WordPress Storage');
 
         // ============================================
-        // GOOGLE API
-        // ============================================
-        
-        function initGoogleAPI() {
-            gapi.load('client', async () => {
-                await gapi.client.init({
-                    apiKey: API_KEY,
-                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']
-                });
-                console.log('Google API client initialized');
-            });
-        }
-        
-        function initOAuth() {
-            const tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: (response) => {
-                    if (response.access_token) {
-                        accessToken = response.access_token;
-                        document.getElementById('status').textContent = 'Connected';
-                        document.getElementById('status').classList.add('connected');
-                        updateWeekDisplay(); // Update button states
-                        showToast('Connected to Google Calendar');
-                    }
-                },
-            });
-            
-            window.tokenClient = tokenClient;
-        }
-
-        document.getElementById('authBtn').onclick = () => {
-            if (accessToken) {
-                google.accounts.oauth2.revoke(accessToken, () => {
-                    console.log('Access token revoked');
-                });
-                accessToken = null;
-                document.getElementById('status').textContent = 'Not connected';
-                document.getElementById('status').classList.remove('connected');
-                updateWeekDisplay(); // Update button states
-                showToast('Disconnected from Google Calendar');
-            } else {
-                if (window.tokenClient) {
-                    window.tokenClient.requestAccessToken();
-                } else {
-                    showToast('Authentication not ready. Please refresh the page.');
-                }
-            }
-        };
-
-        // ============================================
-        // WEEK LOCKING SYSTEM - NEW!
+        // WEEK LOCKING SYSTEM
         // ============================================
         
         function getFridayOfWeek(date) {
@@ -611,18 +542,23 @@
         }
 
         function lockCurrentWeek() {
+            if (scheduled.length === 0) {
+                showToast('No events to lock');
+                return;
+            }
+            
             const friday = getFridayOfWeek(currentWeek);
             const weekKey = formatDate(friday);
             lockedWeeks[weekKey] = true;
-            console.log('Locking week:', weekKey, 'lockedWeeks:', lockedWeeks);
+            console.log('Locking week:', weekKey);
             saveToWordPress();
             updateWeekDisplay();
             renderSchedule();
-            showToast('Week locked');
+            showToast('Week saved & locked');
         }
 
         function unlockCurrentWeek() {
-            if (!confirm('Unlock this week for editing? You will need to re-push to Google after making changes.')) {
+            if (!confirm('Unlock this week for editing?')) {
                 return;
             }
             const friday = getFridayOfWeek(currentWeek);
@@ -656,11 +592,6 @@
             updateWeekDisplay();
             renderSchedule();
         }
-        
-        function resetWeek() {
-            weekOffset = 0;
-            setWeek(0);
-        }
 
         function updateWeekDisplay() {
             const friday = getFridayOfWeek(currentWeek);
@@ -670,47 +601,34 @@
             const weekKey = formatDate(friday);
             const isLocked = lockedWeeks[weekKey] || false;
             
-            console.log('updateWeekDisplay - weekKey:', weekKey, 'isLocked:', isLocked, 'lockedWeeks:', lockedWeeks);
-            
             const options = { month: 'short', day: 'numeric', year: 'numeric' };
             document.getElementById('weekDisplay').innerHTML = 
                 `${currentWeek.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
             
-            // Update lock status indicator (display-only, not clickable)
             const lockStatusBtn = document.getElementById('lockStatusBtn');
+            const lockBtn = document.getElementById('lockBtn');
+            const unlockBtn = document.getElementById('unlockBtn');
+            
             if (isLocked) {
                 lockStatusBtn.textContent = 'LOCKED';
                 lockStatusBtn.style.background = '#ff4444';
                 lockStatusBtn.style.color = 'white';
                 lockStatusBtn.style.opacity = '1';
+                lockBtn.style.display = 'none';
+                unlockBtn.style.display = 'inline-block';
             } else {
                 lockStatusBtn.textContent = 'DRAFT';
                 lockStatusBtn.style.background = '#4CAF50';
                 lockStatusBtn.style.color = 'white';
                 lockStatusBtn.style.opacity = '1';
-            }
-            
-            // Update push button state
-            const pushBtn = document.getElementById('pushBtn');
-            const unlockBtn = document.getElementById('unlockBtn');
-            
-            if (isLocked) {
-                pushBtn.disabled = true;
-                pushBtn.textContent = 'Week Locked';
-                pushBtn.style.opacity = '0.5';
-                pushBtn.style.cursor = 'not-allowed';
-                unlockBtn.style.display = 'inline-block';
-            } else {
-                pushBtn.disabled = !accessToken;
-                pushBtn.textContent = 'Push to Google';
-                pushBtn.style.opacity = '1';
-                pushBtn.style.cursor = 'pointer';
+                lockBtn.style.display = 'inline-block';
                 unlockBtn.style.display = 'none';
             }
         }
 
         document.getElementById('prevWeek').onclick = () => setWeek(-1);
         document.getElementById('nextWeek').onclick = () => setWeek(1);
+        document.getElementById('lockBtn').onclick = lockCurrentWeek;
         document.getElementById('unlockBtn').onclick = unlockCurrentWeek;
 
         // ============================================
@@ -757,18 +675,15 @@
                         if (event.startTime) {
                             event.startTime = new Date(event.startTime);
                         }
-                        if (event.actualDate) {
-                            event.actualDate = new Date(event.actualDate);
-                        }
                     });
                     console.log('Loaded from WordPress:', scheduled.length, 'events');
                     renderSchedule();
-                    showToast(`Loaded ${scheduled.length} scheduled events from database`);
+                    showToast(`Loaded ${scheduled.length} scheduled events`);
                 }
                 
                 if (data.lockedWeeks) {
                     lockedWeeks = data.lockedWeeks;
-                    console.log('Loaded locked weeks from WordPress:', lockedWeeks);
+                    console.log('Loaded locked weeks:', lockedWeeks);
                     updateWeekDisplay();
                 }
             } catch (error) {
@@ -838,7 +753,7 @@
         }
 
         // ============================================
-        // LIBRARY RENDERING - FIXED FOR SPECIAL CHARS
+        // LIBRARY RENDERING
         // ============================================
         
         function renderLibrary() {
@@ -874,7 +789,6 @@
                 return;
             }
 
-            // FIXED: Use cache instead of JSON in HTML attributes
             container.innerHTML = filtered.map((item, index) => {
                 window.libraryItemsCache[index] = item;
                 
@@ -892,7 +806,6 @@
                     draggedItem = window.libraryItemsCache[index];
                     dragOffset = 0;
                     e.dataTransfer.effectAllowed = 'move';
-                    console.log('Dragging:', draggedItem.title);
                 });
                 
                 el.addEventListener('dragend', () => {
@@ -967,7 +880,6 @@
             
             container.innerHTML = html;
             
-            // Only enable drag/drop if week is NOT locked
             if (!isLocked) {
                 document.querySelectorAll('.theater-grid').forEach(grid => {
                     grid.addEventListener('dragover', handleDragOver);
@@ -1020,7 +932,6 @@
         function handleDrop(e) {
             e.preventDefault();
             
-            // Check if week is locked
             if (isCurrentWeekLocked()) {
                 showToast('Week is locked! Unlock it first to make changes.');
                 document.querySelectorAll('.drag-preview').forEach(p => p.remove());
@@ -1034,7 +945,6 @@
                 return;
             }
             
-            // Validate dragged item
             if (!draggedItem.title || !draggedItem.duration) {
                 console.error('Invalid dragged item:', draggedItem);
                 showToast('Error: Invalid event data');
@@ -1122,7 +1032,6 @@
                 block.style.top = `${event.position}px`;
                 block.style.height = `${event.duration * 80 / 60}px`;
                 
-                // Only make draggable if week is NOT locked
                 if (!isLocked) {
                     block.draggable = true;
                 }
@@ -1168,7 +1077,6 @@
         // ============================================
         
         function deleteEvent(scheduleId) {
-            // Check if week is locked
             if (isCurrentWeekLocked()) {
                 showToast('Week is locked! Unlock it first to delete events.');
                 return;
@@ -1187,192 +1095,14 @@
         }
 
         // ============================================
-        // GOOGLE CALENDAR PUSH
-        // ============================================
-
-        document.getElementById('pushBtn').onclick = async () => {
-            if (!accessToken) {
-                showToast('Please connect to Google first');
-                return;
-            }
-            
-            if (scheduled.length === 0) {
-                showToast('No events to push');
-                return;
-            }
-            
-            // DISABLE BUTTON DURING PUSH
-            const pushBtn = document.getElementById('pushBtn');
-            pushBtn.disabled = true;
-            pushBtn.textContent = 'Pushing...';
-            
-            showToast(`Pushing ${scheduled.length} events to Google Calendar...`);
-            
-            try {
-                let created = 0;
-                let skipped = 0;
-                let errors = 0;
-                
-                for (const event of scheduled) {
-                    try {
-                        let calendarId;
-                        if (event.type === 'movie') {
-                            calendarId = event.theater === 1 ? CALENDARS['theater-1'] : CALENDARS['theater-2'];
-                        } else {
-                            calendarId = CALENDARS['events'];
-                        }
-                        
-                        const startTime = new Date(event.startTime);
-                        const endTime = new Date(startTime.getTime() + (event.duration * 60000));
-                        
-                        const googleEvent = {
-                            summary: event.title,
-                            start: {
-                                dateTime: startTime.toISOString(),
-                                timeZone: 'America/New_York'
-                            },
-                            end: {
-                                dateTime: endTime.toISOString(),
-                                timeZone: 'America/New_York'
-                            },
-                            extendedProperties: {
-                                private: {
-                                    supabaseId: event.supabaseId || '',
-                                    supabaseTable: event.table || '',
-                                    scheduleId: event.scheduleId || ''
-                                }
-                            }
-                        };
-                        
-                        let shouldSkip = false;
-                        
-                        // Check if we have a saved googleEventId
-                        if (event.googleEventId) {
-                            try {
-                                const checkResponse = await gapi.client.calendar.events.get({
-                                    calendarId: calendarId,
-                                    eventId: event.googleEventId
-                                });
-                                if (checkResponse.status === 200) {
-                                    shouldSkip = true;
-                                    console.log(`Skipping: ${event.title} (already in Google)`);
-                                }
-                            } catch (e) {
-                                console.log('Saved event ID not found, will search for duplicates');
-                            }
-                        }
-                        
-                        // If no saved ID, search for duplicate by title + time
-                        if (!shouldSkip && !event.googleEventId) {
-                            try {
-                                const searchResponse = await gapi.client.calendar.events.list({
-                                    calendarId: calendarId,
-                                    timeMin: startTime.toISOString(),
-                                    timeMax: endTime.toISOString(),
-                                    q: event.title,
-                                    singleEvents: true
-                                });
-                                
-                                if (searchResponse.result.items && searchResponse.result.items.length > 0) {
-                                    const match = searchResponse.result.items.find(item => 
-                                        item.summary === event.title &&
-                                        item.start.dateTime === startTime.toISOString()
-                                    );
-                                    
-                                    if (match) {
-                                        shouldSkip = true;
-                                        
-                                        // Save the ID so we don't search next time
-                                        const idx = scheduled.findIndex(e => e.scheduleId === event.scheduleId);
-                                        if (idx !== -1) {
-                                            scheduled[idx].googleEventId = match.id;
-                                        }
-                                        
-                                        console.log(`Skipping: ${event.title} (duplicate found in Google)`);
-                                    }
-                                }
-                            } catch (e) {
-                                console.log('Search failed, will create new event');
-                            }
-                        }
-                        
-                        if (shouldSkip) {
-                            skipped++;
-                        } else {
-                            // CREATE new event
-                            const response = await gapi.client.calendar.events.insert({
-                                calendarId: calendarId,
-                                resource: googleEvent
-                            });
-                            
-                            const idx = scheduled.findIndex(e => e.scheduleId === event.scheduleId);
-                            if (idx !== -1) {
-                                scheduled[idx].googleEventId = response.result.id;
-                            }
-                            
-                            created++;
-                            console.log(`Created: ${event.title}`);
-                        }
-                        
-                    } catch (error) {
-                        console.error(`Failed to push ${event.title}:`, error);
-                        errors++;
-                    }
-                }
-                
-                saveToWordPress();
-                
-                // Always lock week after push (regardless of outcome)
-                lockCurrentWeek();
-                
-                // RE-ENABLE BUTTON
-                pushBtn.disabled = false;
-                pushBtn.textContent = 'Push to Google';
-                
-                if (errors === 0 && created > 0) {
-                    showToast(`Pushed: ${created} created, ${skipped} skipped - Week locked`);
-                } else if (errors === 0) {
-                    showToast(`All events in Google: ${skipped} skipped - Week locked`);
-                } else {
-                    showToast(`Pushed: ${created} created, ${skipped} skipped, ${errors} failed - Week locked`);
-                }
-                
-            } catch (error) {
-                console.error('Push error:', error);
-                
-                // NEW: Lock week even on catastrophic failure
-                lockCurrentWeek();
-                showToast('Failed to push to Google Calendar - Week locked anyway');
-                
-                // RE-ENABLE BUTTON
-                pushBtn.disabled = false;
-                pushBtn.textContent = 'Push to Google';
-            }
-        };
-
-        // ============================================
         // START THE APP
         // ============================================
         
         setWeek(0);
-        loadFromWordPress(); // Load events and locked weeks from WordPress
-        importFromSupabase(); // Auto-import library on startup
+        loadFromWordPress();
+        importFromSupabase();
         
         document.getElementById('clearBtn').onclick = clearSchedule;
-        
-        const gapiScript = document.createElement('script');
-        gapiScript.src = 'https://apis.google.com/js/api.js';
-        gapiScript.onload = initGoogleAPI;
-        document.head.appendChild(gapiScript);
-        
-        const gsiScript = document.createElement('script');
-        gsiScript.src = 'https://accounts.google.com/gsi/client';
-        gsiScript.onload = () => {
-            setTimeout(() => {
-                initOAuth();
-            }, 1000);
-        };
-        document.head.appendChild(gsiScript);
     </script>
 </body>
 </html>
