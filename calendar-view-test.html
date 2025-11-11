@@ -126,11 +126,40 @@
     font:500 12px/1 "avenir-next-lt-pro", "Avenir Next", sans-serif; 
     color:var(--tsl-black); margin-bottom:4px;
     letter-spacing:-0.015em;
+    display:flex; align-items:center; gap:6px;
   }
   .today{
     background:#fff8f7;
     outline:2px solid var(--tsl-red);
     outline-offset:-2px;
+  }
+
+  /* Past day collapsible styling */
+  .day-cell.past-day{
+    cursor:pointer;
+    background:#fafafa;
+  }
+  .day-cell.past-day:hover{
+    background:#f5f5f5;
+  }
+  .day-cell.past-day .day-number{
+    color:var(--tsl-gray-600);
+  }
+  .expand-indicator{
+    font-size:10px;
+    color:var(--tsl-gray-600);
+    transition:transform .2s ease;
+  }
+  .day-cell.past-day.expanded .expand-indicator{
+    transform:rotate(90deg);
+  }
+  .day-cell.past-day .events-container{
+    display:none;
+  }
+  .day-cell.past-day.expanded .events-container{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
   }
 
   .event{
@@ -154,14 +183,7 @@
 
   /* Past event styling */
   .event.past{
-    opacity:0.5;
-    pointer-events:none;
-    cursor:default;
-    color:var(--tsl-gray-600);
-  }
-  .event.past:hover{
-    border-color:#ddd;
-    background:var(--tsl-white);
+    opacity:0.6;
   }
 
   .calendar-grid.week-view{
@@ -376,9 +398,25 @@
         cell.className = 'day-cell';
         const cmp = new Date(loopDate); cmp.setHours(0,0,0,0);
         const isToday = (cmp.getTime()===today.getTime());
+        const isPastDay = cmp < today;
 
         if(isToday) cell.classList.add('today');
         if(currentView==='month' && loopDate.getMonth()!==curMonth) cell.classList.add('other-month');
+
+        // Get events for this day
+        const dayEvents = events.filter(ev=>{
+          const d = new Date(ev.start.dateTime || ev.start.date);
+          return d.toDateString() === loopDate.toDateString();
+        }).sort((a,b)=>{
+          const ta=new Date(a.start.dateTime||a.start.date);
+          const tb=new Date(b.start.dateTime||b.start.date);
+          return ta - tb;
+        });
+
+        // Mark as past day if it has events and is in the past
+        if(isPastDay && dayEvents.length > 0){
+          cell.classList.add('past-day');
+        }
 
         if(currentView==='week'){
           const head=document.createElement('div');
@@ -389,18 +427,23 @@
         }else{
           const dn=document.createElement('div');
           dn.className='day-number';
-          dn.textContent = loopDate.getDate();
+          
+          // Add expand indicator for past days with events
+          if(isPastDay && dayEvents.length > 0){
+            const indicator = document.createElement('span');
+            indicator.className = 'expand-indicator';
+            indicator.textContent = '▸';
+            dn.appendChild(indicator);
+          }
+          
+          const dateText = document.createTextNode(loopDate.getDate());
+          dn.appendChild(dateText);
           cell.appendChild(dn);
         }
 
-        const dayEvents = events.filter(ev=>{
-          const d = new Date(ev.start.dateTime || ev.start.date);
-          return d.toDateString() === loopDate.toDateString();
-        }).sort((a,b)=>{
-          const ta=new Date(a.start.dateTime||a.start.date);
-          const tb=new Date(b.start.dateTime||b.start.date);
-          return ta - tb;
-        });
+        // Create events container
+        const eventsContainer = document.createElement('div');
+        eventsContainer.className = 'events-container';
 
         dayEvents.forEach(ev=>{
           const a=document.createElement('a');
@@ -456,8 +499,19 @@
             timeText = t.toLocaleTimeString('en-US',{hour:'numeric', minute:'2-digit', hour12:true});
           }
           a.innerHTML = `<div>${title}</div>${timeText?`<div class="event-time">${timeText}</div>`:''}`;
-          cell.appendChild(a);
+          eventsContainer.appendChild(a);
         });
+
+        cell.appendChild(eventsContainer);
+
+        // Add click handler for past days
+        if(isPastDay && dayEvents.length > 0){
+          cell.addEventListener('click', function(e){
+            // Don't toggle if clicking on an event link
+            if(e.target.closest('.event')) return;
+            this.classList.toggle('expanded');
+          });
+        }
 
         colIndex = (colIndex+1) % 7;
         if(currentView==='month' && colIndex===0){
