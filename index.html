@@ -527,11 +527,23 @@
             weekOffset += offset;
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            const day = today.getDay();
-            const daysFromFriday = (day + 2) % 7;
+            const day = today.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+            
+            // Find the current Friday-Monday week
+            let daysToFriday;
+            if (day >= 5 || day <= 1) {
+                // It's Fri/Sat/Sun/Mon - show this week's Friday
+                if (day === 0) daysToFriday = -2; // Sunday, go back 2 days to Friday
+                else if (day === 1) daysToFriday = -3; // Monday, go back 3 days to Friday
+                else if (day === 5) daysToFriday = 0; // Friday, it's today
+                else daysToFriday = -1; // Saturday, go back 1 day to Friday
+            } else {
+                // It's Tue/Wed/Thu - show next week's Friday
+                daysToFriday = (5 - day + 7) % 7;
+            }
+            
             currentWeek = new Date(today);
-            currentWeek.setDate(today.getDate() - daysFromFriday);
-            currentWeek.setDate(currentWeek.getDate() + (weekOffset * 7));
+            currentWeek.setDate(today.getDate() + daysToFriday + (weekOffset * 7));
             updateWeekDisplay();
             renderSchedule();
         }
