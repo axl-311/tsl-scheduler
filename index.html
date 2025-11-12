@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v2.5 - Direct WordPress</title>
+    <title>TSL Scheduler v2.6 - Draft/Publish</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
@@ -60,8 +60,17 @@
             padding: 8px 16px;
             border-radius: 20px;
             font-size: 14px;
-            background: #e8f5e9;
-            color: #2e7d32;
+            font-weight: 500;
+        }
+
+        .status.draft {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.published {
+            background: #d4edda;
+            color: #155724;
         }
 
         .btn {
@@ -437,11 +446,11 @@
             <div>
                 <h1>
                     TSL Scheduler
-                    <span class="version">v2.5</span>
+                    <span class="version">v2.6</span>
                 </h1>
             </div>
             <div class="header-actions">
-                <div class="status">WordPress Connected</div>
+                <div class="status draft" id="statusBadge">DRAFT</div>
             </div>
         </div>
 
@@ -451,11 +460,11 @@
                 <button class="btn btn-secondary" id="prevWeek">Prev</button>
                 <div class="week-display" id="weekDisplay">Loading...</div>
                 <button class="btn btn-secondary" id="nextWeek">Next</button>
-                <button class="btn btn-secondary" id="lockStatusBtn" style="min-width: 100px; cursor: default;" disabled>DRAFT</button>
             </div>
             <div class="control-actions">
-                <button class="btn btn-warning" id="unlockBtn" style="display:none;">Unlock Week</button>
-                <button class="btn btn-success" id="lockBtn">Save & Lock Week</button>
+                <button class="btn btn-primary" id="refreshBtn">Refresh Library</button>
+                <button class="btn btn-warning" id="saveDraftBtn">Save Draft</button>
+                <button class="btn btn-success" id="publishBtn">Publish Schedule</button>
                 <button class="btn btn-secondary" id="clearBtn">Clear Schedule</button>
             </div>
         </div>
@@ -477,7 +486,7 @@
                 <input type="text" class="library-search" id="search" placeholder="Search...">
                 <div class="library-items" id="library">
                     <div class="empty-state">
-                        <div class="empty-state-icon">📚</div>
+                        <div class="empty-state-icon">Library</div>
                         <div>Import from database to get started</div>
                     </div>
                 </div>
@@ -491,220 +500,155 @@
     </div>
 
     <script>
-        // ============================================
-        // CONFIGURATION
-        // ============================================
-        
+        // Configuration
         const WORDPRESS_URL = 'https://new.site.sesmultimedia.com';
-        
         const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
 
-        // ============================================
-        // STATE
-        // ============================================
-        
+        // State
         let supabase = null;
         let currentWeek = new Date();
         let library = [];
         let scheduled = [];
         let draggedItem = null;
         let dragOffset = 0;
-        let lockedWeeks = {};
+        let scheduleStatus = 'draft';
         
         window.libraryItemsCache = {};
 
-        // ============================================
-        // INITIALIZE
-        // ============================================
-        
+        // Initialize
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.log('TSL Scheduler v2.5 - Direct WordPress Storage');
+        console.log('TSL Scheduler v2.6 - Draft/Publish Workflow');
 
-        // ============================================
-        // WEEK LOCKING SYSTEM
-        // ============================================
-        
-        function getFridayOfWeek(date) {
-            const d = new Date(date);
-            d.setHours(0, 0, 0, 0);
-            return d;
-        }
-
-        function formatDate(date) {
-            return date.toISOString().split('T')[0];
-        }
-
-        function isCurrentWeekLocked() {
-            const friday = getFridayOfWeek(currentWeek);
-            const weekKey = formatDate(friday);
-            return lockedWeeks[weekKey] || false;
-        }
-
-        function lockCurrentWeek() {
-            if (scheduled.length === 0) {
-                showToast('No events to lock');
-                return;
-            }
-            
-            const friday = getFridayOfWeek(currentWeek);
-            const weekKey = formatDate(friday);
-            lockedWeeks[weekKey] = true;
-            console.log('Locking week:', weekKey);
-            saveToWordPress();
-            updateWeekDisplay();
-            renderSchedule();
-            showToast('Week saved & locked');
-        }
-
-        function unlockCurrentWeek() {
-            if (!confirm('Unlock this week for editing?')) {
-                return;
-            }
-            const friday = getFridayOfWeek(currentWeek);
-            const weekKey = formatDate(friday);
-            delete lockedWeeks[weekKey];
-            saveToWordPress();
-            updateWeekDisplay();
-            renderSchedule();
-            showToast('Week unlocked');
-        }
-
-        // ============================================
-        // WEEK NAVIGATION
-        // ============================================
-        
+        // Week Navigation
         let weekOffset = 0;
         
         function setWeek(offset) {
             weekOffset += offset;
-            
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            
             const day = today.getDay();
             const daysFromFriday = (day + 2) % 7;
-            
             currentWeek = new Date(today);
             currentWeek.setDate(today.getDate() - daysFromFriday);
             currentWeek.setDate(currentWeek.getDate() + (weekOffset * 7));
-            
             updateWeekDisplay();
             renderSchedule();
         }
 
         function updateWeekDisplay() {
-            const friday = getFridayOfWeek(currentWeek);
+            const friday = new Date(currentWeek);
             const end = new Date(currentWeek);
             end.setDate(end.getDate() + 3);
-            
-            const weekKey = formatDate(friday);
-            const isLocked = lockedWeeks[weekKey] || false;
-            
             const options = { month: 'short', day: 'numeric', year: 'numeric' };
             document.getElementById('weekDisplay').innerHTML = 
                 `${currentWeek.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
-            
-            const lockStatusBtn = document.getElementById('lockStatusBtn');
-            const lockBtn = document.getElementById('lockBtn');
-            const unlockBtn = document.getElementById('unlockBtn');
-            
-            if (isLocked) {
-                lockStatusBtn.textContent = 'LOCKED';
-                lockStatusBtn.style.background = '#ff4444';
-                lockStatusBtn.style.color = 'white';
-                lockStatusBtn.style.opacity = '1';
-                lockBtn.style.display = 'none';
-                unlockBtn.style.display = 'inline-block';
+        }
+
+        function updateStatusBadge() {
+            const badge = document.getElementById('statusBadge');
+            if (scheduleStatus === 'published') {
+                badge.textContent = 'PUBLISHED';
+                badge.className = 'status published';
             } else {
-                lockStatusBtn.textContent = 'DRAFT';
-                lockStatusBtn.style.background = '#4CAF50';
-                lockStatusBtn.style.color = 'white';
-                lockStatusBtn.style.opacity = '1';
-                lockBtn.style.display = 'inline-block';
-                unlockBtn.style.display = 'none';
+                badge.textContent = 'DRAFT';
+                badge.className = 'status draft';
             }
         }
 
         document.getElementById('prevWeek').onclick = () => setWeek(-1);
         document.getElementById('nextWeek').onclick = () => setWeek(1);
-        document.getElementById('lockBtn').onclick = lockCurrentWeek;
-        document.getElementById('unlockBtn').onclick = unlockCurrentWeek;
 
-        // ============================================
-        // SAVE/LOAD TO WORDPRESS DATABASE
-        // ============================================
-        
-        async function saveToWordPress() {
+        // Save Draft
+        async function saveDraft() {
             try {
-                const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl/v1/scheduler/save`, {
+                const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/save`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        events: scheduled,
-                        lockedWeeks: lockedWeeks
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ events: scheduled })
                 });
                 
-                if (!response.ok) {
-                    throw new Error('Failed to save to WordPress');
+                const data = await response.json();
+                if (data.success) {
+                    scheduleStatus = data.status;
+                    updateStatusBadge();
+                    showToast('Draft saved!');
+                } else {
+                    showToast('Failed to save draft');
                 }
-                
-                console.log('Saved to WordPress:', scheduled.length, 'events');
             } catch (error) {
-                console.error('Failed to save to WordPress:', error);
-                showToast('Warning: Failed to save to database');
+                console.error('Save error:', error);
+                showToast('Error saving draft');
             }
         }
-        
-        async function loadFromWordPress() {
+
+        // Publish Schedule
+        async function publishSchedule() {
+            if (scheduled.length === 0) {
+                showToast('Nothing to publish!');
+                return;
+            }
+            
+            if (!confirm('Publish schedule? This will create WooCommerce ticket products.')) {
+                return;
+            }
+            
             try {
-                const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl/v1/scheduler/load`);
-                
-                if (!response.ok) {
-                    throw new Error('Failed to load from WordPress');
-                }
+                const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/publish`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ events: scheduled })
+                });
                 
                 const data = await response.json();
+                if (data.success) {
+                    scheduleStatus = 'published';
+                    updateStatusBadge();
+                    showToast('Schedule published! Products are being created...');
+                } else {
+                    showToast('Failed to publish schedule');
+                }
+            } catch (error) {
+                console.error('Publish error:', error);
+                showToast('Error publishing schedule');
+            }
+        }
+
+        // Load from WordPress
+        async function loadFromWordPress() {
+            try {
+                const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/load`);
+                const data = await response.json();
                 
-                if (data.events && Array.isArray(data.events)) {
-                    scheduled = data.events;
+                if (data.success) {
+                    scheduled = data.events || [];
+                    scheduleStatus = data.status || 'draft';
                     scheduled.forEach(event => {
                         if (event.startTime) {
                             event.startTime = new Date(event.startTime);
                         }
                     });
-                    console.log('Loaded from WordPress:', scheduled.length, 'events');
+                    updateStatusBadge();
                     renderSchedule();
-                    showToast(`Loaded ${scheduled.length} scheduled events`);
-                }
-                
-                if (data.lockedWeeks) {
-                    lockedWeeks = data.lockedWeeks;
-                    console.log('Loaded locked weeks:', lockedWeeks);
-                    updateWeekDisplay();
+                    console.log('Loaded:', scheduled.length, 'events, status:', scheduleStatus);
                 }
             } catch (error) {
-                console.error('Failed to load from WordPress:', error);
-                showToast('Warning: Failed to load from database');
+                console.error('Load error:', error);
             }
         }
-        
+
+        // Clear Schedule
         function clearSchedule() {
             if (confirm('Clear all scheduled events? This cannot be undone.')) {
                 scheduled = [];
+                scheduleStatus = 'draft';
                 renderSchedule();
-                saveToWordPress();
+                saveDraft();
                 showToast('Schedule cleared');
             }
         }
 
-        // ============================================
-        // IMPORT FROM DATABASE
-        // ============================================
-        
+        // Import from Supabase
         async function importFromSupabase() {
             try {
                 const [movies, events] = await Promise.all([
@@ -752,10 +696,7 @@
             }
         }
 
-        // ============================================
-        // LIBRARY RENDERING
-        // ============================================
-        
+        // Render Library
         function renderLibrary() {
             const container = document.getElementById('library');
             const search = document.getElementById('search').value.toLowerCase();
@@ -769,33 +710,25 @@
                 const daysAgo = parseInt(recentFilter);
                 const cutoffDate = new Date();
                 cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
-                
                 filtered = filtered.filter(item => {
                     if (!item.updatedAt) return true;
-                    const itemDate = new Date(item.updatedAt);
-                    return itemDate >= cutoffDate;
+                    return new Date(item.updatedAt) >= cutoffDate;
                 });
             }
 
             document.getElementById('libCount').textContent = `(${filtered.length})`;
 
             if (filtered.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">🔍</div>
-                        <div>No items found</div>
-                    </div>
-                `;
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">Search</div><div>No items found</div></div>';
                 return;
             }
 
             container.innerHTML = filtered.map((item, index) => {
                 window.libraryItemsCache[index] = item;
-                
                 return `
                     <div class="library-item ${item.type}" draggable="true" data-item-index="${index}">
                         <div class="library-item-title">${item.title}</div>
-                        <div class="library-item-info">${formatDuration(item.duration)} · ${item.type}</div>
+                        <div class="library-item-info">${formatDuration(item.duration)} - ${item.type}</div>
                     </div>
                 `;
             }).join('');
@@ -807,7 +740,6 @@
                     dragOffset = 0;
                     e.dataTransfer.effectAllowed = 'move';
                 });
-                
                 el.addEventListener('dragend', () => {
                     document.querySelectorAll('.drag-preview').forEach(p => p.remove());
                 });
@@ -817,10 +749,7 @@
         document.getElementById('search').oninput = renderLibrary;
         document.getElementById('recentFilter').onchange = renderLibrary;
 
-        // ============================================
-        // UTILITIES
-        // ============================================
-        
+        // Utilities
         function formatDuration(mins) {
             const h = Math.floor(mins / 60);
             const m = mins % 60;
@@ -830,7 +759,6 @@
         function showToast(message) {
             const existing = document.querySelector('.toast');
             if (existing) existing.remove();
-            
             const toast = document.createElement('div');
             toast.className = 'toast';
             toast.textContent = message;
@@ -838,14 +766,10 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
-        // ============================================
-        // SCHEDULE RENDERING
-        // ============================================
-        
+        // Render Schedule
         function renderSchedule() {
             const container = document.getElementById('schedule');
             const days = ['Friday', 'Saturday', 'Sunday', 'Monday'];
-            const isLocked = isCurrentWeekLocked();
             
             let html = '';
             for (let i = 0; i < 4; i++) {
@@ -859,17 +783,12 @@
                             ${[1, 2].map(theater => `
                                 <div class="theater">
                                     <div class="theater-header">T${theater}</div>
-                                    <div class="theater-grid" data-day="${i}" data-theater="${theater}" ${isLocked ? 'style="opacity: 0.7;"' : ''}>
+                                    <div class="theater-grid" data-day="${i}" data-theater="${theater}">
                                         ${Array.from({length: 12}, (_, hour) => {
                                             const displayHour = (hour + 12) > 12 ? (hour + 12) - 12 : (hour + 12);
                                             const period = (hour + 12) >= 12 ? 'PM' : 'AM';
-                                            return `
-                                            <div class="time-slot">
-                                                ${theater === 1 ? 
-                                                    `<div class="time-label">${displayHour}${period}</div>` 
-                                                    : ''}
-                                            </div>
-                                        `;}).join('')}
+                                            return `<div class="time-slot">${theater === 1 ? `<div class="time-label">${displayHour}${period}</div>` : ''}</div>`;
+                                        }).join('')}
                                     </div>
                                 </div>
                             `).join('')}
@@ -880,45 +799,31 @@
             
             container.innerHTML = html;
             
-            if (!isLocked) {
-                document.querySelectorAll('.theater-grid').forEach(grid => {
-                    grid.addEventListener('dragover', handleDragOver);
-                    grid.addEventListener('dragleave', handleDragLeave);
-                    grid.addEventListener('drop', handleDrop);
-                });
-            }
+            document.querySelectorAll('.theater-grid').forEach(grid => {
+                grid.addEventListener('dragover', handleDragOver);
+                grid.addEventListener('dragleave', handleDragLeave);
+                grid.addEventListener('drop', handleDrop);
+            });
             
             renderScheduledEvents();
         }
 
-        // ============================================
-        // DRAG & DROP
-        // ============================================
-        
+        // Drag & Drop
         function handleDragOver(e) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            
             document.querySelectorAll('.drag-preview').forEach(p => p.remove());
-            
             const rect = this.getBoundingClientRect();
             let y = e.clientY - rect.top;
-            
-            if (dragOffset > 0) {
-                y = y - dragOffset;
-            }
-            
+            if (dragOffset > 0) y = y - dragOffset;
             const snappedY = Math.round(y / 20) * 20;
-            
             const preview = document.createElement('div');
             preview.className = 'drag-preview';
             this.appendChild(preview);
-            
             const hour = Math.floor(snappedY / 80) + 12;
             const min = Math.round((snappedY % 80) / 80 * 60);
             const displayHour = hour > 12 ? hour - 12 : hour;
             const period = hour >= 12 ? 'PM' : 'AM';
-            
             preview.textContent = `${displayHour}:${min.toString().padStart(2,'0')} ${period}`;
             preview.style.top = `${snappedY}px`;
         }
@@ -931,50 +836,26 @@
 
         function handleDrop(e) {
             e.preventDefault();
-            
-            if (isCurrentWeekLocked()) {
-                showToast('Week is locked! Unlock it first to make changes.');
-                document.querySelectorAll('.drag-preview').forEach(p => p.remove());
-                return;
-            }
-            
             document.querySelectorAll('.drag-preview').forEach(p => p.remove());
             
-            if (!draggedItem) {
-                console.error('No dragged item');
-                return;
-            }
-            
-            if (!draggedItem.title || !draggedItem.duration) {
-                console.error('Invalid dragged item:', draggedItem);
-                showToast('Error: Invalid event data');
-                return;
-            }
+            if (!draggedItem) return;
             
             try {
                 const rect = this.getBoundingClientRect();
                 let y = e.clientY - rect.top;
-                
-                if (dragOffset > 0) {
-                    y = y - dragOffset;
-                }
-                
+                if (dragOffset > 0) y = y - dragOffset;
                 const snappedY = Math.round(y / 20) * 20;
-                
                 const day = parseInt(this.dataset.day);
                 const theater = parseInt(this.dataset.theater);
                 const hour = Math.floor(snappedY / 80) + 12;
                 const min = Math.round((snappedY % 80) / 80 * 60);
-                
                 const date = new Date(currentWeek);
                 date.setDate(date.getDate() + day);
                 date.setHours(hour, min, 0, 0);
                 
                 if (draggedItem.fromSchedule && draggedItem.scheduleId) {
                     const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
-                    if (index !== -1) {
-                        scheduled.splice(index, 1);
-                    }
+                    if (index !== -1) scheduled.splice(index, 1);
                 }
                 
                 scheduled.push({
@@ -984,41 +865,31 @@
                     startTime: date,
                     position: snappedY,
                     scheduleId: `sched-${Date.now()}`,
-                    fromSchedule: false
+                    fromSchedule: false,
+                    actualDate: date.toISOString()
                 });
                 
                 dragOffset = 0;
-                
                 renderSchedule();
-                saveToWordPress();
-                showToast(`${draggedItem.fromSchedule ? 'Moved' : 'Scheduled'}: ${draggedItem.title}`);
-                
+                saveDraft();
+                showToast(`Scheduled: ${draggedItem.title}`);
             } catch (error) {
                 console.error('Drop error:', error);
                 showToast('Error scheduling event');
             }
         }
 
-        // ============================================
-        // RENDER SCHEDULED EVENTS
-        // ============================================
-        
+        // Render Scheduled Events
         function renderScheduledEvents() {
             const weekStart = new Date(currentWeek);
             weekStart.setHours(0, 0, 0, 0);
-            
             const weekEnd = new Date(currentWeek);
             weekEnd.setDate(weekEnd.getDate() + 3);
             weekEnd.setHours(23, 59, 59, 999);
             
-            const isLocked = isCurrentWeekLocked();
-            
             scheduled.forEach((event) => {
                 const eventDate = new Date(event.startTime);
-                
-                if (eventDate < weekStart || eventDate > weekEnd) {
-                    return;
-                }
+                if (eventDate < weekStart || eventDate > weekEnd) return;
                 
                 const eventDayStart = new Date(eventDate);
                 eventDayStart.setHours(0, 0, 0, 0);
@@ -1031,10 +902,7 @@
                 block.className = `event-block ${event.type === 'movie' ? `movie-t${event.theater}` : 'event'}`;
                 block.style.top = `${event.position}px`;
                 block.style.height = `${event.duration * 80 / 60}px`;
-                
-                if (!isLocked) {
-                    block.draggable = true;
-                }
+                block.draggable = true;
                 
                 const hour = eventDate.getHours();
                 const min = eventDate.getMinutes();
@@ -1043,66 +911,54 @@
                 
                 block.innerHTML = `
                     <div class="event-title">${event.title}</div>
-                    <div class="event-time">${displayHour}:${min.toString().padStart(2,'0')} ${period} · ${formatDuration(event.duration)}</div>
-                    ${!isLocked ? '<button class="delete-btn">×</button>' : ''}
+                    <div class="event-time">${displayHour}:${min.toString().padStart(2,'0')} ${period} - ${formatDuration(event.duration)}</div>
+                    <button class="delete-btn">×</button>
                 `;
                 
-                if (!isLocked) {
-                    block.addEventListener('dragstart', e => {
-                        const rect = block.getBoundingClientRect();
-                        dragOffset = e.clientY - rect.top;
-                        draggedItem = { ...event, fromSchedule: true, scheduleId: event.scheduleId };
-                        e.dataTransfer.effectAllowed = 'move';
-                    });
-                    
-                    block.addEventListener('dragend', () => {
-                        document.querySelectorAll('.drag-preview').forEach(p => p.remove());
-                    });
-                    
-                    const deleteBtn = block.querySelector('.delete-btn');
-                    if (deleteBtn) {
-                        deleteBtn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            deleteEvent(event.scheduleId);
-                        });
-                    }
-                }
+                block.addEventListener('dragstart', e => {
+                    const rect = block.getBoundingClientRect();
+                    dragOffset = e.clientY - rect.top;
+                    draggedItem = { ...event, fromSchedule: true, scheduleId: event.scheduleId };
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+                
+                block.addEventListener('dragend', () => {
+                    document.querySelectorAll('.drag-preview').forEach(p => p.remove());
+                });
+                
+                const deleteBtn = block.querySelector('.delete-btn');
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteEvent(event.scheduleId);
+                });
                 
                 grid.appendChild(block);
             });
         }
 
-        // ============================================
-        // DELETE EVENT
-        // ============================================
-        
+        // Delete Event
         function deleteEvent(scheduleId) {
-            if (isCurrentWeekLocked()) {
-                showToast('Week is locked! Unlock it first to delete events.');
-                return;
-            }
-            
             const index = scheduled.findIndex(e => e.scheduleId === scheduleId);
             if (index === -1) return;
-            
             const event = scheduled[index];
             if (confirm(`Delete ${event.title}?`)) {
                 scheduled.splice(index, 1);
                 renderSchedule();
-                saveToWordPress();
+                saveDraft();
                 showToast('Event deleted');
             }
         }
 
-        // ============================================
-        // START THE APP
-        // ============================================
-        
+        // Button Handlers
+        document.getElementById('saveDraftBtn').onclick = saveDraft;
+        document.getElementById('publishBtn').onclick = publishSchedule;
+        document.getElementById('clearBtn').onclick = clearSchedule;
+        document.getElementById('refreshBtn').onclick = importFromSupabase;
+
+        // Start
         setWeek(0);
         loadFromWordPress();
         importFromSupabase();
-        
-        document.getElementById('clearBtn').onclick = clearSchedule;
     </script>
 </body>
 </html>
