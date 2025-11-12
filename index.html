@@ -995,11 +995,11 @@
                     table: draggedItem.table,
                     day,
                     theater,
-                    startTime: date,
+                    startTime: localDateTime, // ✅ FIXED: Store as local time string!
                     position: snappedY,
                     scheduleId: `sched-${Date.now()}`,
                     fromSchedule: false,
-                    actualDate: localDateTime // Store as local time string, not UTC
+                    actualDate: localDateTime
                 };
                 
                 console.log('Created event:', newEvent);
