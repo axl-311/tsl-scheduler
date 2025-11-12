@@ -509,12 +509,31 @@
         let supabase = null;
         let currentWeek = new Date();
         let library = [];
-        let scheduled = []; // MUST be an array
+        let scheduled = []; // ALL events across all weeks
         let draggedItem = null;
         let dragOffset = 0;
-        let scheduleStatus = 'draft';
+        let weekStatuses = {}; // Track status per week: { 'YYYY-MM-DD': 'draft'/'published' }
         
         window.libraryItemsCache = {};
+        
+        // Get week key for current week
+        function getWeekKey() {
+            const friday = new Date(currentWeek);
+            friday.setHours(0, 0, 0, 0);
+            return friday.toISOString().split('T')[0];
+        }
+        
+        // Get current week's status
+        function getCurrentWeekStatus() {
+            const key = getWeekKey();
+            return weekStatuses[key] || 'draft';
+        }
+        
+        // Set current week's status
+        function setCurrentWeekStatus(status) {
+            const key = getWeekKey();
+            weekStatuses[key] = status;
+        }
 
         // Initialize
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -561,11 +580,16 @@
             const options = { month: 'short', day: 'numeric', year: 'numeric' };
             document.getElementById('weekDisplay').innerHTML = 
                 `${currentWeek.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
+            
+            // Update status badge for current week
+            updateStatusBadge();
         }
 
         function updateStatusBadge() {
             const badge = document.getElementById('statusBadge');
-            if (scheduleStatus === 'published') {
+            const status = getCurrentWeekStatus();
+            
+            if (status === 'published') {
                 badge.textContent = 'PUBLISHED';
                 badge.className = 'status published';
             } else {
@@ -577,18 +601,21 @@
         document.getElementById('prevWeek').onclick = () => setWeek(-1);
         document.getElementById('nextWeek').onclick = () => setWeek(1);
 
-        // Save Draft
+        // Save Draft (current week only)
         async function saveDraft() {
             try {
                 const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/save`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ events: scheduled })
+                    body: JSON.stringify({ 
+                        events: scheduled,
+                        weekStatuses: weekStatuses
+                    })
                 });
                 
                 const data = await response.json();
                 if (data.success) {
-                    scheduleStatus = data.status;
+                    setCurrentWeekStatus('draft');
                     updateStatusBadge();
                     showToast('Draft saved!');
                 } else {
@@ -600,14 +627,26 @@
             }
         }
 
-        // Publish Schedule
+        // Publish Schedule (current week only)
         async function publishSchedule() {
-            if (scheduled.length === 0) {
-                showToast('Nothing to publish!');
+            // Get current week's events only
+            const weekStart = new Date(currentWeek);
+            weekStart.setHours(0, 0, 0, 0);
+            const weekEnd = new Date(currentWeek);
+            weekEnd.setDate(weekEnd.getDate() + 3);
+            weekEnd.setHours(23, 59, 59, 999);
+            
+            const currentWeekEvents = scheduled.filter(event => {
+                const eventDate = new Date(event.startTime);
+                return eventDate >= weekStart && eventDate <= weekEnd;
+            });
+            
+            if (currentWeekEvents.length === 0) {
+                showToast('Nothing to publish for this week!');
                 return;
             }
             
-            if (!confirm('Publish schedule? This will create WooCommerce ticket products.')) {
+            if (!confirm(`Publish ${currentWeekEvents.length} events for this week? This will create WooCommerce ticket products.`)) {
                 return;
             }
             
@@ -615,12 +654,15 @@
                 const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/publish`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ events: scheduled })
+                    body: JSON.stringify({ 
+                        events: currentWeekEvents,
+                        weekKey: getWeekKey()
+                    })
                 });
                 
                 const data = await response.json();
                 if (data.success) {
-                    scheduleStatus = 'published';
+                    setCurrentWeekStatus('published');
                     updateStatusBadge();
                     showToast('Schedule published! Products are being created...');
                 } else {
@@ -648,6 +690,13 @@
                         scheduled = [];
                     }
                     
+                    // Load week statuses
+                    if (data.weekStatuses && typeof data.weekStatuses === 'object') {
+                        weekStatuses = data.weekStatuses;
+                    } else {
+                        weekStatuses = {};
+                    }
+                    
                     // Convert date strings to Date objects
                     scheduled.forEach(event => {
                         if (event.startTime) {
@@ -658,33 +707,49 @@
                         }
                     });
                     
-                    scheduleStatus = data.status || 'draft';
                     updateStatusBadge();
                     renderSchedule();
-                    console.log('Loaded:', scheduled.length, 'events, status:', scheduleStatus);
+                    console.log('Loaded:', scheduled.length, 'events across all weeks');
+                    console.log('Week statuses:', weekStatuses);
                 } else {
                     console.log('No saved schedule found, starting fresh');
                     scheduled = [];
-                    scheduleStatus = 'draft';
+                    weekStatuses = {};
                     updateStatusBadge();
                 }
             } catch (error) {
                 console.error('Load error:', error);
                 scheduled = [];
-                scheduleStatus = 'draft';
+                weekStatuses = {};
                 updateStatusBadge();
             }
         }
 
-        // Clear Schedule
+        // Clear Schedule (current week only)
         function clearSchedule() {
-            if (confirm('Clear all scheduled events? This cannot be undone.')) {
-                scheduled = [];
-                scheduleStatus = 'draft';
-                renderSchedule();
-                saveDraft();
-                showToast('Schedule cleared');
+            if (!confirm('Clear this week\'s schedule? This cannot be undone.')) {
+                return;
             }
+            
+            // Calculate current week's date range
+            const weekStart = new Date(currentWeek);
+            weekStart.setHours(0, 0, 0, 0);
+            const weekEnd = new Date(currentWeek);
+            weekEnd.setDate(weekEnd.getDate() + 3);
+            weekEnd.setHours(23, 59, 59, 999);
+            
+            // Filter out events from this week only
+            const beforeCount = scheduled.length;
+            scheduled = scheduled.filter(event => {
+                const eventDate = new Date(event.startTime);
+                return eventDate < weekStart || eventDate > weekEnd;
+            });
+            const clearedCount = beforeCount - scheduled.length;
+            
+            setCurrentWeekStatus('draft');
+            renderSchedule();
+            saveDraft();
+            showToast(`Cleared ${clearedCount} events from this week`);
         }
 
         // Import from Supabase
