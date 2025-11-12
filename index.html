@@ -702,8 +702,18 @@
                         if (event.startTime) {
                             event.startTime = new Date(event.startTime);
                         }
-                        if (event.actualDate) {
-                            event.actualDate = new Date(event.actualDate).toISOString();
+                        
+                        // Migrate old ISO format to local format
+                        if (event.actualDate && event.actualDate.includes('T')) {
+                            // Old format: ISO string with timezone
+                            const oldDate = new Date(event.actualDate);
+                            const year = oldDate.getFullYear();
+                            const month = String(oldDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(oldDate.getDate()).padStart(2, '0');
+                            const hours = String(oldDate.getHours()).padStart(2, '0');
+                            const minutes = String(oldDate.getMinutes()).padStart(2, '0');
+                            event.actualDate = `${year}-${month}-${day} ${hours}:${minutes}:00`;
+                            console.log('Migrated event date:', event.title, event.actualDate);
                         }
                     });
                     
@@ -963,6 +973,14 @@
                 date.setDate(date.getDate() + day);
                 date.setHours(hour, min, 0, 0);
                 
+                // Format date as YYYY-MM-DD HH:MM:SS in local timezone
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const dayOfMonth = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const localDateTime = `${year}-${month}-${dayOfMonth} ${hours}:${minutes}:00`;
+                
                 if (draggedItem.fromSchedule && draggedItem.scheduleId) {
                     const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
                     if (index !== -1) scheduled.splice(index, 1);
@@ -981,7 +999,7 @@
                     position: snappedY,
                     scheduleId: `sched-${Date.now()}`,
                     fromSchedule: false,
-                    actualDate: date.toISOString()
+                    actualDate: localDateTime // Store as local time string, not UTC
                 };
                 
                 console.log('Created event:', newEvent);
