@@ -509,7 +509,7 @@
         let supabase = null;
         let currentWeek = new Date();
         let library = [];
-        let scheduled = [];
+        let scheduled = []; // MUST be an array
         let draggedItem = null;
         let dragOffset = 0;
         let scheduleStatus = 'draft';
@@ -639,19 +639,40 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    scheduled = data.events || [];
-                    scheduleStatus = data.status || 'draft';
+                    // Ensure scheduled is always an array
+                    if (Array.isArray(data.events)) {
+                        scheduled = data.events;
+                    } else if (data.events && typeof data.events === 'object') {
+                        scheduled = Object.values(data.events);
+                    } else {
+                        scheduled = [];
+                    }
+                    
+                    // Convert date strings to Date objects
                     scheduled.forEach(event => {
                         if (event.startTime) {
                             event.startTime = new Date(event.startTime);
                         }
+                        if (event.actualDate) {
+                            event.actualDate = new Date(event.actualDate).toISOString();
+                        }
                     });
+                    
+                    scheduleStatus = data.status || 'draft';
                     updateStatusBadge();
                     renderSchedule();
                     console.log('Loaded:', scheduled.length, 'events, status:', scheduleStatus);
+                } else {
+                    console.log('No saved schedule found, starting fresh');
+                    scheduled = [];
+                    scheduleStatus = 'draft';
+                    updateStatusBadge();
                 }
             } catch (error) {
                 console.error('Load error:', error);
+                scheduled = [];
+                scheduleStatus = 'draft';
+                updateStatusBadge();
             }
         }
 
@@ -899,6 +920,13 @@
                 };
                 
                 console.log('Created event:', newEvent);
+                
+                // Ensure scheduled is an array
+                if (!Array.isArray(scheduled)) {
+                    console.error('scheduled is not an array!', typeof scheduled);
+                    scheduled = [];
+                }
+                
                 scheduled.push(newEvent);
                 
                 dragOffset = 0;
