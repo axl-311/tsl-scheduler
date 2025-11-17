@@ -426,11 +426,17 @@
             font-weight: 600;
         }
 
-        /* Make dragged items transparent */
+        /* Make dragged items invisible */
         .library-item.dragging,
-        .event-block.dragging {
-            opacity: 0.1 !important;
+        .event-block.dragging,
+        .library-item.dragging *,
+        .event-block.dragging * {
+            opacity: 0 !important;
             transition: none !important;
+        }
+        
+        .dragging {
+            opacity: 0 !important;
         }
 
         .toast {
@@ -774,13 +780,26 @@ function renderLibrary() {
         div.innerHTML = `<div class="library-item-title">${item.title}</div><div class="library-item-info">${item.duration}min</div>`;
         
         div.addEventListener('dragstart', e => {
+            e.target.style.opacity = '0';  // Completely hide the original
             e.target.classList.add('dragging');
+            
+            // Create invisible drag image
+            const dragImg = document.createElement('div');
+            dragImg.style.opacity = '0';
+            dragImg.style.position = 'absolute';
+            dragImg.style.top = '-1000px';
+            document.body.appendChild(dragImg);
+            e.dataTransfer.setDragImage(dragImg, 0, 0);
+            setTimeout(() => dragImg.remove(), 0);
+            
+            console.log('Added dragging class:', e.target.classList.contains('dragging'));
             dragOffset = 0;
             draggedItem = { ...item, fromSchedule: false };
             e.dataTransfer.effectAllowed = 'copy';
         });
 
         div.addEventListener('dragend', e => {
+            e.target.style.opacity = '';  // Restore
             e.target.classList.remove('dragging');
         });
 
@@ -980,7 +999,18 @@ function renderScheduledEvents() {
         `;
 
         div.addEventListener('dragstart', e => {
+            e.target.style.opacity = '0';  // Completely hide the original
             e.target.classList.add('dragging');
+            
+            // Create invisible drag image
+            const dragImg = document.createElement('div');
+            dragImg.style.opacity = '0';
+            dragImg.style.position = 'absolute';
+            dragImg.style.top = '-1000px';
+            document.body.appendChild(dragImg);
+            e.dataTransfer.setDragImage(dragImg, 0, 0);
+            setTimeout(() => dragImg.remove(), 0);
+            
             const rect = div.getBoundingClientRect();
             dragOffset = e.clientY - rect.top;
             draggedItem = { ...event, fromSchedule: true, scheduleId: event.scheduleId };
@@ -988,6 +1018,7 @@ function renderScheduledEvents() {
         });
 
         div.addEventListener('dragend', (e) => {
+            e.target.style.opacity = '';  // Restore
             e.target.classList.remove('dragging');
             document.querySelectorAll('.drag-preview').forEach(p => p.remove());
         });
