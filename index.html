@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v3.0 - FIXED</title>
+    <title>TSL Scheduler v3.0 - DRAG FIXED</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
@@ -24,7 +24,6 @@
             padding: 20px;
         }
 
-        /* Header */
         .header {
             background: white;
             border-radius: 12px;
@@ -124,7 +123,6 @@
             cursor: not-allowed;
         }
 
-        /* Controls */
         .controls {
             background: white;
             border-radius: 12px;
@@ -154,13 +152,11 @@
             gap: 10px;
         }
 
-        /* Main Layout */
         .main {
             display: flex;
             gap: 20px;
         }
 
-        /* Library Panel */
         .library {
             width: 300px;
             background: white;
@@ -238,13 +234,6 @@
             color: #86868b;
         }
 
-        /* Make dragged items transparent */
-        .library-item.dragging,
-        .event-block.dragging {
-            opacity: 0.3;
-        }
-
-        /* Schedule Grid */
         .schedule {
             flex: 1;
             background: white;
@@ -320,7 +309,6 @@
             padding-right: 8px;
         }
 
-        /* Event Blocks */
         .event-block {
             position: absolute;
             left: 4px;
@@ -395,83 +383,23 @@
             background: rgba(0,0,0,0.8);
         }
 
-        /* Drag Preview - SIMPLE & CLEAR */
         .drag-preview {
             position: absolute;
             left: 4px;
             right: 4px;
-            background: rgba(0,200,0,0.2);
-            border: 4px dashed #00cc00;
-            border-radius: 8px;
+            background: rgba(0,122,255,0.2);
+            border: 2px dashed #007aff;
+            border-radius: 6px;
             pointer-events: none;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
-            color: #00aa00;
-            font-weight: 700;
-            z-index: 9999;
-            box-shadow: 0 0 20px rgba(0,200,0,0.5);
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 0.8; }
-            50% { opacity: 1; }
-        }
-
-        .drag-preview.movie-preview {
-            background: rgba(0,122,255,0.3);
-            border-color: #007aff;
-            color: #007aff;
-            box-shadow: 0 0 20px rgba(0,122,255,0.6);
-        }
-
-        .drag-preview.event-preview {
-            background: rgba(255,100,100,0.3);
-            border-color: #ff3333;
-            color: #ff0000;
-            box-shadow: 0 0 20px rgba(255,50,50,0.6);
-        }
-
-        .drag-preview-time {
-            font-size: 18px;
-            font-weight: 900;
-            margin-bottom: 6px;
-            text-shadow: 0 0 4px rgba(255,255,255,0.8);
-        }
-
-        .drag-preview-title {
-            font-size: 13px;
-            font-weight: 700;
-            text-align: center;
-            padding: 0 8px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 100%;
-        }
-
-        .drag-preview-duration {
             font-size: 12px;
             font-weight: 600;
-            margin-top: 4px;
+            color: #007aff;
+            z-index: 100;
         }
 
-        /* Snap indicator line at top of preview */
-        .drag-preview::before {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: currentColor;
-            border-radius: 2px;
-        }
-
-        /* Toast */
         .toast {
             position: fixed;
             bottom: 20px;
@@ -482,10 +410,8 @@
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             z-index: 1000;
-            display: none;
         }
 
-        /* Empty state */
         .empty-state {
             text-align: center;
             padding: 40px 20px;
@@ -500,7 +426,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <div class="header">
             <div>
                 <h1>
@@ -513,7 +438,6 @@
             </div>
         </div>
 
-        <!-- Controls -->
         <div class="controls">
             <div class="week-nav">
                 <button class="btn btn-secondary" id="prevWeek">Prev</button>
@@ -528,9 +452,7 @@
             </div>
         </div>
 
-        <!-- Main Content -->
         <div class="main">
-            <!-- Library -->
             <div class="library">
                 <div class="library-header">
                     <span>Library</span>
@@ -551,19 +473,13 @@
                 </div>
             </div>
 
-            <!-- Schedule -->
             <div class="schedule">
                 <div class="days-grid" id="schedule"></div>
             </div>
         </div>
     </div>
 
-    <div id="toast" class="toast"></div>
-
     <script>
-// ==========================================
-// CONFIGURATION
-// ==========================================
 const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
 const WORDPRESS_URL = 'https://new.site.sesmultimedia.com';
@@ -573,12 +489,10 @@ let currentWeek = new Date();
 let library = [];
 let scheduled = [];
 let draggedItem = null;
+let dragOffset = 0; // ✅ OLD WORKING DRAG OFFSET
 let weekStatuses = {};
 window.libraryItemsCache = {};
 
-// ==========================================
-// INITIALIZATION
-// ==========================================
 async function init() {
     try {
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -597,13 +511,10 @@ async function init() {
         renderSchedule();
     } catch (error) {
         console.error('Init error:', error);
-        showToast('Initialization error - check console');
+        showToast('Initialization error');
     }
 }
 
-// ==========================================
-// WEEK MANAGEMENT
-// ==========================================
 function getWeekKey() {
     const friday = new Date(currentWeek);
     friday.setHours(0, 0, 0, 0);
@@ -656,18 +567,13 @@ function updateStatusBadge() {
     }
 }
 
-// ==========================================
-// SAVE DRAFT
-// ==========================================
 async function saveDraft() {
     try {
-        const validatedEvents = await validateEvents(scheduled);
-
         const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                events: validatedEvents,
+                events: scheduled,
                 weekStatuses: weekStatuses
             })
         });
@@ -675,16 +581,9 @@ async function saveDraft() {
         const data = await response.json();
 
         if (data.success) {
-            scheduled = validatedEvents;
             setCurrentWeekStatus('draft');
             updateStatusBadge();
-
-            if (data.stats && data.stats.orphaned_removed > 0) {
-                showToast(`Draft saved! (${data.stats.orphaned_removed} orphaned events removed)`);
-            } else {
-                showToast('Draft saved!');
-            }
-
+            showToast('Draft saved!');
             renderSchedule();
         } else {
             showToast('Failed to save draft');
@@ -695,9 +594,6 @@ async function saveDraft() {
     }
 }
 
-// ==========================================
-// PUBLISH SCHEDULE
-// ==========================================
 async function publishSchedule() {
     const weekStart = new Date(currentWeek);
     weekStart.setHours(0, 0, 0, 0);
@@ -711,25 +607,11 @@ async function publishSchedule() {
     });
 
     if (currentWeekEvents.length === 0) {
-        showToast('Nothing to publish for this week!');
+        showToast('Nothing to publish!');
         return;
     }
 
-    const validatedEvents = await validateEvents(currentWeekEvents);
-
-    if (validatedEvents.length === 0) {
-        showToast('No valid events to publish! All events missing WordPress posts.');
-        return;
-    }
-
-    if (validatedEvents.length < currentWeekEvents.length) {
-        const orphanCount = currentWeekEvents.length - validatedEvents.length;
-        if (!confirm(`${orphanCount} events don't have WordPress posts and will be skipped. Continue?`)) {
-            return;
-        }
-    }
-
-    if (!confirm(`Publish ${validatedEvents.length} events for this week? This will create WooCommerce ticket products.`)) {
+    if (!confirm(`Publish ${currentWeekEvents.length} events?`)) {
         return;
     }
 
@@ -738,7 +620,7 @@ async function publishSchedule() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                events: validatedEvents,
+                events: currentWeekEvents,
                 weekKey: getWeekKey()
             })
         });
@@ -748,26 +630,17 @@ async function publishSchedule() {
         if (data.success) {
             setCurrentWeekStatus('published');
             updateStatusBadge();
-
-            let message = 'Schedule published!';
-            if (data.stats) {
-                message += ` (${data.stats.events_published} events, ${data.stats.posts_updated} posts updated)`;
-            }
-            showToast(message);
-
+            showToast('Published!');
             renderSchedule();
         } else {
-            showToast('Failed to publish schedule');
+            showToast('Publish failed');
         }
     } catch (error) {
         console.error('Publish error:', error);
-        showToast('Error publishing schedule');
+        showToast('Error publishing');
     }
 }
 
-// ==========================================
-// LOAD FROM WORDPRESS
-// ==========================================
 async function loadFromWordPress() {
     try {
         const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/load`);
@@ -776,13 +649,11 @@ async function loadFromWordPress() {
         if (data.success) {
             if (Array.isArray(data.events)) {
                 scheduled = data.events;
-            } else if (data.events && typeof data.events === 'object') {
-                scheduled = Object.values(data.events);
             } else {
                 scheduled = [];
             }
 
-            if (data.weekStatuses && typeof data.weekStatuses === 'object') {
+            if (data.weekStatuses) {
                 weekStatuses = data.weekStatuses;
             } else {
                 weekStatuses = {};
@@ -792,50 +663,20 @@ async function loadFromWordPress() {
                 if (event.startTime && typeof event.startTime === 'string') {
                     event.startTime = new Date(event.startTime);
                 }
-
-                if (event.actualDate && event.actualDate.includes('T')) {
-                    const oldDate = new Date(event.actualDate);
-                    const year = oldDate.getFullYear();
-                    const month = String(oldDate.getMonth() + 1).padStart(2, '0');
-                    const day = String(oldDate.getDate()).padStart(2, '0');
-                    const hours = String(oldDate.getHours()).padStart(2, '0');
-                    const minutes = String(oldDate.getMinutes()).padStart(2, '0');
-                    event.actualDate = `${year}-${month}-${day} ${hours}:${minutes}:00`;
-                }
             });
-
-            const beforeCount = scheduled.length;
-            scheduled = scheduled.filter(event => {
-                return event.supabaseId && (event.startTime || event.actualDate);
-            });
-            const removedCount = beforeCount - scheduled.length;
-
-            if (removedCount > 0) {
-                console.log(`Removed ${removedCount} invalid events on load`);
-            }
 
             updateStatusBadge();
             renderSchedule();
-        } else {
-            scheduled = [];
-            weekStatuses = {};
-            updateStatusBadge();
         }
     } catch (error) {
         console.error('Load error:', error);
         scheduled = [];
         weekStatuses = {};
-        updateStatusBadge();
     }
 }
 
-// ==========================================
-// CLEAR SCHEDULE
-// ==========================================
 function clearSchedule() {
-    if (!confirm('Clear this week\'s schedule? This cannot be undone.')) {
-        return;
-    }
+    if (!confirm('Clear this week?')) return;
 
     const weekStart = new Date(currentWeek);
     weekStart.setHours(0, 0, 0, 0);
@@ -843,119 +684,32 @@ function clearSchedule() {
     weekEnd.setDate(weekEnd.getDate() + 3);
     weekEnd.setHours(23, 59, 59, 999);
 
-    const beforeCount = scheduled.length;
-
     scheduled = scheduled.filter(event => {
         const eventDate = new Date(event.startTime);
         return eventDate < weekStart || eventDate > weekEnd;
     });
 
-    const clearedCount = beforeCount - scheduled.length;
-
     setCurrentWeekStatus('draft');
     renderSchedule();
     saveDraft();
-
-    showToast(`Cleared ${clearedCount} event(s) from this week`);
+    showToast('Cleared');
 }
 
-// ==========================================
-// DELETE EVENT
-// ==========================================
 function deleteEvent(scheduleId) {
     const index = scheduled.findIndex(e => e.scheduleId === scheduleId);
-
-    if (index === -1) {
-        showToast('Event not found');
-        return;
-    }
-
+    if (index === -1) return;
     const event = scheduled[index];
-
     if (confirm(`Delete ${event.title}?`)) {
         scheduled.splice(index, 1);
         renderSchedule();
         saveDraft();
-        showToast('Event deleted');
+        showToast('Deleted');
     }
 }
 
-// ==========================================
-// VALIDATION FUNCTIONS
-// ==========================================
-async function validateEvents(events) {
-    const validEvents = [];
-    const supabaseIds = [...new Set(events.map(e => e.supabaseId).filter(id => id))];
-    const existingPosts = await checkPostsExist(supabaseIds);
-
-    for (const event of events) {
-        const supabaseId = event.supabaseId;
-
-        if (!supabaseId) {
-            console.warn('Event missing supabaseId:', event.title);
-            continue;
-        }
-
-        if (existingPosts.has(supabaseId)) {
-            validEvents.push(event);
-        } else {
-            console.warn(`Event ${event.title} (${supabaseId}) has no WordPress post`);
-        }
-    }
-
-    return validEvents;
-}
-
-async function checkPostsExist(supabaseIds) {
-    if (supabaseIds.length === 0) {
-        return new Set();
-    }
-
-    const existingSet = new Set();
-
-    for (const id of supabaseIds) {
-        if (window.libraryItemsCache && window.libraryItemsCache[id]) {
-            existingSet.add(id);
-        }
-    }
-
-    return existingSet;
-}
-
-// ==========================================
-// MANUAL CLEANUP
-// ==========================================
-async function manualCleanup() {
-    if (!confirm('Clean up all orphaned events? This will remove events that don\'t have WordPress posts.')) {
-        return;
-    }
-
-    try {
-        const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/cleanup`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        const data = await response.json();
-
-        if (data.success && data.stats) {
-            showToast(`Cleanup complete! Removed ${data.stats.removed} orphaned event(s)`);
-            await loadFromWordPress();
-        } else {
-            showToast('Cleanup failed');
-        }
-    } catch (error) {
-        console.error('Cleanup error:', error);
-        showToast('Error during cleanup');
-    }
-}
-
-// ==========================================
-// SUPABASE IMPORT - VERIFIED EXACT SCHEMA
-// ==========================================
 async function importFromSupabase() {
     try {
-        showToast('Importing from Supabase...');
+        showToast('Importing...');
 
         const { data: movies, error: moviesError } = await supabase
             .from('movies')
@@ -976,16 +730,14 @@ async function importFromSupabase() {
         if (movies) {
             movies.forEach(movie => {
                 const minutes = movie.runtime_minutes || 120;
-
                 window.libraryItemsCache[movie.id] = {
                     id: movie.id,
-                    title: movie.title || 'Untitled Movie',
+                    title: movie.title || 'Untitled',
                     duration: minutes,
                     type: 'movie',
                     supabaseId: movie.id,
                     table: 'movies'
                 };
-
                 library.push(window.libraryItemsCache[movie.id]);
             });
         }
@@ -993,45 +745,34 @@ async function importFromSupabase() {
         if (events) {
             events.forEach(event => {
                 const minutes = event.duration_minutes || 120;
-
                 window.libraryItemsCache[event.id] = {
                     id: event.id,
-                    title: event.event_name || 'Untitled Event',
+                    title: event.event_name || 'Untitled',
                     duration: minutes,
                     type: 'event',
                     supabaseId: event.id,
                     table: 'events'
                 };
-
                 library.push(window.libraryItemsCache[event.id]);
             });
         }
 
         renderLibrary();
-
-        const movieCount = movies ? movies.length : 0;
-        const eventCount = events ? events.length : 0;
-        showToast(`Library imported! ${movieCount} movies, ${eventCount} events`);
+        showToast(`Imported ${library.length} items`);
     } catch (error) {
         console.error('Import error:', error);
-        showToast('Error importing from Supabase: ' + error.message);
+        showToast('Import failed');
     }
 }
 
-// ==========================================
-// LIBRARY RENDERING
-// ==========================================
 function renderLibrary() {
     const container = document.getElementById('library');
     const searchInput = document.getElementById('search');
-    const filterSelect = document.getElementById('recentFilter');
     const countEl = document.getElementById('libCount');
 
     if (!container) return;
 
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
-    const daysFilter = filterSelect ? filterSelect.value : 'all';
-
     let filtered = library;
 
     if (searchTerm) {
@@ -1062,26 +803,19 @@ function renderLibrary() {
         div.draggable = true;
         div.innerHTML = `
             <div class="library-item-title">${item.title}</div>
-            <div class="library-item-info">${item.duration}min • ${item.type}</div>
+            <div class="library-item-info">${item.duration}min</div>
         `;
 
         div.addEventListener('dragstart', e => {
-            e.target.classList.add('dragging');
+            dragOffset = 0; // ✅ Reset offset for library items
             draggedItem = { ...item, fromSchedule: false };
             e.dataTransfer.effectAllowed = 'copy';
-        });
-
-        div.addEventListener('dragend', e => {
-            e.target.classList.remove('dragging');
         });
 
         container.appendChild(div);
     });
 }
 
-// ==========================================
-// SCHEDULE RENDERING
-// ==========================================
 function renderSchedule() {
     const scheduleContainer = document.getElementById('schedule');
     if (!scheduleContainer) return;
@@ -1139,7 +873,11 @@ function buildScheduleGrid(container) {
                 grid.appendChild(slot);
             }
 
-            setupDropZone(grid);
+            // ✅ OLD WORKING DRAG/DROP
+            grid.addEventListener('dragover', handleDragOver);
+            grid.addEventListener('dragleave', handleDragLeave);
+            grid.addEventListener('drop', handleDrop);
+
             theaterDiv.appendChild(grid);
             theaters.appendChild(theaterDiv);
         }
@@ -1147,6 +885,98 @@ function buildScheduleGrid(container) {
         dayCol.appendChild(theaters);
         container.appendChild(dayCol);
     });
+}
+
+// ✅ OLD WORKING DRAG FUNCTIONS
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    document.querySelectorAll('.drag-preview').forEach(p => p.remove());
+    
+    const rect = this.getBoundingClientRect();
+    let y = e.clientY - rect.top;
+    
+    if (dragOffset > 0) y = y - dragOffset;
+    
+    const snappedY = Math.round(y / 20) * 20;
+    const preview = document.createElement('div');
+    preview.className = 'drag-preview';
+    this.appendChild(preview);
+    
+    const hour = Math.floor(snappedY / 80) + 12;
+    const min = Math.round((snappedY % 80) / 80 * 60);
+    const displayHour = hour > 12 ? hour - 12 : hour;
+    const period = hour >= 12 ? 'PM' : 'AM';
+    
+    preview.textContent = `${displayHour}:${min.toString().padStart(2,'0')} ${period}`;
+    preview.style.top = `${snappedY}px`;
+}
+
+function handleDragLeave(e) {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+        document.querySelectorAll('.drag-preview').forEach(p => p.remove());
+    }
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    document.querySelectorAll('.drag-preview').forEach(p => p.remove());
+    
+    if (!draggedItem) return;
+    
+    try {
+        const rect = this.getBoundingClientRect();
+        let y = e.clientY - rect.top;
+        
+        if (dragOffset > 0) y = y - dragOffset;
+        
+        const snappedY = Math.round(y / 20) * 20;
+        const day = parseInt(this.dataset.day);
+        const theater = parseInt(this.dataset.theater);
+        const hour = Math.floor(snappedY / 80) + 12;
+        const min = Math.round((snappedY % 80) / 80 * 60);
+        
+        const date = new Date(currentWeek);
+        date.setDate(date.getDate() + day);
+        date.setHours(hour, min, 0, 0);
+        
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const dayOfMonth = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const localDateTime = `${year}-${month}-${dayOfMonth} ${hours}:${minutes}:00`;
+        
+        if (draggedItem.fromSchedule && draggedItem.scheduleId) {
+            const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
+            if (index !== -1) scheduled.splice(index, 1);
+        }
+        
+        const newEvent = {
+            id: draggedItem.id,
+            title: draggedItem.title,
+            duration: draggedItem.duration,
+            type: draggedItem.type,
+            supabaseId: draggedItem.supabaseId,
+            table: draggedItem.table,
+            day,
+            theater,
+            startTime: date,
+            position: snappedY,
+            scheduleId: `sched-${Date.now()}`,
+            actualDate: localDateTime
+        };
+        
+        scheduled.push(newEvent);
+        dragOffset = 0;
+        renderSchedule();
+        saveDraft();
+        showToast(`Added: ${draggedItem.title}`);
+    } catch (error) {
+        console.error('Drop error:', error);
+        showToast('Error: ' + error.message);
+    }
 }
 
 function renderScheduledEvents() {
@@ -1176,7 +1006,9 @@ function renderScheduledEvents() {
 
         const hours = eventDate.getHours();
         const minutes = eventDate.getMinutes();
-        const topPos = ((hours - 12) * 80) + (minutes / 60 * 80);
+        
+        // Use position if available, otherwise calculate
+        const topPos = event.position || (((hours - 12) * 80) + (minutes / 60 * 80));
 
         const div = document.createElement('div');
         div.className = `event-block ${event.type}-t${event.theater}`;
@@ -1194,148 +1026,32 @@ function renderScheduledEvents() {
             <button class="delete-btn" onclick="deleteEvent('${event.scheduleId}')">×</button>
         `;
 
+        // ✅ OLD WORKING DRAG START WITH OFFSET
         div.addEventListener('dragstart', e => {
-            e.target.classList.add('dragging');
+            const rect = div.getBoundingClientRect();
+            dragOffset = e.clientY - rect.top; // Calculate offset from top of block
             draggedItem = { ...event, fromSchedule: true, scheduleId: event.scheduleId };
             e.dataTransfer.effectAllowed = 'move';
         });
 
-        div.addEventListener('dragend', e => {
-            e.target.classList.remove('dragging');
+        div.addEventListener('dragend', () => {
+            document.querySelectorAll('.drag-preview').forEach(p => p.remove());
         });
 
         grid.appendChild(div);
     });
 }
 
-// ==========================================
-// DRAG & DROP - SIMPLE & CLEAR
-// ==========================================
-function setupDropZone(grid) {
-    grid.addEventListener('dragover', e => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = draggedItem?.fromSchedule ? 'move' : 'copy';
-
-        if (!draggedItem) return;
-
-        const rect = grid.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-
-        // SNAP TO 15-MINUTE INTERVALS
-        const snappedY = Math.round(y / 20) * 20;
-
-        // Remove old preview
-        grid.querySelectorAll('.drag-preview').forEach(p => p.remove());
-
-        // Calculate exact time
-        const hour = Math.floor(snappedY / 80) + 12;
-        const minute = Math.round((snappedY % 80) / 20) * 15;
-
-        // Format time
-        const displayHour = hour > 12 ? hour - 12 : hour;
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const timeDisplay = `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
-
-        // Create preview at EXACT snap location
-        const preview = document.createElement('div');
-        preview.className = `drag-preview ${draggedItem.type}-preview`;
-        preview.style.top = snappedY + 'px';
-        preview.style.height = ((draggedItem.duration || 120) * 80 / 60) + 'px';
-
-        preview.innerHTML = `
-            <div class="drag-preview-time">DROP AT ${timeDisplay}</div>
-            <div class="drag-preview-title">${draggedItem.title}</div>
-            <div class="drag-preview-duration">${draggedItem.duration} minutes</div>
-        `;
-
-        grid.appendChild(preview);
-    });
-
-    grid.addEventListener('dragleave', e => {
-        if (e.target === grid || !grid.contains(e.relatedTarget)) {
-            grid.querySelectorAll('.drag-preview').forEach(p => p.remove());
-        }
-    });
-
-    grid.addEventListener('drop', e => {
-        e.preventDefault();
-        grid.querySelectorAll('.drag-preview').forEach(p => p.remove());
-
-        if (!draggedItem) return;
-
-        const rect = grid.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-
-        // SNAP TO 15-MINUTE INTERVALS
-        const snappedY = Math.round(y / 20) * 20;
-
-        const day = parseInt(grid.dataset.day);
-        const theater = parseInt(grid.dataset.theater);
-
-        // Calculate hour and minute
-        const hour = Math.floor(snappedY / 80) + 12;
-        const minute = Math.round((snappedY % 80) / 20) * 15;
-
-        const date = new Date(currentWeek);
-        date.setDate(date.getDate() + day);
-        date.setHours(hour, minute, 0, 0);
-
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const dayOfMonth = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const localDateTime = `${year}-${month}-${dayOfMonth} ${hours}:${minutes}:00`;
-
-        if (draggedItem.fromSchedule && draggedItem.scheduleId) {
-            const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
-            if (index !== -1) scheduled.splice(index, 1);
-        }
-
-        const newEvent = {
-            id: draggedItem.id,
-            title: draggedItem.title,
-            duration: draggedItem.duration,
-            type: draggedItem.type,
-            supabaseId: draggedItem.supabaseId,
-            table: draggedItem.table,
-            day,
-            theater,
-            startTime: date,
-            scheduleId: `sched-${Date.now()}`,
-            actualDate: localDateTime
-        };
-
-        scheduled.push(newEvent);
-        renderSchedule();
-
-        // Show confirmation
-        const displayHour = hour > 12 ? hour - 12 : hour;
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        showToast(`Added at ${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`);
-
-        draggedItem = null;
-    });
-}
-
-// ==========================================
-// TOAST NOTIFICATIONS
-// ==========================================
 function showToast(message) {
-    const toast = document.getElementById('toast');
-    if (!toast) return;
-
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'toast';
     toast.textContent = message;
-    toast.style.display = 'block';
-
-    setTimeout(() => {
-        toast.style.display = 'none';
-    }, 3000);
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
 }
 
-// ==========================================
-// EVENT LISTENERS
-// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     init();
 
@@ -1355,10 +1071,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (clearBtn) clearBtn.addEventListener('click', clearSchedule);
 
     const searchInput = document.getElementById('search');
-    const filterSelect = document.getElementById('recentFilter');
-
     if (searchInput) searchInput.addEventListener('input', renderLibrary);
-    if (filterSelect) filterSelect.addEventListener('change', renderLibrary);
 });
     </script>
 </body>
