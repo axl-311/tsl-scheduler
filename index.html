@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v2.6 - Draft/Publish</title>
+    <title>TSL Scheduler v3.0 - FIXED</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
@@ -217,7 +217,7 @@
             background: #e8f4ff;
         }
 
-        .library-item.event {
+        .library-item.performance {
             border-left-color: #e74c43;
             background: #ffe8e6;
         }
@@ -243,7 +243,7 @@
             flex: 1;
             background: white;
             border-radius: 12px;
-            padding: 20px 20px 20px 80px;
+            padding: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             overflow-x: auto;
         }
@@ -251,6 +251,8 @@
         .days-grid {
             display: flex;
             gap: 4px;
+            position: relative;
+            padding-left: 60px;
         }
 
         .day-column {
@@ -339,7 +341,11 @@
             background: #4bc4a5;
         }
 
-        .event-block.event {
+        .event-block.performance-t1 {
+            background: #ff9999;
+        }
+
+        .event-block.performance-t2 {
             background: #e74c43;
             color: white;
         }
@@ -412,18 +418,7 @@
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             z-index: 1000;
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateY(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
+            display: none;
         }
 
         /* Empty state */
@@ -446,7 +441,7 @@
             <div>
                 <h1>
                     TSL Scheduler
-                    <span class="version">v2.6</span>
+                    <span class="version">v3.0</span>
                 </h1>
             </div>
             <div class="header-actions">
@@ -486,8 +481,8 @@
                 <input type="text" class="library-search" id="search" placeholder="Search...">
                 <div class="library-items" id="library">
                     <div class="empty-state">
-                        <div class="empty-state-icon">Library</div>
-                        <div>Import from database to get started</div>
+                        <div class="empty-state-icon">📚</div>
+                        <div>Click "Refresh Library" to import from Supabase</div>
                     </div>
                 </div>
             </div>
@@ -498,6 +493,8 @@
             </div>
         </div>
     </div>
+
+    <div id="toast" class="toast"></div>
 
     <script>
 // ==========================================
@@ -510,28 +507,34 @@ const WORDPRESS_URL = 'https://axlentertainment.com';
 let supabase = null;
 let currentWeek = new Date();
 let library = [];
-let scheduled = []; // ALL events across all weeks
+let scheduled = [];
 let draggedItem = null;
-let dragOffset = 0;
-let weekStatuses = {}; // Track status per week
+let weekStatuses = {};
 window.libraryItemsCache = {};
 
 // ==========================================
 // INITIALIZATION
 // ==========================================
 async function init() {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    try {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
-    currentWeek = new Date(today);
-    currentWeek.setDate(today.getDate() + daysUntilFriday);
-    currentWeek.setHours(0, 0, 0, 0);
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+        currentWeek = new Date(today);
+        currentWeek.setDate(today.getDate() + daysUntilFriday);
+        currentWeek.setHours(0, 0, 0, 0);
 
-    await loadFromWordPress();
-    await importFromSupabase();
-    setWeek(0);
+        await loadFromWordPress();
+        await importFromSupabase();
+        updateWeekDisplay();
+        updateStatusBadge();
+        renderSchedule();
+    } catch (error) {
+        console.error('Init error:', error);
+        showToast('Initialization error - check console');
+    }
 }
 
 // ==========================================
@@ -553,17 +556,15 @@ function setCurrentWeekStatus(status) {
     weekStatuses[key] = status;
 }
 
-function setWeek(offset) {
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
-    const thisFriday = new Date(today);
-    thisFriday.setDate(today.getDate() + daysUntilFriday);
-    thisFriday.setHours(0, 0, 0, 0);
+function prevWeek() {
+    currentWeek.setDate(currentWeek.getDate() - 7);
+    updateWeekDisplay();
+    updateStatusBadge();
+    renderSchedule();
+}
 
-    currentWeek = new Date(thisFriday);
-    currentWeek.setDate(thisFriday.getDate() + (offset * 7));
-
+function nextWeek() {
+    currentWeek.setDate(currentWeek.getDate() + 7);
     updateWeekDisplay();
     updateStatusBadge();
     renderSchedule();
@@ -574,17 +575,21 @@ function updateWeekDisplay() {
     const monday = new Date(currentWeek);
     monday.setDate(friday.getDate() + 3);
 
-    const options = { month: 'short', day: 'numeric' };
-    document.getElementById('current-week').textContent =
-        `${friday.toLocaleDateString('en-US', options)} - ${monday.toLocaleDateString('en-US', options)}`;
+    const options = { month: 'short', day: 'numeric', year: 'numeric' };
+    const weekEl = document.getElementById('weekDisplay');
+    if (weekEl) {
+        weekEl.textContent = `${friday.toLocaleDateString('en-US', options)} - ${monday.toLocaleDateString('en-US', options)}`;
+    }
 }
 
 function updateStatusBadge() {
     const status = getCurrentWeekStatus();
-    const badge = document.querySelector('.status-badge');
+    const badge = document.getElementById('statusBadge');
 
-    badge.textContent = status === 'published' ? 'Published' : 'Draft';
-    badge.className = 'status-badge ' + (status === 'published' ? 'published' : 'draft');
+    if (badge) {
+        badge.textContent = status === 'published' ? 'PUBLISHED' : 'DRAFT';
+        badge.className = 'status ' + (status === 'published' ? 'published' : 'draft');
+    }
 }
 
 // ==========================================
@@ -592,7 +597,6 @@ function updateStatusBadge() {
 // ==========================================
 async function saveDraft() {
     try {
-        // ✅ NEW: Validate events before saving
         const validatedEvents = await validateEvents(scheduled);
 
         const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/save`, {
@@ -607,12 +611,10 @@ async function saveDraft() {
         const data = await response.json();
 
         if (data.success) {
-            // ✅ NEW: Update local state with cleaned data
             scheduled = validatedEvents;
             setCurrentWeekStatus('draft');
             updateStatusBadge();
 
-            // ✅ NEW: Show stats if orphans removed
             if (data.stats && data.stats.orphaned_removed > 0) {
                 showToast(`Draft saved! (${data.stats.orphaned_removed} orphaned events removed)`);
             } else {
@@ -633,14 +635,12 @@ async function saveDraft() {
 // PUBLISH SCHEDULE - FIXED WITH REPLACE STRATEGY
 // ==========================================
 async function publishSchedule() {
-    // Get current week boundaries
     const weekStart = new Date(currentWeek);
     weekStart.setHours(0, 0, 0, 0);
     const weekEnd = new Date(currentWeek);
     weekEnd.setDate(weekEnd.getDate() + 3);
     weekEnd.setHours(23, 59, 59, 999);
 
-    // Filter to current week events only
     const currentWeekEvents = scheduled.filter(event => {
         const eventDate = new Date(event.startTime);
         return eventDate >= weekStart && eventDate <= weekEnd;
@@ -651,7 +651,6 @@ async function publishSchedule() {
         return;
     }
 
-    // ✅ NEW: Validate events have WordPress posts
     const validatedEvents = await validateEvents(currentWeekEvents);
 
     if (validatedEvents.length === 0) {
@@ -659,7 +658,6 @@ async function publishSchedule() {
         return;
     }
 
-    // ✅ NEW: Warn if some events skipped
     if (validatedEvents.length < currentWeekEvents.length) {
         const orphanCount = currentWeekEvents.length - validatedEvents.length;
         if (!confirm(`${orphanCount} events don't have WordPress posts and will be skipped. Continue?`)) {
@@ -687,7 +685,6 @@ async function publishSchedule() {
             setCurrentWeekStatus('published');
             updateStatusBadge();
 
-            // ✅ NEW: Show detailed stats
             let message = 'Schedule published!';
             if (data.stats) {
                 message += ` (${data.stats.events_published} events, ${data.stats.posts_updated} posts updated)`;
@@ -727,13 +724,11 @@ async function loadFromWordPress() {
                 weekStatuses = {};
             }
 
-            // Convert date strings to Date objects
             scheduled.forEach(event => {
                 if (event.startTime && typeof event.startTime === 'string') {
                     event.startTime = new Date(event.startTime);
                 }
 
-                // Normalize actualDate format
                 if (event.actualDate && event.actualDate.includes('T')) {
                     const oldDate = new Date(event.actualDate);
                     const year = oldDate.getFullYear();
@@ -745,7 +740,6 @@ async function loadFromWordPress() {
                 }
             });
 
-            // ✅ NEW: Remove events without required fields
             const beforeCount = scheduled.length;
             scheduled = scheduled.filter(event => {
                 return event.supabaseId && (event.startTime || event.actualDate);
@@ -768,12 +762,11 @@ async function loadFromWordPress() {
         scheduled = [];
         weekStatuses = {};
         updateStatusBadge();
-        showToast('Error loading schedule');
     }
 }
 
 // ==========================================
-// CLEAR SCHEDULE - IMPROVED
+// CLEAR SCHEDULE
 // ==========================================
 function clearSchedule() {
     if (!confirm('Clear this week\'s schedule? This cannot be undone.')) {
@@ -797,13 +790,13 @@ function clearSchedule() {
 
     setCurrentWeekStatus('draft');
     renderSchedule();
-    saveDraft(); // ✅ Auto-save after clear
+    saveDraft();
 
     showToast(`Cleared ${clearedCount} event(s) from this week`);
 }
 
 // ==========================================
-// DELETE EVENT - IMPROVED
+// DELETE EVENT
 // ==========================================
 function deleteEvent(scheduleId) {
     const index = scheduled.findIndex(e => e.scheduleId === scheduleId);
@@ -818,13 +811,13 @@ function deleteEvent(scheduleId) {
     if (confirm(`Delete ${event.title}?`)) {
         scheduled.splice(index, 1);
         renderSchedule();
-        saveDraft(); // ✅ Auto-save after delete
+        saveDraft();
         showToast('Event deleted');
     }
 }
 
 // ==========================================
-// NEW: VALIDATION FUNCTIONS
+// VALIDATION FUNCTIONS
 // ==========================================
 async function validateEvents(events) {
     const validEvents = [];
@@ -866,7 +859,7 @@ async function checkPostsExist(supabaseIds) {
 }
 
 // ==========================================
-// NEW: MANUAL CLEANUP
+// MANUAL CLEANUP
 // ==========================================
 async function manualCleanup() {
     if (!confirm('Clean up all orphaned events? This will remove events that don\'t have WordPress posts.')) {
@@ -898,6 +891,8 @@ async function manualCleanup() {
 // ==========================================
 async function importFromSupabase() {
     try {
+        showToast('Importing from Supabase...');
+
         const { data: movies, error: moviesError } = await supabase
             .from('Movies')
             .select('*')
@@ -951,7 +946,7 @@ async function importFromSupabase() {
         }
 
         renderLibrary();
-        showToast('Library imported from Supabase!');
+        showToast(`Library imported! ${library.length} items`);
     } catch (error) {
         console.error('Import error:', error);
         showToast('Error importing from Supabase');
@@ -962,9 +957,15 @@ async function importFromSupabase() {
 // LIBRARY RENDERING
 // ==========================================
 function renderLibrary() {
-    const container = document.getElementById('library-items');
-    const searchTerm = document.getElementById('library-search').value.toLowerCase();
-    const typeFilter = document.getElementById('library-type-filter').value;
+    const container = document.getElementById('library');
+    const searchInput = document.getElementById('search');
+    const filterSelect = document.getElementById('recentFilter');
+    const countEl = document.getElementById('libCount');
+
+    if (!container) return;
+
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    const daysFilter = filterSelect ? filterSelect.value : 'all';
 
     let filtered = library;
 
@@ -974,24 +975,33 @@ function renderLibrary() {
         );
     }
 
-    if (typeFilter !== 'all') {
-        filtered = filtered.filter(item => item.type === typeFilter);
+    if (countEl) {
+        countEl.textContent = `(${filtered.length})`;
     }
 
     container.innerHTML = '';
 
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">📚</div>
+                <div>No items found</div>
+            </div>
+        `;
+        return;
+    }
+
     filtered.forEach(item => {
         const div = document.createElement('div');
-        div.className = 'library-item';
+        div.className = `library-item ${item.type}`;
         div.draggable = true;
         div.innerHTML = `
-            <div class="lib-title">${item.title}</div>
-            <div class="lib-meta">${item.duration}min • ${item.type}</div>
+            <div class="library-item-title">${item.title}</div>
+            <div class="library-item-info">${item.duration}min • ${item.type}</div>
         `;
 
         div.addEventListener('dragstart', e => {
             draggedItem = { ...item, fromSchedule: false };
-            dragOffset = 0;
             e.dataTransfer.effectAllowed = 'copy';
         });
 
@@ -1003,12 +1013,74 @@ function renderLibrary() {
 // SCHEDULE RENDERING
 // ==========================================
 function renderSchedule() {
+    const scheduleContainer = document.getElementById('schedule');
+    if (!scheduleContainer) return;
+
+    if (!scheduleContainer.querySelector('.day-column')) {
+        buildScheduleGrid(scheduleContainer);
+    }
+
     renderScheduledEvents();
-    renderTimeLabels();
+}
+
+function buildScheduleGrid(container) {
+    const days = ['Friday', 'Saturday', 'Sunday', 'Monday'];
+    container.innerHTML = '';
+
+    days.forEach((day, dayIndex) => {
+        const dayCol = document.createElement('div');
+        dayCol.className = 'day-column';
+
+        const header = document.createElement('div');
+        header.className = 'day-header';
+        header.textContent = day;
+        dayCol.appendChild(header);
+
+        const theaters = document.createElement('div');
+        theaters.className = 'theaters';
+
+        for (let theater = 1; theater <= 2; theater++) {
+            const theaterDiv = document.createElement('div');
+            theaterDiv.className = 'theater';
+
+            const theaterHeader = document.createElement('div');
+            theaterHeader.className = 'theater-header';
+            theaterHeader.textContent = `Theater ${theater}`;
+            theaterDiv.appendChild(theaterHeader);
+
+            const grid = document.createElement('div');
+            grid.className = 'theater-grid';
+            grid.dataset.day = dayIndex;
+            grid.dataset.theater = theater;
+
+            for (let hour = 12; hour <= 23; hour++) {
+                const slot = document.createElement('div');
+                slot.className = 'time-slot';
+
+                if (theater === 1) {
+                    const label = document.createElement('div');
+                    label.className = 'time-label';
+                    const displayHour = hour > 12 ? hour - 12 : hour;
+                    const ampm = hour >= 12 ? 'PM' : 'AM';
+                    label.textContent = `${displayHour}${ampm}`;
+                    slot.appendChild(label);
+                }
+
+                grid.appendChild(slot);
+            }
+
+            setupDropZone(grid);
+            theaterDiv.appendChild(grid);
+            theaters.appendChild(theaterDiv);
+        }
+
+        dayCol.appendChild(theaters);
+        container.appendChild(dayCol);
+    });
 }
 
 function renderScheduledEvents() {
-    document.querySelectorAll('.scheduled-event').forEach(el => el.remove());
+    document.querySelectorAll('.event-block').forEach(el => el.remove());
 
     const weekStart = new Date(currentWeek);
     weekStart.setHours(0, 0, 0, 0);
@@ -1029,17 +1101,19 @@ function renderScheduledEvents() {
 
         if (dayDiff < 0 || dayDiff > 3) return;
 
-        const column = document.querySelector(`.day-column[data-day="${dayDiff}"][data-theater="${event.theater}"]`);
-        if (!column) return;
-
-        const div = document.createElement('div');
-        div.className = 'scheduled-event';
-        div.draggable = true;
-        div.style.top = event.position + 'px';
-        div.style.height = (event.duration * 80 / 60) + 'px';
+        const grid = document.querySelector(`.theater-grid[data-day="${dayDiff}"][data-theater="${event.theater}"]`);
+        if (!grid) return;
 
         const hours = eventDate.getHours();
         const minutes = eventDate.getMinutes();
+        const topPos = ((hours - 12) * 80) + (minutes / 60 * 80);
+
+        const div = document.createElement('div');
+        div.className = `event-block ${event.type}-t${event.theater}`;
+        div.draggable = true;
+        div.style.top = topPos + 'px';
+        div.style.height = (event.duration * 80 / 60) + 'px';
+
         const ampm = hours >= 12 ? 'PM' : 'AM';
         const displayHours = hours % 12 || 12;
         const timeStr = `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
@@ -1051,146 +1125,93 @@ function renderScheduledEvents() {
         `;
 
         div.addEventListener('dragstart', e => {
-            draggedItem = {
-                ...event,
-                fromSchedule: true,
-                scheduleId: event.scheduleId
-            };
-
-            const rect = div.getBoundingClientRect();
-            const y = e.clientY - rect.top;
-            dragOffset = y;
-
+            draggedItem = { ...event, fromSchedule: true, scheduleId: event.scheduleId };
             e.dataTransfer.effectAllowed = 'move';
-
-            setTimeout(() => {
-                div.style.opacity = '0.3';
-            }, 0);
         });
 
-        div.addEventListener('dragend', () => {
-            div.style.opacity = '1';
-        });
-
-        column.appendChild(div);
+        grid.appendChild(div);
     });
-}
-
-function renderTimeLabels() {
-    const container = document.querySelector('.time-labels');
-    container.innerHTML = '';
-
-    for (let hour = 12; hour <= 23; hour++) {
-        const div = document.createElement('div');
-        div.className = 'time-label';
-        const displayHour = hour > 12 ? hour - 12 : hour;
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        div.textContent = `${displayHour}${ampm}`;
-        container.appendChild(div);
-    }
 }
 
 // ==========================================
 // DRAG & DROP
 // ==========================================
-function setupDragAndDrop() {
-    document.querySelectorAll('.day-column').forEach(column => {
-        column.addEventListener('dragover', handleDragOver);
-        column.addEventListener('drop', handleDrop);
-        column.addEventListener('dragenter', handleDragEnter);
-        column.addEventListener('dragleave', handleDragLeave);
+function setupDropZone(grid) {
+    grid.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = draggedItem?.fromSchedule ? 'move' : 'copy';
+
+        const rect = grid.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const snappedY = Math.round(y / 20) * 20;
+
+        grid.querySelectorAll('.drag-preview').forEach(p => p.remove());
+
+        const preview = document.createElement('div');
+        preview.className = 'drag-preview';
+        preview.style.top = snappedY + 'px';
+        preview.style.height = ((draggedItem?.duration || 120) * 80 / 60) + 'px';
+        grid.appendChild(preview);
     });
-}
 
-function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = draggedItem?.fromSchedule ? 'move' : 'copy';
+    grid.addEventListener('dragleave', e => {
+        if (e.target === grid) {
+            grid.querySelectorAll('.drag-preview').forEach(p => p.remove());
+        }
+    });
 
-    const rect = this.getBoundingClientRect();
-    let y = e.clientY - rect.top;
-    if (dragOffset > 0) y = y - dragOffset;
-    const snappedY = Math.round(y / 20) * 20;
+    grid.addEventListener('drop', e => {
+        e.preventDefault();
+        grid.querySelectorAll('.drag-preview').forEach(p => p.remove());
 
-    document.querySelectorAll('.drag-preview').forEach(p => p.remove());
+        if (!draggedItem) return;
 
-    const preview = document.createElement('div');
-    preview.className = 'drag-preview';
-    preview.style.top = snappedY + 'px';
-    preview.style.height = ((draggedItem?.duration || 120) * 80 / 60) + 'px';
-    this.appendChild(preview);
-}
+        const rect = grid.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const snappedY = Math.round(y / 20) * 20;
 
-function handleDragEnter(e) {
-    e.preventDefault();
-    this.classList.add('drag-over');
-}
+        const day = parseInt(grid.dataset.day);
+        const theater = parseInt(grid.dataset.theater);
 
-function handleDragLeave(e) {
-    if (e.target === this) {
-        this.classList.remove('drag-over');
-        document.querySelectorAll('.drag-preview').forEach(p => p.remove());
-    }
-}
+        const hour = Math.floor(snappedY / 80) + 12;
+        const min = Math.round((snappedY % 80) / 80 * 60);
 
-function handleDrop(e) {
-    e.preventDefault();
-    document.querySelectorAll('.drag-preview').forEach(p => p.remove());
-    this.classList.remove('drag-over');
+        const date = new Date(currentWeek);
+        date.setDate(date.getDate() + day);
+        date.setHours(hour, min, 0, 0);
 
-    if (!draggedItem) {
-        showToast('Error: No item selected');
-        return;
-    }
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const dayOfMonth = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const localDateTime = `${year}-${month}-${dayOfMonth} ${hours}:${minutes}:00`;
 
-    const rect = this.getBoundingClientRect();
-    let y = e.clientY - rect.top;
-    if (dragOffset > 0) y = y - dragOffset;
-    const snappedY = Math.round(y / 20) * 20;
+        if (draggedItem.fromSchedule && draggedItem.scheduleId) {
+            const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
+            if (index !== -1) scheduled.splice(index, 1);
+        }
 
-    const day = parseInt(this.dataset.day);
-    const theater = parseInt(this.dataset.theater);
+        const newEvent = {
+            id: draggedItem.id,
+            title: draggedItem.title,
+            duration: draggedItem.duration,
+            type: draggedItem.type,
+            supabaseId: draggedItem.supabaseId,
+            table: draggedItem.table,
+            day,
+            theater,
+            startTime: date,
+            scheduleId: `sched-${Date.now()}`,
+            actualDate: localDateTime
+        };
 
-    const hour = Math.floor(snappedY / 80) + 12;
-    const min = Math.round((snappedY % 80) / 80 * 60);
+        scheduled.push(newEvent);
+        renderSchedule();
+        showToast('Event added!');
 
-    const date = new Date(currentWeek);
-    date.setDate(date.getDate() + day);
-    date.setHours(hour, min, 0, 0);
-
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const dayOfMonth = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const localDateTime = `${year}-${month}-${dayOfMonth} ${hours}:${minutes}:00`;
-
-    if (draggedItem.fromSchedule && draggedItem.scheduleId) {
-        const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
-        if (index !== -1) scheduled.splice(index, 1);
-    }
-
-    const newEvent = {
-        id: draggedItem.id,
-        title: draggedItem.title,
-        duration: draggedItem.duration,
-        type: draggedItem.type,
-        supabaseId: draggedItem.supabaseId,
-        table: draggedItem.table,
-        day,
-        theater,
-        startTime: date,
-        position: snappedY,
-        scheduleId: `sched-${Date.now()}`,
-        fromSchedule: false,
-        actualDate: localDateTime
-    };
-
-    scheduled.push(newEvent);
-    renderSchedule();
-    showToast('Event added!');
-
-    draggedItem = null;
-    dragOffset = 0;
+        draggedItem = null;
+    });
 }
 
 // ==========================================
@@ -1198,11 +1219,13 @@ function handleDrop(e) {
 // ==========================================
 function showToast(message) {
     const toast = document.getElementById('toast');
+    if (!toast) return;
+
     toast.textContent = message;
-    toast.className = 'toast show';
+    toast.style.display = 'block';
 
     setTimeout(() => {
-        toast.className = 'toast';
+        toast.style.display = 'none';
     }, 3000);
 }
 
@@ -1212,18 +1235,27 @@ function showToast(message) {
 document.addEventListener('DOMContentLoaded', () => {
     init();
 
-    document.getElementById('prev-week').addEventListener('click', () => setWeek(Math.floor((currentWeek - new Date()) / (1000 * 60 * 60 * 24 * 7)) - 1));
-    document.getElementById('next-week').addEventListener('click', () => setWeek(Math.floor((currentWeek - new Date()) / (1000 * 60 * 60 * 24 * 7)) + 1));
-    document.getElementById('save-draft').addEventListener('click', saveDraft);
-    document.getElementById('publish-schedule').addEventListener('click', publishSchedule);
-    document.getElementById('clear-schedule').addEventListener('click', clearSchedule);
-    document.getElementById('import-supabase').addEventListener('click', importFromSupabase);
-    document.getElementById('library-search').addEventListener('input', renderLibrary);
-    document.getElementById('library-type-filter').addEventListener('change', renderLibrary);
+    const prevBtn = document.getElementById('prevWeek');
+    const nextBtn = document.getElementById('nextWeek');
+    if (prevBtn) prevBtn.addEventListener('click', prevWeek);
+    if (nextBtn) nextBtn.addEventListener('click', nextWeek);
 
-    setupDragAndDrop();
+    const refreshBtn = document.getElementById('refreshBtn');
+    const saveDraftBtn = document.getElementById('saveDraftBtn');
+    const publishBtn = document.getElementById('publishBtn');
+    const clearBtn = document.getElementById('clearBtn');
+
+    if (refreshBtn) refreshBtn.addEventListener('click', importFromSupabase);
+    if (saveDraftBtn) saveDraftBtn.addEventListener('click', saveDraft);
+    if (publishBtn) publishBtn.addEventListener('click', publishSchedule);
+    if (clearBtn) clearBtn.addEventListener('click', clearSchedule);
+
+    const searchInput = document.getElementById('search');
+    const filterSelect = document.getElementById('recentFilter');
+
+    if (searchInput) searchInput.addEventListener('input', renderLibrary);
+    if (filterSelect) filterSelect.addEventListener('change', renderLibrary);
 });
-
     </script>
 </body>
 </html>
