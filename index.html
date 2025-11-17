@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TSL Scheduler v3.0 - FINAL</title>
+    <title>TSL Scheduler v3.0 - WORKING DRAG</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
@@ -387,17 +387,43 @@
             position: absolute;
             left: 4px;
             right: 4px;
-            background: rgba(0,122,255,0.2);
-            border: 2px dashed #007aff;
-            border-radius: 6px;
+            background: rgba(0,122,255,0.25);
+            border: 4px dashed #007aff;
+            border-radius: 8px;
             pointer-events: none;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            color: #007aff;
+            z-index: 1000;
+            box-shadow: 0 0 20px rgba(0,122,255,0.5);
+            animation: pulse 0.8s infinite;
+        }
+
+        .drag-preview.event-preview {
+            background: rgba(255,50,50,0.25);
+            border-color: #ff3333;
+            color: #ff0000;
+            box-shadow: 0 0 20px rgba(255,50,50,0.5);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        .drag-preview-time {
+            font-size: 16px;
+            font-weight: 900;
+            margin-bottom: 4px;
+        }
+
+        .drag-preview-title {
             font-size: 12px;
             font-weight: 600;
-            color: #007aff;
-            z-index: 100;
         }
 
         /* Make dragged items transparent */
@@ -416,6 +442,7 @@
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             z-index: 1000;
+            display: none;
         }
 
         .empty-state {
@@ -474,7 +501,7 @@
                 <div class="library-items" id="library">
                     <div class="empty-state">
                         <div class="empty-state-icon">📚</div>
-                        <div>Click "Refresh Library" to import from Supabase</div>
+                        <div>Click "Refresh Library"</div>
                     </div>
                 </div>
             </div>
@@ -484,6 +511,8 @@
             </div>
         </div>
     </div>
+
+    <div id="toast" class="toast"></div>
 
     <script>
 const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
@@ -502,7 +531,6 @@ window.libraryItemsCache = {};
 async function init() {
     try {
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
         const today = new Date();
         const dayOfWeek = today.getDay();
         const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
@@ -517,7 +545,7 @@ async function init() {
         renderSchedule();
     } catch (error) {
         console.error('Init error:', error);
-        showToast('Initialization error');
+        showToast('Error loading');
     }
 }
 
@@ -528,13 +556,11 @@ function getWeekKey() {
 }
 
 function getCurrentWeekStatus() {
-    const key = getWeekKey();
-    return weekStatuses[key] || 'draft';
+    return weekStatuses[getWeekKey()] || 'draft';
 }
 
 function setCurrentWeekStatus(status) {
-    const key = getWeekKey();
-    weekStatuses[key] = status;
+    weekStatuses[getWeekKey()] = status;
 }
 
 function prevWeek() {
@@ -555,7 +581,6 @@ function updateWeekDisplay() {
     const friday = new Date(currentWeek);
     const monday = new Date(currentWeek);
     monday.setDate(friday.getDate() + 3);
-
     const options = { month: 'short', day: 'numeric', year: 'numeric' };
     const weekEl = document.getElementById('weekDisplay');
     if (weekEl) {
@@ -566,7 +591,6 @@ function updateWeekDisplay() {
 function updateStatusBadge() {
     const status = getCurrentWeekStatus();
     const badge = document.getElementById('statusBadge');
-
     if (badge) {
         badge.textContent = status === 'published' ? 'PUBLISHED' : 'DRAFT';
         badge.className = 'status ' + (status === 'published' ? 'published' : 'draft');
@@ -578,25 +602,18 @@ async function saveDraft() {
         const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                events: scheduled,
-                weekStatuses: weekStatuses
-            })
+            body: JSON.stringify({ events: scheduled, weekStatuses: weekStatuses })
         });
-
         const data = await response.json();
-
         if (data.success) {
             setCurrentWeekStatus('draft');
             updateStatusBadge();
-            showToast('Draft saved!');
+            showToast('Saved!');
             renderSchedule();
-        } else {
-            showToast('Failed to save draft');
         }
     } catch (error) {
         console.error('Save error:', error);
-        showToast('Error saving draft');
+        showToast('Save failed');
     }
 }
 
@@ -617,33 +634,23 @@ async function publishSchedule() {
         return;
     }
 
-    if (!confirm(`Publish ${currentWeekEvents.length} events?`)) {
-        return;
-    }
+    if (!confirm(`Publish ${currentWeekEvents.length} events?`)) return;
 
     try {
         const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/publish`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                events: currentWeekEvents,
-                weekKey: getWeekKey()
-            })
+            body: JSON.stringify({ events: currentWeekEvents, weekKey: getWeekKey() })
         });
-
         const data = await response.json();
-
         if (data.success) {
             setCurrentWeekStatus('published');
             updateStatusBadge();
             showToast('Published!');
-            renderSchedule();
-        } else {
-            showToast('Publish failed');
         }
     } catch (error) {
         console.error('Publish error:', error);
-        showToast('Error publishing');
+        showToast('Publish failed');
     }
 }
 
@@ -651,39 +658,24 @@ async function loadFromWordPress() {
     try {
         const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/load`);
         const data = await response.json();
-
         if (data.success) {
-            if (Array.isArray(data.events)) {
-                scheduled = data.events;
-            } else {
-                scheduled = [];
-            }
-
-            if (data.weekStatuses) {
-                weekStatuses = data.weekStatuses;
-            } else {
-                weekStatuses = {};
-            }
-
+            scheduled = Array.isArray(data.events) ? data.events : [];
+            weekStatuses = data.weekStatuses || {};
             scheduled.forEach(event => {
                 if (event.startTime && typeof event.startTime === 'string') {
                     event.startTime = new Date(event.startTime);
                 }
             });
-
             updateStatusBadge();
             renderSchedule();
         }
     } catch (error) {
         console.error('Load error:', error);
-        scheduled = [];
-        weekStatuses = {};
     }
 }
 
 function clearSchedule() {
     if (!confirm('Clear this week?')) return;
-
     const weekStart = new Date(currentWeek);
     weekStart.setHours(0, 0, 0, 0);
     const weekEnd = new Date(currentWeek);
@@ -698,35 +690,23 @@ function clearSchedule() {
     setCurrentWeekStatus('draft');
     renderSchedule();
     saveDraft();
-    showToast('Cleared');
 }
 
 function deleteEvent(scheduleId) {
     const index = scheduled.findIndex(e => e.scheduleId === scheduleId);
     if (index === -1) return;
-    const event = scheduled[index];
-    if (confirm(`Delete ${event.title}?`)) {
+    if (confirm(`Delete ${scheduled[index].title}?`)) {
         scheduled.splice(index, 1);
         renderSchedule();
         saveDraft();
-        showToast('Deleted');
     }
 }
 
 async function importFromSupabase() {
     try {
         showToast('Importing...');
-
-        const { data: movies, error: moviesError } = await supabase
-            .from('movies')
-            .select('*')
-            .order('title');
-
-        const { data: events, error: eventsError } = await supabase
-            .from('events')
-            .select('*')
-            .eq('show_on_events_list', true)
-            .order('event_name');
+        const { data: movies, error: moviesError } = await supabase.from('movies').select('*').order('title');
+        const { data: events, error: eventsError } = await supabase.from('events').select('*').eq('show_on_events_list', true).order('event_name');
 
         if (moviesError) throw moviesError;
         if (eventsError) throw eventsError;
@@ -735,11 +715,10 @@ async function importFromSupabase() {
 
         if (movies) {
             movies.forEach(movie => {
-                const minutes = movie.runtime_minutes || 120;
                 window.libraryItemsCache[movie.id] = {
                     id: movie.id,
                     title: movie.title || 'Untitled',
-                    duration: minutes,
+                    duration: movie.runtime_minutes || 120,
                     type: 'movie',
                     supabaseId: movie.id,
                     table: 'movies'
@@ -750,11 +729,10 @@ async function importFromSupabase() {
 
         if (events) {
             events.forEach(event => {
-                const minutes = event.duration_minutes || 120;
                 window.libraryItemsCache[event.id] = {
                     id: event.id,
                     title: event.event_name || 'Untitled',
-                    duration: minutes,
+                    duration: event.duration_minutes || 120,
                     type: 'event',
                     supabaseId: event.id,
                     table: 'events'
@@ -764,7 +742,7 @@ async function importFromSupabase() {
         }
 
         renderLibrary();
-        showToast(`Imported ${library.length} items`);
+        showToast(`Loaded ${library.length} items`);
     } catch (error) {
         console.error('Import error:', error);
         showToast('Import failed');
@@ -775,31 +753,16 @@ function renderLibrary() {
     const container = document.getElementById('library');
     const searchInput = document.getElementById('search');
     const countEl = document.getElementById('libCount');
-
     if (!container) return;
 
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
-    let filtered = library;
+    let filtered = searchTerm ? library.filter(item => item.title.toLowerCase().includes(searchTerm)) : library;
 
-    if (searchTerm) {
-        filtered = filtered.filter(item =>
-            item.title.toLowerCase().includes(searchTerm)
-        );
-    }
-
-    if (countEl) {
-        countEl.textContent = `(${filtered.length})`;
-    }
-
+    if (countEl) countEl.textContent = `(${filtered.length})`;
     container.innerHTML = '';
 
     if (filtered.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">📚</div>
-                <div>No items found</div>
-            </div>
-        `;
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📚</div><div>No items</div></div>';
         return;
     }
 
@@ -807,11 +770,8 @@ function renderLibrary() {
         const div = document.createElement('div');
         div.className = `library-item ${item.type}`;
         div.draggable = true;
-        div.innerHTML = `
-            <div class="library-item-title">${item.title}</div>
-            <div class="library-item-info">${item.duration}min</div>
-        `;
-
+        div.innerHTML = `<div class="library-item-title">${item.title}</div><div class="library-item-info">${item.duration}min</div>`;
+        
         div.addEventListener('dragstart', e => {
             e.target.classList.add('dragging');
             dragOffset = 0;
@@ -830,11 +790,9 @@ function renderLibrary() {
 function renderSchedule() {
     const scheduleContainer = document.getElementById('schedule');
     if (!scheduleContainer) return;
-
     if (!scheduleContainer.querySelector('.day-column')) {
         buildScheduleGrid(scheduleContainer);
     }
-
     renderScheduledEvents();
 }
 
@@ -871,16 +829,13 @@ function buildScheduleGrid(container) {
             for (let hour = 12; hour <= 23; hour++) {
                 const slot = document.createElement('div');
                 slot.className = 'time-slot';
-
                 if (theater === 1) {
                     const label = document.createElement('div');
                     label.className = 'time-label';
                     const displayHour = hour > 12 ? hour - 12 : hour;
-                    const ampm = hour >= 12 ? 'PM' : 'AM';
-                    label.textContent = `${displayHour}${ampm}`;
+                    label.textContent = `${displayHour}${hour >= 12 ? 'PM' : 'AM'}`;
                     slot.appendChild(label);
                 }
-
                 grid.appendChild(slot);
             }
 
@@ -899,27 +854,30 @@ function buildScheduleGrid(container) {
 
 function handleDragOver(e) {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    
+    e.dataTransfer.dropEffect = draggedItem?.fromSchedule ? 'move' : 'copy';
+    if (!draggedItem) return;
+
     document.querySelectorAll('.drag-preview').forEach(p => p.remove());
-    
+
     const rect = this.getBoundingClientRect();
-    let y = e.clientY - rect.top;
-    
-    if (dragOffset > 0) y = y - dragOffset;
-    
+    let y = e.clientY - rect.top - dragOffset;
+
     const snappedY = Math.round(y / 20) * 20;
-    const preview = document.createElement('div');
-    preview.className = 'drag-preview';
-    this.appendChild(preview);
-    
+
     const hour = Math.floor(snappedY / 80) + 12;
-    const min = Math.round((snappedY % 80) / 80 * 60);
+    const minute = Math.round((snappedY % 80) / 20) * 15;
     const displayHour = hour > 12 ? hour - 12 : hour;
     const period = hour >= 12 ? 'PM' : 'AM';
-    
-    preview.textContent = `${displayHour}:${min.toString().padStart(2,'0')} ${period}`;
+
+    const preview = document.createElement('div');
+    preview.className = `drag-preview ${draggedItem.type}-preview`;
     preview.style.top = `${snappedY}px`;
+    preview.style.height = `${(draggedItem.duration || 120) * 80 / 60}px`;
+    preview.innerHTML = `
+        <div class="drag-preview-time">${displayHour}:${minute.toString().padStart(2,'0')} ${period}</div>
+        <div class="drag-preview-title">${draggedItem.title}</div>
+    `;
+    this.appendChild(preview);
 }
 
 function handleDragLeave(e) {
@@ -931,61 +889,49 @@ function handleDragLeave(e) {
 function handleDrop(e) {
     e.preventDefault();
     document.querySelectorAll('.drag-preview').forEach(p => p.remove());
-    
     if (!draggedItem) return;
-    
-    try {
-        const rect = this.getBoundingClientRect();
-        let y = e.clientY - rect.top;
-        
-        if (dragOffset > 0) y = y - dragOffset;
-        
-        const snappedY = Math.round(y / 20) * 20;
-        const day = parseInt(this.dataset.day);
-        const theater = parseInt(this.dataset.theater);
-        const hour = Math.floor(snappedY / 80) + 12;
-        const min = Math.round((snappedY % 80) / 80 * 60);
-        
-        const date = new Date(currentWeek);
-        date.setDate(date.getDate() + day);
-        date.setHours(hour, min, 0, 0);
-        
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const dayOfMonth = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const localDateTime = `${year}-${month}-${dayOfMonth} ${hours}:${minutes}:00`;
-        
-        if (draggedItem.fromSchedule && draggedItem.scheduleId) {
-            const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
-            if (index !== -1) scheduled.splice(index, 1);
-        }
-        
-        const newEvent = {
-            id: draggedItem.id,
-            title: draggedItem.title,
-            duration: draggedItem.duration,
-            type: draggedItem.type,
-            supabaseId: draggedItem.supabaseId,
-            table: draggedItem.table,
-            day,
-            theater,
-            startTime: date,
-            position: snappedY,
-            scheduleId: `sched-${Date.now()}`,
-            actualDate: localDateTime
-        };
-        
-        scheduled.push(newEvent);
-        dragOffset = 0;
-        renderSchedule();
-        saveDraft();
-        showToast(`Added: ${draggedItem.title}`);
-    } catch (error) {
-        console.error('Drop error:', error);
-        showToast('Error: ' + error.message);
+
+    const rect = this.getBoundingClientRect();
+    let y = e.clientY - rect.top - dragOffset;
+    const snappedY = Math.round(y / 20) * 20;
+
+    const day = parseInt(this.dataset.day);
+    const theater = parseInt(this.dataset.theater);
+    const hour = Math.floor(snappedY / 80) + 12;
+    const minute = Math.round((snappedY % 80) / 20) * 15;
+
+    const date = new Date(currentWeek);
+    date.setDate(date.getDate() + day);
+    date.setHours(hour, minute, 0, 0);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const dayOfMonth = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    if (draggedItem.fromSchedule && draggedItem.scheduleId) {
+        const index = scheduled.findIndex(e => e.scheduleId === draggedItem.scheduleId);
+        if (index !== -1) scheduled.splice(index, 1);
     }
+
+    scheduled.push({
+        id: draggedItem.id,
+        title: draggedItem.title,
+        duration: draggedItem.duration,
+        type: draggedItem.type,
+        supabaseId: draggedItem.supabaseId,
+        table: draggedItem.table,
+        day,
+        theater,
+        startTime: date,
+        scheduleId: `sched-${Date.now()}`,
+        actualDate: `${year}-${month}-${dayOfMonth} ${hours}:${minutes}:00`
+    });
+
+    dragOffset = 0;
+    renderSchedule();
+    saveDraft();
 }
 
 function renderScheduledEvents() {
@@ -1015,8 +961,7 @@ function renderScheduledEvents() {
 
         const hours = eventDate.getHours();
         const minutes = eventDate.getMinutes();
-        
-        const topPos = event.position || (((hours - 12) * 80) + (minutes / 60 * 80));
+        const topPos = ((hours - 12) * 80) + (minutes / 60 * 80);
 
         const div = document.createElement('div');
         div.className = `event-block ${event.type}-t${event.theater}`;
@@ -1026,11 +971,10 @@ function renderScheduledEvents() {
 
         const ampm = hours >= 12 ? 'PM' : 'AM';
         const displayHours = hours % 12 || 12;
-        const timeStr = `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
 
         div.innerHTML = `
             <div class="event-title">${event.title}</div>
-            <div class="event-time">${timeStr} • ${event.duration}min</div>
+            <div class="event-time">${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm} • ${event.duration}min</div>
             <button class="delete-btn" onclick="deleteEvent('${event.scheduleId}')">×</button>
         `;
 
@@ -1052,35 +996,22 @@ function renderScheduledEvents() {
 }
 
 function showToast(message) {
-    const existing = document.querySelector('.toast');
-    if (existing) existing.remove();
-    const toast = document.createElement('div');
-    toast.className = 'toast';
+    const toast = document.getElementById('toast');
+    if (!toast) return;
     toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     init();
-
-    const prevBtn = document.getElementById('prevWeek');
-    const nextBtn = document.getElementById('nextWeek');
-    if (prevBtn) prevBtn.addEventListener('click', prevWeek);
-    if (nextBtn) nextBtn.addEventListener('click', nextWeek);
-
-    const refreshBtn = document.getElementById('refreshBtn');
-    const saveDraftBtn = document.getElementById('saveDraftBtn');
-    const publishBtn = document.getElementById('publishBtn');
-    const clearBtn = document.getElementById('clearBtn');
-
-    if (refreshBtn) refreshBtn.addEventListener('click', importFromSupabase);
-    if (saveDraftBtn) saveDraftBtn.addEventListener('click', saveDraft);
-    if (publishBtn) publishBtn.addEventListener('click', publishSchedule);
-    if (clearBtn) clearBtn.addEventListener('click', clearSchedule);
-
-    const searchInput = document.getElementById('search');
-    if (searchInput) searchInput.addEventListener('input', renderLibrary);
+    document.getElementById('prevWeek')?.addEventListener('click', prevWeek);
+    document.getElementById('nextWeek')?.addEventListener('click', nextWeek);
+    document.getElementById('refreshBtn')?.addEventListener('click', importFromSupabase);
+    document.getElementById('saveDraftBtn')?.addEventListener('click', saveDraft);
+    document.getElementById('publishBtn')?.addEventListener('click', publishSchedule);
+    document.getElementById('clearBtn')?.addEventListener('click', clearSchedule);
+    document.getElementById('search')?.addEventListener('input', renderLibrary);
 });
     </script>
 </body>
