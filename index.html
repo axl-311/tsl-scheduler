@@ -439,6 +439,15 @@
             opacity: 0 !important;
         }
 
+        /* Hide cursor during drag */
+        body.dragging-active {
+            cursor: none !important;
+        }
+        
+        body.dragging-active * {
+            cursor: none !important;
+        }
+
         .toast {
             position: fixed;
             bottom: 20px;
@@ -780,6 +789,7 @@ function renderLibrary() {
         div.innerHTML = `<div class="library-item-title">${item.title}</div><div class="library-item-info">${item.duration}min</div>`;
         
         div.addEventListener('dragstart', e => {
+            document.body.classList.add('dragging-active');
             e.target.style.opacity = '0';  // Completely hide the original
             e.target.classList.add('dragging');
             
@@ -799,6 +809,7 @@ function renderLibrary() {
         });
 
         div.addEventListener('dragend', e => {
+            document.body.classList.remove('dragging-active');
             e.target.style.opacity = '';  // Restore
             e.target.classList.remove('dragging');
         });
@@ -999,6 +1010,7 @@ function renderScheduledEvents() {
         `;
 
         div.addEventListener('dragstart', e => {
+            document.body.classList.add('dragging-active');
             e.target.style.opacity = '0';  // Completely hide the original
             e.target.classList.add('dragging');
             
@@ -1018,6 +1030,7 @@ function renderScheduledEvents() {
         });
 
         div.addEventListener('dragend', (e) => {
+            document.body.classList.remove('dragging-active');
             e.target.style.opacity = '';  // Restore
             e.target.classList.remove('dragging');
             document.querySelectorAll('.drag-preview').forEach(p => p.remove());
