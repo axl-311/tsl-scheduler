@@ -389,46 +389,56 @@
             background: rgba(0,0,0,0.8);
         }
 
-        /* Drag Preview - IMPROVED */
+        /* Drag Preview - SIMPLE & CLEAR */
         .drag-preview {
             position: absolute;
             left: 4px;
             right: 4px;
-            background: rgba(0,122,255,0.3);
-            border: 3px dashed #007aff;
-            border-radius: 6px;
+            background: rgba(0,200,0,0.2);
+            border: 4px dashed #00cc00;
+            border-radius: 8px;
             pointer-events: none;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 13px;
-            color: #007aff;
-            font-weight: 600;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0,122,255,0.3);
+            font-size: 14px;
+            color: #00aa00;
+            font-weight: 700;
+            z-index: 999;
+            box-shadow: 0 0 20px rgba(0,200,0,0.5);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
         }
 
         .drag-preview.movie-preview {
-            background: rgba(0,122,255,0.25);
+            background: rgba(0,122,255,0.3);
             border-color: #007aff;
+            color: #007aff;
+            box-shadow: 0 0 20px rgba(0,122,255,0.6);
         }
 
         .drag-preview.event-preview {
-            background: rgba(231,76,67,0.25);
-            border-color: #e74c43;
-            color: #e74c43;
+            background: rgba(255,100,100,0.3);
+            border-color: #ff3333;
+            color: #ff0000;
+            box-shadow: 0 0 20px rgba(255,50,50,0.6);
         }
 
         .drag-preview-time {
-            font-size: 14px;
-            font-weight: 700;
-            margin-bottom: 4px;
+            font-size: 18px;
+            font-weight: 900;
+            margin-bottom: 6px;
+            text-shadow: 0 0 4px rgba(255,255,255,0.8);
         }
 
         .drag-preview-title {
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 13px;
+            font-weight: 700;
             text-align: center;
             padding: 0 8px;
             white-space: nowrap;
@@ -438,9 +448,21 @@
         }
 
         .drag-preview-duration {
-            font-size: 11px;
-            opacity: 0.8;
-            margin-top: 2px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        /* Snap indicator line at top of preview */
+        .drag-preview::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: currentColor;
+            border-radius: 2px;
         }
 
         /* Toast */
@@ -534,9 +556,8 @@
 
     <script>
 // ==========================================
-// CONFIGURATION - UPDATE THESE VALUES!
+// CONFIGURATION
 // ==========================================
-
 const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
 const WORDPRESS_URL = 'https://new.site.sesmultimedia.com';
@@ -930,19 +951,11 @@ async function importFromSupabase() {
     try {
         showToast('Importing from Supabase...');
 
-        // ✅ MOVIES TABLE - VERIFIED SCHEMA
-        // Table: movies (lowercase)
-        // Fields: id, title, director, runtime_minutes, release_year
-        // Filter: None - import all
         const { data: movies, error: moviesError } = await supabase
             .from('movies')
             .select('*')
             .order('title');
 
-        // ✅ EVENTS TABLE - VERIFIED SCHEMA
-        // Table: events (lowercase)
-        // Fields: id, event_name, presented_by, duration_minutes, event_status, show_on_events_list
-        // Filter: show_on_events_list = true
         const { data: events, error: eventsError } = await supabase
             .from('events')
             .select('*')
@@ -954,7 +967,6 @@ async function importFromSupabase() {
 
         library = [];
 
-        // Process movies - USE EXACT FIELD NAMES
         if (movies) {
             movies.forEach(movie => {
                 const minutes = movie.runtime_minutes || 120;
@@ -972,7 +984,6 @@ async function importFromSupabase() {
             });
         }
 
-        // Process events - USE EXACT FIELD NAMES
         if (events) {
             events.forEach(event => {
                 const minutes = event.duration_minutes || 120;
@@ -1182,7 +1193,7 @@ function renderScheduledEvents() {
 }
 
 // ==========================================
-// DRAG & DROP - IMPROVED WITH BETTER SNAPPING
+// DRAG & DROP - SIMPLE & CLEAR
 // ==========================================
 function setupDropZone(grid) {
     grid.addEventListener('dragover', e => {
@@ -1194,35 +1205,31 @@ function setupDropZone(grid) {
         const rect = grid.getBoundingClientRect();
         const y = e.clientY - rect.top;
 
-        // IMPROVED SNAPPING: 15-minute intervals (20px = 15min since 80px = 1 hour)
+        // SNAP TO 15-MINUTE INTERVALS
         const snappedY = Math.round(y / 20) * 20;
 
         // Remove old preview
         grid.querySelectorAll('.drag-preview').forEach(p => p.remove());
 
-        // Calculate time for preview
+        // Calculate exact time
         const hour = Math.floor(snappedY / 80) + 12;
-        const minute = Math.round((snappedY % 80) / 20) * 15; // 15-minute intervals
+        const minute = Math.round((snappedY % 80) / 20) * 15;
 
-        // Format time display
+        // Format time
         const displayHour = hour > 12 ? hour - 12 : hour;
         const ampm = hour >= 12 ? 'PM' : 'AM';
         const timeDisplay = `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
 
-        // Create enhanced preview - OFFSET UPWARD so cursor doesn't block view
+        // Create preview at EXACT snap location
         const preview = document.createElement('div');
         preview.className = `drag-preview ${draggedItem.type}-preview`;
-
-        // Show preview 200px ABOVE actual drop position for visibility
-        const previewOffset = 200;
-        const previewY = Math.max(0, snappedY - previewOffset);
-        preview.style.top = previewY + 'px';
+        preview.style.top = snappedY + 'px';
         preview.style.height = ((draggedItem.duration || 120) * 80 / 60) + 'px';
 
         preview.innerHTML = `
-            <div class="drag-preview-time">${timeDisplay}</div>
+            <div class="drag-preview-time">DROP AT ${timeDisplay}</div>
             <div class="drag-preview-title">${draggedItem.title}</div>
-            <div class="drag-preview-duration">${draggedItem.duration}min</div>
+            <div class="drag-preview-duration">${draggedItem.duration} minutes</div>
         `;
 
         grid.appendChild(preview);
@@ -1243,15 +1250,15 @@ function setupDropZone(grid) {
         const rect = grid.getBoundingClientRect();
         const y = e.clientY - rect.top;
 
-        // IMPROVED SNAPPING: Exact 15-minute intervals
+        // SNAP TO 15-MINUTE INTERVALS
         const snappedY = Math.round(y / 20) * 20;
 
         const day = parseInt(grid.dataset.day);
         const theater = parseInt(grid.dataset.theater);
 
-        // Calculate hour and minute with proper 15-minute snapping
+        // Calculate hour and minute
         const hour = Math.floor(snappedY / 80) + 12;
-        const minute = Math.round((snappedY % 80) / 20) * 15; // 0, 15, 30, or 45
+        const minute = Math.round((snappedY % 80) / 20) * 15;
 
         const date = new Date(currentWeek);
         date.setDate(date.getDate() + day);
@@ -1286,7 +1293,7 @@ function setupDropZone(grid) {
         scheduled.push(newEvent);
         renderSchedule();
 
-        // Show confirmation with exact time
+        // Show confirmation
         const displayHour = hour > 12 ? hour - 12 : hour;
         const ampm = hour >= 12 ? 'PM' : 'AM';
         showToast(`Added at ${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`);
