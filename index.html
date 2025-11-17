@@ -217,7 +217,7 @@
             background: #e8f4ff;
         }
 
-        .library-item.performance {
+        .library-item.event {
             border-left-color: #e74c43;
             background: #ffe8e6;
         }
@@ -341,11 +341,11 @@
             background: #4bc4a5;
         }
 
-        .event-block.performance-t1 {
+        .event-block.event-t1 {
             background: #ff9999;
         }
 
-        .event-block.performance-t2 {
+        .event-block.event-t2 {
             background: #e74c43;
             color: white;
         }
@@ -498,10 +498,10 @@
 
     <script>
 // ==========================================
-// SUPABASE & STATE
+// CONFIGURATION - UPDATE THESE VALUES!
 // ==========================================
-const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
+const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';  // Get from Supabase dashboard
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';  // Get from Supabase dashboard
 const WORDPRESS_URL = 'https://new.site.sesmultimedia.com';
 
 let supabase = null;
@@ -593,7 +593,7 @@ function updateStatusBadge() {
 }
 
 // ==========================================
-// SAVE DRAFT - FIXED WITH VALIDATION
+// SAVE DRAFT
 // ==========================================
 async function saveDraft() {
     try {
@@ -632,7 +632,7 @@ async function saveDraft() {
 }
 
 // ==========================================
-// PUBLISH SCHEDULE - FIXED WITH REPLACE STRATEGY
+// PUBLISH SCHEDULE
 // ==========================================
 async function publishSchedule() {
     const weekStart = new Date(currentWeek);
@@ -702,7 +702,7 @@ async function publishSchedule() {
 }
 
 // ==========================================
-// LOAD FROM WORDPRESS - FIXED WITH VALIDATION
+// LOAD FROM WORDPRESS
 // ==========================================
 async function loadFromWordPress() {
     try {
@@ -887,69 +887,80 @@ async function manualCleanup() {
 }
 
 // ==========================================
-// SUPABASE IMPORT
+// SUPABASE IMPORT - VERIFIED EXACT SCHEMA
 // ==========================================
 async function importFromSupabase() {
     try {
         showToast('Importing from Supabase...');
 
+        // ✅ MOVIES TABLE - VERIFIED SCHEMA
+        // Table: movies (lowercase)
+        // Fields: id, title, director, runtime_minutes, release_year
+        // Filter: None - import all
         const { data: movies, error: moviesError } = await supabase
-            .from('Movies')
+            .from('movies')
             .select('*')
-            .eq('status', 'Published')
-            .order('original_title');
+            .order('title');
 
-        const { data: performances, error: performancesError } = await supabase
-            .from('Performances')
+        // ✅ EVENTS TABLE - VERIFIED SCHEMA
+        // Table: events (lowercase)
+        // Fields: id, event_name, presented_by, duration_minutes, event_status, show_on_events_list
+        // Filter: show_on_events_list = true
+        const { data: events, error: eventsError } = await supabase
+            .from('events')
             .select('*')
-            .order('EventTitle');
+            .eq('show_on_events_list', true)
+            .order('event_name');
 
         if (moviesError) throw moviesError;
-        if (performancesError) throw performancesError;
+        if (eventsError) throw eventsError;
 
         library = [];
 
+        // Process movies - USE EXACT FIELD NAMES
         if (movies) {
             movies.forEach(movie => {
-                const runtimeMatch = movie.runtime?.match(/(\d+)/);
-                const minutes = runtimeMatch ? parseInt(runtimeMatch[1]) : 120;
+                const minutes = movie.runtime_minutes || 120;
 
                 window.libraryItemsCache[movie.id] = {
                     id: movie.id,
-                    title: movie.original_title,
+                    title: movie.title || 'Untitled Movie',
                     duration: minutes,
                     type: 'movie',
                     supabaseId: movie.id,
-                    table: 'Movies'
+                    table: 'movies'
                 };
 
                 library.push(window.libraryItemsCache[movie.id]);
             });
         }
 
-        if (performances) {
-            performances.forEach(performance => {
-                const runtimeMatch = performance.Runtime?.match(/(\d+)/);
-                const minutes = runtimeMatch ? parseInt(runtimeMatch[1]) : 120;
+        // Process events - USE EXACT FIELD NAMES
+        if (events) {
+            events.forEach(event => {
+                const minutes = event.duration_minutes || 120;
 
-                window.libraryItemsCache[performance.id] = {
-                    id: performance.id,
-                    title: performance.EventTitle,
+                window.libraryItemsCache[event.id] = {
+                    id: event.id,
+                    title: event.event_name || 'Untitled Event',
                     duration: minutes,
-                    type: 'performance',
-                    supabaseId: performance.id,
-                    table: 'Performances'
+                    type: 'event',
+                    supabaseId: event.id,
+                    table: 'events'
                 };
 
-                library.push(window.libraryItemsCache[performance.id]);
+                library.push(window.libraryItemsCache[event.id]);
             });
         }
 
         renderLibrary();
-        showToast(`Library imported! ${library.length} items`);
+
+        const movieCount = movies ? movies.length : 0;
+        const eventCount = events ? events.length : 0;
+        showToast(`Library imported! ${movieCount} movies, ${eventCount} events`);
     } catch (error) {
         console.error('Import error:', error);
-        showToast('Error importing from Supabase');
+        showToast('Error importing from Supabase: ' + error.message);
     }
 }
 
