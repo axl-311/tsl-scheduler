@@ -536,10 +536,10 @@
 // ==========================================
 // CONFIGURATION - UPDATE THESE VALUES!
 // ==========================================
-const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';  // Get from Supabase dashboard
+const SUPABASE_KEY = 'YOUR_SUPABASE_KEY_HERE';  // Get from Supabase dashboard
 const WORDPRESS_URL = 'https://new.site.sesmultimedia.com';
-        
+
 let supabase = null;
 let currentWeek = new Date();
 let library = [];
@@ -1208,10 +1208,14 @@ function setupDropZone(grid) {
         const ampm = hour >= 12 ? 'PM' : 'AM';
         const timeDisplay = `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
 
-        // Create enhanced preview
+        // Create enhanced preview - OFFSET UPWARD so cursor doesn't block view
         const preview = document.createElement('div');
         preview.className = `drag-preview ${draggedItem.type}-preview`;
-        preview.style.top = snappedY + 'px';
+
+        // Show preview 200px ABOVE actual drop position for visibility
+        const previewOffset = 200;
+        const previewY = Math.max(0, snappedY - previewOffset);
+        preview.style.top = previewY + 'px';
         preview.style.height = ((draggedItem.duration || 120) * 80 / 60) + 'px';
 
         preview.innerHTML = `
