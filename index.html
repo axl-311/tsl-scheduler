@@ -238,6 +238,12 @@
             color: #86868b;
         }
 
+        /* Make dragged items transparent */
+        .library-item.dragging,
+        .event-block.dragging {
+            opacity: 0.3;
+        }
+
         /* Schedule Grid */
         .schedule {
             flex: 1;
@@ -405,7 +411,7 @@
             font-size: 14px;
             color: #00aa00;
             font-weight: 700;
-            z-index: 999;
+            z-index: 9999;
             box-shadow: 0 0 20px rgba(0,200,0,0.5);
             animation: pulse 1s infinite;
         }
@@ -490,16 +496,6 @@
             font-size: 48px;
             margin-bottom: 16px;
         }
-
-        .drag-preview {
-    position: absolute;
-    background: rgba(0, 123, 255, 0.3);
-    border: 2px dashed #007bff;
-    pointer-events: none;
-    z-index: 9999;
-}
-
-    
     </style>
 </head>
 <body>
@@ -1070,8 +1066,13 @@ function renderLibrary() {
         `;
 
         div.addEventListener('dragstart', e => {
+            e.target.classList.add('dragging');
             draggedItem = { ...item, fromSchedule: false };
             e.dataTransfer.effectAllowed = 'copy';
+        });
+
+        div.addEventListener('dragend', e => {
+            e.target.classList.remove('dragging');
         });
 
         container.appendChild(div);
@@ -1194,8 +1195,13 @@ function renderScheduledEvents() {
         `;
 
         div.addEventListener('dragstart', e => {
+            e.target.classList.add('dragging');
             draggedItem = { ...event, fromSchedule: true, scheduleId: event.scheduleId };
             e.dataTransfer.effectAllowed = 'move';
+        });
+
+        div.addEventListener('dragend', e => {
+            e.target.classList.remove('dragging');
         });
 
         grid.appendChild(div);
