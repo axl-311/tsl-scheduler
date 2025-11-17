@@ -389,22 +389,58 @@
             background: rgba(0,0,0,0.8);
         }
 
-        /* Drag Preview */
+        /* Drag Preview - IMPROVED */
         .drag-preview {
             position: absolute;
             left: 4px;
             right: 4px;
-            height: 60px;
-            background: rgba(0,122,255,0.2);
-            border: 2px dashed #007aff;
+            background: rgba(0,122,255,0.3);
+            border: 3px dashed #007aff;
             border-radius: 6px;
             pointer-events: none;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 13px;
             color: #007aff;
             font-weight: 600;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,122,255,0.3);
+        }
+
+        .drag-preview.movie-preview {
+            background: rgba(0,122,255,0.25);
+            border-color: #007aff;
+        }
+
+        .drag-preview.event-preview {
+            background: rgba(231,76,67,0.25);
+            border-color: #e74c43;
+            color: #e74c43;
+        }
+
+        .drag-preview-time {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .drag-preview-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+            padding: 0 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        .drag-preview-duration {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 2px;
         }
 
         /* Toast */
@@ -500,10 +536,10 @@
 // ==========================================
 // CONFIGURATION - UPDATE THESE VALUES!
 // ==========================================
-const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';  // Get from Supabase dashboard
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';  // Get from Supabase dashboard
+const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
 const WORDPRESS_URL = 'https://new.site.sesmultimedia.com';
-
+        
 let supabase = null;
 let currentWeek = new Date();
 let library = [];
@@ -1145,28 +1181,50 @@ function renderScheduledEvents() {
 }
 
 // ==========================================
-// DRAG & DROP
+// DRAG & DROP - IMPROVED WITH BETTER SNAPPING
 // ==========================================
 function setupDropZone(grid) {
     grid.addEventListener('dragover', e => {
         e.preventDefault();
         e.dataTransfer.dropEffect = draggedItem?.fromSchedule ? 'move' : 'copy';
 
+        if (!draggedItem) return;
+
         const rect = grid.getBoundingClientRect();
         const y = e.clientY - rect.top;
+
+        // IMPROVED SNAPPING: 15-minute intervals (20px = 15min since 80px = 1 hour)
         const snappedY = Math.round(y / 20) * 20;
 
+        // Remove old preview
         grid.querySelectorAll('.drag-preview').forEach(p => p.remove());
 
+        // Calculate time for preview
+        const hour = Math.floor(snappedY / 80) + 12;
+        const minute = Math.round((snappedY % 80) / 20) * 15; // 15-minute intervals
+
+        // Format time display
+        const displayHour = hour > 12 ? hour - 12 : hour;
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const timeDisplay = `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
+
+        // Create enhanced preview
         const preview = document.createElement('div');
-        preview.className = 'drag-preview';
+        preview.className = `drag-preview ${draggedItem.type}-preview`;
         preview.style.top = snappedY + 'px';
-        preview.style.height = ((draggedItem?.duration || 120) * 80 / 60) + 'px';
+        preview.style.height = ((draggedItem.duration || 120) * 80 / 60) + 'px';
+
+        preview.innerHTML = `
+            <div class="drag-preview-time">${timeDisplay}</div>
+            <div class="drag-preview-title">${draggedItem.title}</div>
+            <div class="drag-preview-duration">${draggedItem.duration}min</div>
+        `;
+
         grid.appendChild(preview);
     });
 
     grid.addEventListener('dragleave', e => {
-        if (e.target === grid) {
+        if (e.target === grid || !grid.contains(e.relatedTarget)) {
             grid.querySelectorAll('.drag-preview').forEach(p => p.remove());
         }
     });
@@ -1179,17 +1237,20 @@ function setupDropZone(grid) {
 
         const rect = grid.getBoundingClientRect();
         const y = e.clientY - rect.top;
+
+        // IMPROVED SNAPPING: Exact 15-minute intervals
         const snappedY = Math.round(y / 20) * 20;
 
         const day = parseInt(grid.dataset.day);
         const theater = parseInt(grid.dataset.theater);
 
+        // Calculate hour and minute with proper 15-minute snapping
         const hour = Math.floor(snappedY / 80) + 12;
-        const min = Math.round((snappedY % 80) / 80 * 60);
+        const minute = Math.round((snappedY % 80) / 20) * 15; // 0, 15, 30, or 45
 
         const date = new Date(currentWeek);
         date.setDate(date.getDate() + day);
-        date.setHours(hour, min, 0, 0);
+        date.setHours(hour, minute, 0, 0);
 
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -1219,7 +1280,11 @@ function setupDropZone(grid) {
 
         scheduled.push(newEvent);
         renderSchedule();
-        showToast('Event added!');
+
+        // Show confirmation with exact time
+        const displayHour = hour > 12 ? hour - 12 : hour;
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        showToast(`Added at ${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`);
 
         draggedItem = null;
     });
