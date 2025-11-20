@@ -440,12 +440,9 @@
         }
 
         /* Hide cursor during drag */
-        body.dragging-active {
-            cursor: none !important;
-        }
-        
+        body.dragging-active,
         body.dragging-active * {
-            cursor: none !important;
+            cursor: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='), auto !important;
         }
 
         .toast {
@@ -470,6 +467,43 @@
         .empty-state-icon {
             font-size: 48px;
             margin-bottom: 16px;
+        }
+
+        /* Date Filter Buttons */
+        .tsl-date-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-start;
+            align-items: center;
+        }
+
+        .tsl-date-btn {
+            background: #2c2c2c;
+            color: #ffffff;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            font-family: inherit;
+        }
+
+        .tsl-date-btn:hover {
+            background: #3c3c3c;
+            border-color: #007aff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+        }
+
+        .tsl-date-btn.active {
+            background: #007aff;
+            border-color: #007aff;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.5);
         }
     </style>
 </head>
@@ -507,12 +541,12 @@
                     <span>Library</span>
                     <span class="library-count" id="libCount">(0)</span>
                 </div>
-                <select class="library-search" id="recentFilter" style="margin-bottom: 10px;">
-                    <option value="all">All Items</option>
-                    <option value="30" selected>Recent (30 days)</option>
-                    <option value="7">This Week (7 days)</option>
-                    <option value="1">Today</option>
-                </select>
+                <div class="tsl-date-buttons" style="margin-bottom: 15px;">
+                    <button class="tsl-date-btn active" data-filter="all">All Items</button>
+                    <button class="tsl-date-btn" data-filter="30">Recent (30 days)</button>
+                    <button class="tsl-date-btn" data-filter="7">This Week</button>
+                    <button class="tsl-date-btn" data-filter="1">Today</button>
+                </div>
                 <input type="text" class="library-search" id="search" placeholder="Search...">
                 <div class="library-items" id="library">
                     <div class="empty-state">
@@ -650,11 +684,10 @@ async function publishSchedule() {
         return;
     }
 
-    if (!confirm(`Publish ${currentWeekEvents.length} events?\n\nThis will:\n✓ Sync latest from Supabase\n✓ Update WordPress posts\n✓ Publish showtimes\n✓ Create WooCommerce products`)) return;
+    if (!confirm(`Publish ${currentWeekEvents.length} events?`)) return;
 
     try {
-        showToast('Syncing all data...');
-        const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/sync-all`, {
+        const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/publish`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ events: currentWeekEvents, weekKey: getWeekKey() })
@@ -663,11 +696,7 @@ async function publishSchedule() {
         if (data.success) {
             setCurrentWeekStatus('published');
             updateStatusBadge();
-            const stats = data.stats || {};
-            showToast(`✓ Complete! ${stats.movies_synced || 0} movies, ${stats.events_synced || 0} events, ${stats.products_created || 0} products`);
-        } else {
-            showToast('Sync failed - check console');
-            console.error('Sync errors:', data.stats?.errors);
+            showToast('Published!');
         }
     } catch (error) {
         console.error('Publish error:', error);
@@ -795,10 +824,10 @@ function renderLibrary() {
         
         div.addEventListener('dragstart', e => {
             document.body.classList.add('dragging-active');
-            e.target.style.opacity = '0';  // Completely hide the original
+            document.body.style.cursor = 'none';
+            e.target.style.opacity = '0';
             e.target.classList.add('dragging');
             
-            // Create invisible drag image
             const dragImg = document.createElement('div');
             dragImg.style.opacity = '0';
             dragImg.style.position = 'absolute';
@@ -815,7 +844,8 @@ function renderLibrary() {
 
         div.addEventListener('dragend', e => {
             document.body.classList.remove('dragging-active');
-            e.target.style.opacity = '';  // Restore
+            document.body.style.cursor = '';
+            e.target.style.opacity = '';
             e.target.classList.remove('dragging');
         });
 
@@ -1016,10 +1046,10 @@ function renderScheduledEvents() {
 
         div.addEventListener('dragstart', e => {
             document.body.classList.add('dragging-active');
-            e.target.style.opacity = '0';  // Completely hide the original
+            document.body.style.cursor = 'none';
+            e.target.style.opacity = '0';
             e.target.classList.add('dragging');
             
-            // Create invisible drag image
             const dragImg = document.createElement('div');
             dragImg.style.opacity = '0';
             dragImg.style.position = 'absolute';
@@ -1036,7 +1066,8 @@ function renderScheduledEvents() {
 
         div.addEventListener('dragend', (e) => {
             document.body.classList.remove('dragging-active');
-            e.target.style.opacity = '';  // Restore
+            document.body.style.cursor = '';
+            e.target.style.opacity = '';
             e.target.classList.remove('dragging');
             document.querySelectorAll('.drag-preview').forEach(p => p.remove());
         });
@@ -1050,7 +1081,25 @@ function showToast(message) {
     if (!toast) return;
     toast.textContent = message;
     toast.style.display = 'block';
-    setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    toast.style.cursor = 'pointer';
+    
+    // Clear any existing timeout
+    if (toast.timeoutId) {
+        clearTimeout(toast.timeoutId);
+    }
+    
+    // Click to dismiss
+    toast.onclick = () => {
+        toast.style.display = 'none';
+        if (toast.timeoutId) {
+            clearTimeout(toast.timeoutId);
+        }
+    };
+    
+    // Auto-dismiss after 10 seconds
+    toast.timeoutId = setTimeout(() => { 
+        toast.style.display = 'none'; 
+    }, 10000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1062,6 +1111,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('publishBtn')?.addEventListener('click', publishSchedule);
     document.getElementById('clearBtn')?.addEventListener('click', clearSchedule);
     document.getElementById('search')?.addEventListener('input', renderLibrary);
+    
+    // Date filter buttons
+    document.querySelectorAll('.tsl-date-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tsl-date-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderLibrary();
+        });
+    });
 });
     </script>
 </body>
