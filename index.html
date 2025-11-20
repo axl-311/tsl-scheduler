@@ -441,8 +441,11 @@
 
         /* Hide cursor during drag */
         body.dragging-active,
-        body.dragging-active * {
-            cursor: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='), auto !important;
+        body.dragging-active *,
+        body.dragging-active .theater-grid,
+        body.dragging-active .day-column,
+        body.dragging-active .schedule {
+            cursor: none !important;
         }
 
         .toast {
@@ -829,7 +832,6 @@ function renderLibrary() {
 
         div.addEventListener('dragstart', e => {
             document.body.classList.add('dragging-active');
-            document.body.style.cursor = 'none';
             e.target.style.opacity = '0';
             e.target.classList.add('dragging');
 
@@ -849,7 +851,6 @@ function renderLibrary() {
 
         div.addEventListener('dragend', e => {
             document.body.classList.remove('dragging-active');
-            document.body.style.cursor = '';
             e.target.style.opacity = '';
             e.target.classList.remove('dragging');
         });
@@ -875,9 +876,15 @@ function buildScheduleGrid(container) {
         const dayCol = document.createElement('div');
         dayCol.className = 'day-column';
 
+        // Calculate actual date for this day
+        const dayDate = new Date(currentWeek);
+        dayDate.setDate(dayDate.getDate() + dayIndex);
+        const monthName = dayDate.toLocaleDateString('en-US', { month: 'short' });
+        const dayNum = dayDate.getDate();
+
         const header = document.createElement('div');
         header.className = 'day-header';
-        header.textContent = day;
+        header.textContent = `${day}, ${monthName} ${dayNum}`;
         dayCol.appendChild(header);
 
         const theaters = document.createElement('div');
@@ -1051,7 +1058,6 @@ function renderScheduledEvents() {
 
         div.addEventListener('dragstart', e => {
             document.body.classList.add('dragging-active');
-            document.body.style.cursor = 'none';
             e.target.style.opacity = '0';
             e.target.classList.add('dragging');
 
@@ -1071,7 +1077,6 @@ function renderScheduledEvents() {
 
         div.addEventListener('dragend', (e) => {
             document.body.classList.remove('dragging-active');
-            document.body.style.cursor = '';
             e.target.style.opacity = '';
             e.target.classList.remove('dragging');
             document.querySelectorAll('.drag-preview').forEach(p => p.remove());
