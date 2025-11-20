@@ -434,7 +434,7 @@
             opacity: 0 !important;
             transition: none !important;
         }
-        
+
         .dragging {
             opacity: 0 !important;
         }
@@ -684,10 +684,11 @@ async function publishSchedule() {
         return;
     }
 
-    if (!confirm(`Publish ${currentWeekEvents.length} events?`)) return;
+    if (!confirm(`Publish ${currentWeekEvents.length} events?\n\nThis will:\n✓ Sync latest from Supabase\n✓ Update WordPress posts\n✓ Publish showtimes\n✓ Create WooCommerce products`)) return;
 
     try {
-        const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/publish`, {
+        showToast('Syncing all data...');
+        const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/sync-all`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ events: currentWeekEvents, weekKey: getWeekKey() })
@@ -696,7 +697,11 @@ async function publishSchedule() {
         if (data.success) {
             setCurrentWeekStatus('published');
             updateStatusBadge();
-            showToast('Published!');
+            const stats = data.stats || {};
+            showToast(`✓ Complete! ${stats.movies_synced || 0} movies, ${stats.events_synced || 0} events, ${stats.products_created || 0} products`);
+        } else {
+            showToast('Sync failed - check console');
+            console.error('Sync errors:', data.stats?.errors);
         }
     } catch (error) {
         console.error('Publish error:', error);
@@ -821,13 +826,13 @@ function renderLibrary() {
         div.className = `library-item ${item.type}`;
         div.draggable = true;
         div.innerHTML = `<div class="library-item-title">${item.title}</div><div class="library-item-info">${item.duration}min</div>`;
-        
+
         div.addEventListener('dragstart', e => {
             document.body.classList.add('dragging-active');
             document.body.style.cursor = 'none';
             e.target.style.opacity = '0';
             e.target.classList.add('dragging');
-            
+
             const dragImg = document.createElement('div');
             dragImg.style.opacity = '0';
             dragImg.style.position = 'absolute';
@@ -835,7 +840,7 @@ function renderLibrary() {
             document.body.appendChild(dragImg);
             e.dataTransfer.setDragImage(dragImg, 0, 0);
             setTimeout(() => dragImg.remove(), 0);
-            
+
             console.log('Added dragging class:', e.target.classList.contains('dragging'));
             dragOffset = 0;
             draggedItem = { ...item, fromSchedule: false };
@@ -1049,7 +1054,7 @@ function renderScheduledEvents() {
             document.body.style.cursor = 'none';
             e.target.style.opacity = '0';
             e.target.classList.add('dragging');
-            
+
             const dragImg = document.createElement('div');
             dragImg.style.opacity = '0';
             dragImg.style.position = 'absolute';
@@ -1057,7 +1062,7 @@ function renderScheduledEvents() {
             document.body.appendChild(dragImg);
             e.dataTransfer.setDragImage(dragImg, 0, 0);
             setTimeout(() => dragImg.remove(), 0);
-            
+
             const rect = div.getBoundingClientRect();
             dragOffset = e.clientY - rect.top;
             draggedItem = { ...event, fromSchedule: true, scheduleId: event.scheduleId };
@@ -1082,12 +1087,12 @@ function showToast(message) {
     toast.textContent = message;
     toast.style.display = 'block';
     toast.style.cursor = 'pointer';
-    
+
     // Clear any existing timeout
     if (toast.timeoutId) {
         clearTimeout(toast.timeoutId);
     }
-    
+
     // Click to dismiss
     toast.onclick = () => {
         toast.style.display = 'none';
@@ -1095,10 +1100,10 @@ function showToast(message) {
             clearTimeout(toast.timeoutId);
         }
     };
-    
+
     // Auto-dismiss after 10 seconds
-    toast.timeoutId = setTimeout(() => { 
-        toast.style.display = 'none'; 
+    toast.timeoutId = setTimeout(() => {
+        toast.style.display = 'none';
     }, 10000);
 }
 
@@ -1111,7 +1116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('publishBtn')?.addEventListener('click', publishSchedule);
     document.getElementById('clearBtn')?.addEventListener('click', clearSchedule);
     document.getElementById('search')?.addEventListener('input', renderLibrary);
-    
+
     // Date filter buttons
     document.querySelectorAll('.tsl-date-btn').forEach(btn => {
         btn.addEventListener('click', () => {
