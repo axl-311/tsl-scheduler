@@ -650,10 +650,11 @@ async function publishSchedule() {
         return;
     }
 
-    if (!confirm(`Publish ${currentWeekEvents.length} events?`)) return;
+    if (!confirm(`Publish ${currentWeekEvents.length} events?\n\nThis will:\n✓ Sync latest from Supabase\n✓ Update WordPress posts\n✓ Publish showtimes\n✓ Create WooCommerce products`)) return;
 
     try {
-        const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/publish`, {
+        showToast('Syncing all data...');
+        const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/sync-all`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ events: currentWeekEvents, weekKey: getWeekKey() })
@@ -662,7 +663,11 @@ async function publishSchedule() {
         if (data.success) {
             setCurrentWeekStatus('published');
             updateStatusBadge();
-            showToast('Published!');
+            const stats = data.stats || {};
+            showToast(`✓ Complete! ${stats.movies_synced || 0} movies, ${stats.events_synced || 0} events, ${stats.products_created || 0} products`);
+        } else {
+            showToast('Sync failed - check console');
+            console.error('Sync errors:', data.stats?.errors);
         }
     } catch (error) {
         console.error('Publish error:', error);
