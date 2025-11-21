@@ -779,7 +779,9 @@ async function importFromSupabase() {
                     duration: movie.runtime_minutes || 120,
                     type: 'movie',
                     supabaseId: movie.id,
-                    table: 'movies'
+                    table: 'movies',
+                    // ✅ Include pricing_type for WordPress sync
+                    pricing_type: movie.pricing_type || 'regular'
                 };
                 library.push(window.libraryItemsCache[movie.id]);
             });
@@ -862,9 +864,8 @@ function renderLibrary() {
 function renderSchedule() {
     const scheduleContainer = document.getElementById('schedule');
     if (!scheduleContainer) return;
-    if (!scheduleContainer.querySelector('.day-column')) {
-        buildScheduleGrid(scheduleContainer);
-    }
+    // Always rebuild grid to update day headers with current week dates
+    buildScheduleGrid(scheduleContainer);
     renderScheduledEvents();
 }
 
