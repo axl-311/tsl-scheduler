@@ -671,34 +671,49 @@ async function saveDraft() {
 }
 
 async function publishSchedule() {
-    const weekStart = new Date(currentWeek);
-    weekStart.setHours(0, 0, 0, 0);
-    const weekEnd = new Date(currentWeek);
-    weekEnd.setDate(weekEnd.getDate() + 3);
-    weekEnd.setHours(23, 59, 59, 999);
+    // ✅ FIXED: Publish ALL scheduled events, not just current week
+    // Filter for today and future events only (skip past events)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    const currentWeekEvents = scheduled.filter(event => {
+    const futureEvents = scheduled.filter(event => {
         const eventDate = new Date(event.startTime);
-        return eventDate >= weekStart && eventDate <= weekEnd;
+        eventDate.setHours(0, 0, 0, 0);
+        return eventDate >= today;
     });
 
-    if (currentWeekEvents.length === 0) {
+    if (futureEvents.length === 0) {
         showToast('Nothing to publish!');
         return;
     }
 
-    if (!confirm(`Publish ${currentWeekEvents.length} events?\n\nThis will:\n✓ Sync latest from Supabase\n✓ Update WordPress posts\n✓ Publish showtimes\n✓ Create WooCommerce products`)) return;
+    // Count unique weeks being published
+    const weeks = new Set();
+    futureEvents.forEach(event => {
+        const eventDate = new Date(event.startTime);
+        const dayOfWeek = eventDate.getDay();
+        const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+        const friday = new Date(eventDate);
+        friday.setDate(eventDate.getDate() + daysUntilFriday);
+        friday.setHours(0, 0, 0, 0);
+        weeks.add(friday.toISOString().split('T')[0]);
+    });
+
+    if (!confirm(`Publish ${futureEvents.length} events across ${weeks.size} week(s)?\n\nThis will:\n✓ Sync latest from Supabase\n✓ Update WordPress posts\n✓ Publish showtimes\n✓ Create WooCommerce products`)) return;
 
     try {
         showToast('Syncing all data...');
         const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/sync-all`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ events: currentWeekEvents, weekKey: getWeekKey() })
+            body: JSON.stringify({ events: futureEvents, weekKey: getWeekKey() })
         });
         const data = await response.json();
         if (data.success) {
-            setCurrentWeekStatus('published');
+            // Mark all affected weeks as published
+            weeks.forEach(weekKey => {
+                weekStatuses[weekKey] = 'published';
+            });
             updateStatusBadge();
             const stats = data.stats || {};
             showToast(`✓ Complete! ${stats.movies_synced || 0} movies, ${stats.events_synced || 0} events, ${stats.products_created || 0} products`);
