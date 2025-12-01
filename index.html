@@ -570,7 +570,7 @@
     <script>
 const SUPABASE_URL = 'https://tnnkfnattwpqqrydsyux.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRubmtmbmF0dHdwcXFyeWRzeXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0Njc3NDAsImV4cCI6MjA3MzA0Mzc0MH0.cNzStE1v6YA7HRvTeBCXxGFPuJPq1WmnuVGVaNLjOsE';
-const WORDPRESS_URL = 'https://new.site.sesmultimedia.com';
+const WORDPRESS_URL = 'https://timeandspace.org';
 
 let supabase = null;
 let currentWeek = new Date();
@@ -671,7 +671,7 @@ async function saveDraft() {
 }
 
 async function publishSchedule() {
-    // ✅ FIXED: Publish ALL scheduled events, not just current week
+    // Publish ALL scheduled events, not just current week
     // Filter for today and future events only (skip past events)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -795,7 +795,7 @@ async function importFromSupabase() {
                     type: 'movie',
                     supabaseId: movie.id,
                     table: 'movies',
-                    // ✅ Include pricing_type for WordPress sync
+                    // Include pricing_type for WordPress sync
                     pricing_type: movie.pricing_type || 'regular'
                 };
                 library.push(window.libraryItemsCache[movie.id]);
