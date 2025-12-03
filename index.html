@@ -529,6 +529,10 @@
                 <button class="btn btn-secondary" id="prevWeek">Prev</button>
                 <div class="week-display" id="weekDisplay">Loading...</div>
                 <button class="btn btn-secondary" id="nextWeek">Next</button>
+                <label class="thursday-toggle" style="display: flex; align-items: center; gap: 6px; margin-left: 15px; cursor: pointer; font-size: 14px;">
+                    <input type="checkbox" id="thursdayToggle" style="cursor: pointer; width: 16px; height: 16px;">
+                    <span>Show Thursday</span>
+                </label>
             </div>
             <div class="control-actions">
                 <button class="btn btn-primary" id="refreshBtn">Refresh Library</button>
@@ -579,6 +583,7 @@ let scheduled = [];
 let draggedItem = null;
 let dragOffset = 0;
 let weekStatuses = {};
+let weekThursdays = {}; // Track which weeks have Thursday enabled
 window.libraryItemsCache = {};
 
 async function init() {
@@ -616,10 +621,35 @@ function setCurrentWeekStatus(status) {
     weekStatuses[getWeekKey()] = status;
 }
 
+function getThursdayEnabled() {
+    return weekThursdays[getWeekKey()] || false;
+}
+
+function setThursdayEnabled(enabled) {
+    weekThursdays[getWeekKey()] = enabled;
+}
+
+function toggleThursday() {
+    const newState = !getThursdayEnabled();
+    setThursdayEnabled(newState);
+    updateThursdayToggle();
+    updateWeekDisplay(); // Update date range to include/exclude Thursday
+    renderSchedule();
+    saveDraft();
+}
+
+function updateThursdayToggle() {
+    const checkbox = document.getElementById('thursdayToggle');
+    if (checkbox) {
+        checkbox.checked = getThursdayEnabled();
+    }
+}
+
 function prevWeek() {
     currentWeek.setDate(currentWeek.getDate() - 7);
     updateWeekDisplay();
     updateStatusBadge();
+    updateThursdayToggle();
     renderSchedule();
 }
 
@@ -627,6 +657,7 @@ function nextWeek() {
     currentWeek.setDate(currentWeek.getDate() + 7);
     updateWeekDisplay();
     updateStatusBadge();
+    updateThursdayToggle();
     renderSchedule();
 }
 
@@ -637,7 +668,14 @@ function updateWeekDisplay() {
     const options = { month: 'short', day: 'numeric', year: 'numeric' };
     const weekEl = document.getElementById('weekDisplay');
     if (weekEl) {
-        weekEl.textContent = `${friday.toLocaleDateString('en-US', options)} - ${monday.toLocaleDateString('en-US', options)}`;
+        // Show Thursday-Monday if Thursday enabled, otherwise Friday-Monday
+        if (getThursdayEnabled()) {
+            const thursday = new Date(currentWeek);
+            thursday.setDate(friday.getDate() - 1);
+            weekEl.textContent = `${thursday.toLocaleDateString('en-US', options)} - ${monday.toLocaleDateString('en-US', options)}`;
+        } else {
+            weekEl.textContent = `${friday.toLocaleDateString('en-US', options)} - ${monday.toLocaleDateString('en-US', options)}`;
+        }
     }
 }
 
@@ -655,7 +693,11 @@ async function saveDraft() {
         const response = await fetch(`${WORDPRESS_URL}/wp-json/tsl-scheduler/v1/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ events: scheduled, weekStatuses: weekStatuses })
+            body: JSON.stringify({
+                events: scheduled,
+                weekStatuses: weekStatuses,
+                weekThursdays: weekThursdays
+            })
         });
         const data = await response.json();
         if (data.success) {
@@ -734,12 +776,14 @@ async function loadFromWordPress() {
         if (data.success) {
             scheduled = Array.isArray(data.events) ? data.events : [];
             weekStatuses = data.weekStatuses || {};
+            weekThursdays = data.weekThursdays || {};
             scheduled.forEach(event => {
                 if (event.startTime && typeof event.startTime === 'string') {
                     event.startTime = new Date(event.startTime);
                 }
             });
             updateStatusBadge();
+            updateThursdayToggle();
             renderSchedule();
         }
     } catch (error) {
@@ -750,6 +794,10 @@ async function loadFromWordPress() {
 function clearSchedule() {
     if (!confirm('Clear this week?')) return;
     const weekStart = new Date(currentWeek);
+    // If Thursday enabled, start from Thursday
+    if (getThursdayEnabled()) {
+        weekStart.setDate(weekStart.getDate() - 1);
+    }
     weekStart.setHours(0, 0, 0, 0);
     const weekEnd = new Date(currentWeek);
     weekEnd.setDate(weekEnd.getDate() + 3);
@@ -885,7 +933,11 @@ function renderSchedule() {
 }
 
 function buildScheduleGrid(container) {
-    const days = ['Friday', 'Saturday', 'Sunday', 'Monday'];
+    // Conditionally include Thursday
+    const thursdayEnabled = getThursdayEnabled();
+    const days = thursdayEnabled
+        ? ['Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday']
+        : ['Friday', 'Saturday', 'Sunday', 'Monday'];
     container.innerHTML = '';
 
     days.forEach((day, dayIndex) => {
@@ -893,8 +945,13 @@ function buildScheduleGrid(container) {
         dayCol.className = 'day-column';
 
         // Calculate actual date for this day
+        // If Thursday enabled, start from Thursday (Friday - 1 day)
         const dayDate = new Date(currentWeek);
-        dayDate.setDate(dayDate.getDate() + dayIndex);
+        if (thursdayEnabled) {
+            dayDate.setDate(dayDate.getDate() - 1 + dayIndex); // -1 for Thursday offset
+        } else {
+            dayDate.setDate(dayDate.getDate() + dayIndex);
+        }
         const monthName = dayDate.toLocaleDateString('en-US', { month: 'short' });
         const dayNum = dayDate.getDate();
 
@@ -994,8 +1051,14 @@ function handleDrop(e) {
     const hour = Math.floor(snappedY / 80) + 11;
     const minute = Math.round((snappedY % 80) / 20) * 15;
 
+    // Calculate date accounting for Thursday offset
+    const thursdayEnabled = getThursdayEnabled();
     const date = new Date(currentWeek);
-    date.setDate(date.getDate() + day);
+    if (thursdayEnabled) {
+        date.setDate(date.getDate() - 1 + day); // -1 for Thursday offset
+    } else {
+        date.setDate(date.getDate() + day);
+    }
     date.setHours(hour, minute, 0, 0);
 
     const year = date.getFullYear();
@@ -1031,7 +1094,12 @@ function handleDrop(e) {
 function renderScheduledEvents() {
     document.querySelectorAll('.event-block').forEach(el => el.remove());
 
+    const thursdayEnabled = getThursdayEnabled();
     const weekStart = new Date(currentWeek);
+    // If Thursday enabled, start from Thursday
+    if (thursdayEnabled) {
+        weekStart.setDate(weekStart.getDate() - 1);
+    }
     weekStart.setHours(0, 0, 0, 0);
     const weekEnd = new Date(currentWeek);
     weekEnd.setDate(weekEnd.getDate() + 3);
@@ -1044,11 +1112,17 @@ function renderScheduledEvents() {
 
     currentWeekEvents.forEach(event => {
         const eventDate = new Date(event.startTime);
-        const friday = new Date(currentWeek);
-        friday.setHours(0, 0, 0, 0);
-        const dayDiff = Math.floor((eventDate - friday) / (1000 * 60 * 60 * 24));
+        // Calculate base date (Thursday if enabled, Friday otherwise)
+        const baseDate = new Date(currentWeek);
+        if (thursdayEnabled) {
+            baseDate.setDate(baseDate.getDate() - 1);
+        }
+        baseDate.setHours(0, 0, 0, 0);
+        const dayDiff = Math.floor((eventDate - baseDate) / (1000 * 60 * 60 * 24));
 
-        if (dayDiff < 0 || dayDiff > 3) return;
+        // Check bounds based on whether Thursday is enabled
+        const maxDays = thursdayEnabled ? 4 : 3;
+        if (dayDiff < 0 || dayDiff > maxDays) return;
 
         const grid = document.querySelector(`.theater-grid[data-day="${dayDiff}"][data-theater="${event.theater}"]`);
         if (!grid) return;
@@ -1137,6 +1211,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('publishBtn')?.addEventListener('click', publishSchedule);
     document.getElementById('clearBtn')?.addEventListener('click', clearSchedule);
     document.getElementById('search')?.addEventListener('input', renderLibrary);
+    document.getElementById('thursdayToggle')?.addEventListener('change', toggleThursday);
 
     // Date filter buttons
     document.querySelectorAll('.tsl-date-btn').forEach(btn => {
